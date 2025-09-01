@@ -1,0 +1,26 @@
+{
+  "rules": {
+    "page": "pages/rules/rules",
+    "index": false
+  },
+  "dashboard": {
+    "page": "pages/admin/dashboard",
+    "index": true
+  },
+  "store": {
+    "page": "pages/store/store",
+    "index": false
+  },
+  "orders_list": {
+    "page": "pages/orders/list",
+    "index": false
+  },
+  "orders_detail": {
+    "page": "pages/orders/detail",
+    "index": false
+  },
+  "pay": {
+    "page": "pages/pay/pay",
+    "index": false
+  }
+}

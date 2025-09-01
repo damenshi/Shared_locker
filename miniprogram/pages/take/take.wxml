@@ -1,0 +1,6 @@
+<view class="container">
+  <view class="loading" wx:if="{{isLoading}}">
+    <view class="loading-text">正在处理取件...</view>
+    <view class="tips">请稍候，正在验证信息并打开柜门</view>
+  </view>
+</view>

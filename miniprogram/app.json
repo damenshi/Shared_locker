@@ -1,0 +1,18 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/store/store",
+    "pages/take/take",
+    "pages/admin/dashboard",
+    "pages/admin/rules",
+    "pages/admin/orders"
+  ],
+  "window": {
+    "navigationBarTitleText": "优享储物",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "cloud": true
+}

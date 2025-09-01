@@ -1,0 +1,26 @@
+<!-- miniprogram/pages/admin/dashboard.wxml -->
+<view class="container">
+  <view class="card">
+    <view class="title">营收概况</view>
+    <view class="row">
+      <text class="label">今日收入</text>
+      <text class="value">{{display.today}}</text>
+    </view>
+    <view class="row">
+      <text class="label">本月收入</text>
+      <text class="value">{{display.month}}</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="title">订单统计</view>
+    <view class="row">
+      <text class="label">今日订单</text>
+      <text class="value">{{stat.todayOrders}}</text>
+    </view>
+    <view class="row">
+      <text class="label">本月订单</text>
+      <text class="value">{{stat.monthOrders}}</text>
+    </view>
+  </view>
+</view>

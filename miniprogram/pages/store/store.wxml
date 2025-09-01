@@ -1,0 +1,7 @@
+<view class="container">
+  <view class="card">
+    <view class="title">计费规则</view>
+    <view class="small">{{display.free}}；{{display.first}}</view>
+    <view class="small">{{display.unit}}，{{display.cap}}，{{display.deposit}}</view>
+  </view>
+</view>

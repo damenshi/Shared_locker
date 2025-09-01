@@ -1,0 +1,11 @@
+.page { padding: 16rpx; }
+.btn { margin-top: 24rpx; }
+.card { background: #fff; border-radius: 16rpx; padding: 24rpx; box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.06); margin: 16rpx 0; }
+.title { font-size: 36rpx; font-weight: 600; margin-bottom: 12rpx; }
+.label { color:#888; font-size: 24rpx; }
+.value { font-size: 28rpx; }
+.primary { background: #07c160; color:#fff; }
+.warn { background: #fa5151; color:#fff; }
+.link { color:#1677ff; }
+.row { display:flex; justify-content: space-between; align-items: center; margin: 8rpx 0; }
+.small { font-size:24rpx; color:#666; }
