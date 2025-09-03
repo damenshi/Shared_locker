@@ -6,179 +6,256 @@ Page({
   },
 
   onLoad(options) {
-    // 接收首页传递的手机号和取件码（无需用户再次输入）
-    this.setData({
-      phone: options.phone || '',
-      code: options.code || ''
-    });
+    // 接收首页传递的参数并验证
+    const { phone = '', code = '' } = options;
+    this.setData({ phone, code });
 
-    // 自动触发取件流程（如果参数完整）
-    if (this.data.phone && this.data.code) {
+    // 自动触发取件流程（参数完整时）
+    if (phone && code) {
       this.handleTakeItem();
     } else {
-      wx.showToast({ title: '请先输入手机号和取件码', icon: 'none' });
-      // 2秒后返回首页
-      setTimeout(() => {
+      this.showError('请先输入手机号和取件码', () => {
         wx.navigateBack({ delta: 1 });
-      }, 2000);
+      });
     }
   },
 
-  // 验证输入格式（复用首页已输入的参数）
+  /**
+   * 显示错误提示并执行回调
+   * @param {string} message - 错误信息
+   * @param {Function} callback - 回调函数
+   * @param {number} duration - 提示时长
+   */
+  showError(message, callback, duration = 2000) {
+    wx.showToast({
+      title: message,
+      icon: 'none',
+      duration
+    });
+    setTimeout(callback, duration);
+  },
+
+  /**
+   * 显示成功提示并执行回调
+   * @param {string} message - 成功信息
+   * @param {Function} callback - 回调函数
+   * @param {number} duration - 提示时长
+   */
+  showSuccess(message, callback, duration = 2000) {
+    wx.showToast({
+      title: message,
+      icon: 'success',
+      duration
+    });
+    setTimeout(callback, duration);
+  },
+
+  /**
+   * 验证输入格式
+   * @returns {boolean} 验证结果
+   */
   validateInput() {
-    if (!/^\d{11}$/.test(this.data.phone)) {
-      wx.showToast({ title: '手机号不正确', icon: 'none' });
+    const { phone, code } = this.data;
+    
+    // 手机号验证（11位数字）
+    if (!/^\d{11}$/.test(phone)) {
+      wx.showToast({ title: '请输入正确的11位手机号', icon: 'none' });
       return false;
     }
-    if (!this.data.code || this.data.code.length !== 6) {
+    
+    // 取件码验证（6位数字）
+    if (!/^\d{6}$/.test(code)) {
       wx.showToast({ title: '取件码必须是6位数字', icon: 'none' });
       return false;
     }
+    
     return true;
   },
 
-  // 查询匹配的订单（手机号+取件码）
+  /**
+   * 查询匹配的订单（手机号+取件码）
+   * @returns {Promise<Object|null>} 订单数据或null
+   */
   async queryMatchedOrder() {
     try {
+      const { phone, code } = this.data;
       const res = await wx.cloud.callFunction({
         name: "order",
         data: {
           action: "queryByPhoneAndCode",
-          phone: this.data.phone,
-          code: this.data.code
+          phone,
+          code
         }
       });
+
+      // 检查云函数调用是否成功
+      if (!res.result) {
+        throw new Error('查询接口返回异常');
+      }
+      if (!res.result.success) {
+        throw new Error(res.result.errMsg || '查询订单失败');
+      }
+
       return res.result.data || null;
     } catch (e) {
-      console.error("查询订单失败", e);
-      wx.showToast({ title: '查询订单异常', icon: 'none' });
+      console.error("查询订单失败:", e);
+      wx.showToast({ 
+        title: `查询失败: ${e.message}`, 
+        icon: 'none',
+        duration: 3000
+      });
       return null;
     }
   },
 
-  // 取包打开柜门
+  /**
+   * 取包打开柜门
+   * @param {number} cabinetNo - 柜号
+   * @param {string} orderId - 订单ID
+   * @returns {Promise<boolean>} 开柜是否成功
+   */
   async openCabinetDoor(cabinetNo, orderId) {
     try {
       const res = await wx.cloud.callFunction({
         name: "locker",
         data: {
           action: "openDoor",
-          cabinetNo: cabinetNo,
-          orderId: orderId,
+          cabinetNo,
+          orderId,
           type: "take"
         }
       });
-      // 打印完整返回结果，便于调试
-      console.log("取包开柜接口返回:", res.result);
-      
-      // 严格判断成功状态
-      if (res.result && res.result.ok === true) {
-        return true;
-      } else {
-        // 显示云函数返回的具体错误原因
-        wx.showToast({ 
-          title: `开柜失败: ${res.result?.errMsg || '未知错误'}`, 
-          icon: 'none',
-          duration: 3000
-        });
-        return false;
+
+      console.log("开柜接口返回:", res.result);
+
+      // 验证开柜结果
+      if (!res.result || res.result.ok !== true) {
+        throw new Error(res.result?.errMsg || '开柜失败，未知原因');
       }
+
+      return true;
     } catch (e) {
-      console.error("开门失败", e);
+      console.error("开柜操作失败:", e);
+      wx.showToast({ 
+        title: e.message, 
+        icon: 'none',
+        duration: 3000
+      });
       return false;
     }
   },
 
-  // 完成订单并释放柜子
+  /**
+   * 完成订单并释放柜子
+   * @param {string} orderId - 订单ID
+   * @returns {Promise<boolean>} 订单是否完成
+   */
   async finishOrder(orderId) {
     try {
       const res = await wx.cloud.callFunction({
         name: "order",
         data: {
           action: "finishOrder",
-          orderId: orderId
+          orderId
         }
       });
-      return res.result.success;
+
+      if (!res.result || !res.result.success) {
+        throw new Error(res.result?.errMsg || '完成订单失败');
+      }
+
+      return true;
     } catch (e) {
-      console.error("完成订单失败", e);
+      console.error("完成订单失败:", e);
+      wx.showToast({ 
+        title: `订单状态更新失败: ${e.message}`, 
+        icon: 'none',
+        duration: 3000
+      });
       return false;
     }
   },
 
-  // 核心取件逻辑（自动触发）
+  /**
+   * 核心取件逻辑
+   */
   async handleTakeItem() {
+    // 防止重复触发
     if (this.data.isLoading) return;
     this.setData({ isLoading: true });
     wx.showLoading({ title: '正在验证取件信息...' });
 
     try {
-      // 1. 验证参数
+      // 1. 验证输入参数
       if (!this.validateInput()) {
         this.setData({ isLoading: false });
         wx.hideLoading();
-        // 参数错误时返回首页
-        setTimeout(() => {
+        this.showError('参数错误', () => {
           wx.navigateBack({ delta: 1 });
-        }, 2000);
+        });
         return;
       }
 
-      // 2. 查询订单
+      // 2. 查询匹配订单
       const order = await this.queryMatchedOrder();
       if (!order) {
-        wx.hideLoading();
-        wx.showToast({ title: '未找到匹配的存包记录', icon: 'none' });
         this.setData({ isLoading: false });
-        setTimeout(() => {
+        wx.hideLoading();
+        this.showError('未找到匹配的存包记录', () => {
           wx.navigateBack({ delta: 1 });
-        }, 2000);
+        });
         return;
       }
 
       // 3. 验证订单状态
-      if (!['进行中', '已支付'].includes(order.status)) {
-        wx.hideLoading();
-        wx.showToast({ title: `订单状态异常：${order.status}`, icon: 'none' });
+      const validStatus = ['进行中', '已支付'];
+      if (!validStatus.includes(order.status)) {
         this.setData({ isLoading: false });
-        setTimeout(() => {
+        wx.hideLoading();
+        this.showError(`订单状态异常：${order.status}`, () => {
           wx.navigateBack({ delta: 1 });
-        }, 2000);
+        });
         return;
       }
 
       // 4. 打开柜门
       const isDoorOpen = await this.openCabinetDoor(order.cabinetNo, order._id);
       if (!isDoorOpen) {
-        wx.hideLoading();
-        wx.showToast({ title: '柜门打开失败', icon: 'none' });
         this.setData({ isLoading: false });
+        wx.hideLoading();
+        this.showError('柜门打开失败，请重试', () => {
+          wx.navigateBack({ delta: 1 });
+        });
         return;
       }
 
-      // 5. 完成订单
+      // 5. 完成订单（即使失败也不影响用户取件）
       const isOrderFinished = await this.finishOrder(order._id);
-      if (isOrderFinished) {
-        wx.hideLoading();
-        wx.showToast({ title: '取件成功，，柜号 ${order.cabinetNo} 已打开', 
-        icon: 'success', 
-        duration: 2000 });
-        // 取件成功后返回首页
-        setTimeout(() => {
-          wx.navigateBack({ delta: 1 });
-        }, 2000);
-      } else {
-        wx.hideLoading();
-        wx.showToast({ title: '取件成功，订单状态更新失败', icon: 'none' });
-        setTimeout(() => {
-          wx.navigateBack({ delta: 1 });
-        }, 2000);
-      }
-    } catch (e) {
-      console.error("取件失败", e);
+      
+      // 6. 处理最终结果
       wx.hideLoading();
-      wx.showToast({ title: '系统错误', icon: 'none' });
       this.setData({ isLoading: false });
+
+      if (isOrderFinished) {
+        this.showSuccess(
+          `取件成功，柜号 ${order.cabinetNo} 已打开`,
+          () => { wx.navigateBack({ delta: 1 }); }
+        );
+      } else {
+        // 订单状态更新失败但取件成功，仍提示成功
+        this.showSuccess(
+          `取件成功，柜号 ${order.cabinetNo} 已打开`,
+          () => { wx.navigateBack({ delta: 1 }); }
+        );
+      }
+
+    } catch (e) {
+      console.error("取件流程异常:", e);
+      this.setData({ isLoading: false });
+      wx.hideLoading();
+      this.showError(`系统错误: ${e.message}`, () => {
+        wx.navigateBack({ delta: 1 });
+      });
     }
   }
 });
