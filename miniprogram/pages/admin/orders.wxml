@@ -2,7 +2,7 @@
   <block wx:for="{{orders}}" wx:key="_id">
     <view class="card">
       <view class="title">#{{item._id}} · {{item.status}}</view>
-      <view class="small">手机：{{item.phone}} 柜{{item.cabinetNo}}-{{item.doorNo}}</view>
+      <view class="small">手机：{{item.phone}} 柜{{item.doorNo}}-{{item.doorNo}}</view>
       <view class="row">
         <button size="mini" bindtap="go" data-id="{{item._id}}">详情</button>
         <button size="mini" class="warn" data-id="{{item._id}}" bindtap="force">强制结束</button>

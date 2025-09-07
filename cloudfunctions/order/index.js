@@ -10,15 +10,11 @@ const CONSTANTS = {
     IN_PROGRESS: '进行中',
     COMPLETED: '已完成',
     FORCE_FINISHED: '已强制结束',
-    REFUNDED: '已退款'
+    REFUNDED: '已退款',
+    CANCELLED: '已取消'
   },
-  VALID_STATUSES_FOR_QUERY: ['进行中', '已支付'],
-  // 固定费用配置（单位：分）
-  FIXED_PRICES: {
-    rent: 0,       // 固定租金
-    deposit: 15,    // 固定押金
-    total: 15       // 租金+押金总和
-  }
+  VALID_STATUSES_FOR_QUERY: ['进行中'],
+  FIXED_DEPOSIT: 15  // 固定押金15元
 }
 
 // 工具函数：参数校验
@@ -40,7 +36,7 @@ exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext()
   const now = Date.now()
 
-  // 1. 模拟支付成功（个人账号测试用）
+  // 1. 模拟支付成功
   if (action === 'mockPaySuccess') {
     const { orderId } = event
     
@@ -70,7 +66,7 @@ exports.main = async (event, context) => {
         const user = userDoc.data
 
         // 支付成功：更新用户押金（
-        const newDeposit = user.deposit + order.deposit; // 累加押金
+        const newDeposit = user.deposit + CONSTANTS.FIXED_DEPOSIT;
 
         // 1. 更新用户账户
         await transaction.collection('users').doc(user._id).update({
@@ -81,7 +77,7 @@ exports.main = async (event, context) => {
         await transaction.collection('orders').doc(orderId).update({
           data: {
             status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
-            payAmount: CONSTANTS.FIXED_PRICES.total,
+            payAmount: CONSTANTS.FIXED_DEPOSIT,
             payTime: now,
             updatedAt: now
           }
@@ -97,7 +93,7 @@ exports.main = async (event, context) => {
 
   // 2. 创建订单
   if (action === 'createOrder') {
-    const { lockerId, phone, code } = event
+    const { lockerId, phone, code} = event
   
     // 参数校验
     const validation = validateParams(event, ['lockerId', 'phone'])
@@ -127,40 +123,42 @@ exports.main = async (event, context) => {
         }
         
         // 获取或创建用户账户
-      const getUserAccount = async (phone) => {
-        const user = await transaction.collection('users').where({ phone }).get();
-        if (user.data.length > 0) {
-          return user.data[0];
-        } else {
-          // 新建账户
-          const res = await transaction.collection('users').add({
-            data: {
-              phone,
-              deposit: 0,
-              createdAt: Date.now(),
-              updatedAt: Date.now()
-            }
-          });
-          return { _id: res._id, phone, deposit: 0 };
+        const getUserAccount = async (phone) => {
+          const user = await transaction.collection('users').where({ phone }).get();
+          if (user.data.length > 0) {
+            return user.data[0];
+          } else {
+            // 新建账户
+            const res = await transaction.collection('users').add({
+              data: {
+                phone,
+                deposit: 0,
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+              }
+            });
+            return { _id: res._id, phone, deposit: 0 };
+          }
         }
-      }
-      const user = await getUserAccount(phone);
+        const user = await getUserAccount(phone);
+      
+      // 判断用户是否有余额
+      const hasEnoughDeposit = user.deposit >= CONSTANTS.FIXED_DEPOSIT;
 
-        // 构建订单数据（使用固定费用）
+        // 构建订单数据
         const order = {
           openid: OPENID,
           phone,
-          code: code || String(Math.floor(Math.random() * 900000) + 100000),
+          code: code || String(Math.floor(Math.random() * 9000) + 1000),
           lockerId,
           cabinetNo: lockerDoc.data.cabinetNo,
           doorNo: lockerDoc.data.doorNo,
           size: lockerDoc.data.size || 'M',
-          status: CONSTANTS.ORDER_STATUSES.PENDING_PAY,
+          status: hasEnoughDeposit 
+            ? CONSTANTS.ORDER_STATUSES.IN_PROGRESS 
+            : CONSTANTS.ORDER_STATUSES.PENDING_PAY,
           startTime: now,
-          payAmount: 0,
-          prepay: CONSTANTS.FIXED_PRICES.total,  // 固定预付款
-          deposit: CONSTANTS.FIXED_PRICES.deposit, // 固定押金
-          rent: CONSTANTS.FIXED_PRICES.rent,     // 固定租金
+          deposit: CONSTANTS.FIXED_DEPOSIT, // 固定押金
           userId: user._id, //关联用户ID
           createdAt: now,
           updatedAt: now
@@ -177,7 +175,6 @@ exports.main = async (event, context) => {
             updatedAt: now
           }
         })
-        
         return { orderId: addRes._id }
       })
     } catch (err) {
@@ -208,7 +205,7 @@ exports.main = async (event, context) => {
     }
   }
 
-  // 4. 完成订单（取件后）
+  // 4. 完成订单
   if (action === 'finishOrder') {
     const { orderId } = event
     
@@ -231,13 +228,11 @@ exports.main = async (event, context) => {
           throw new Error(`订单状态不可完成，当前状态：${orderDoc.data.status}`)
         }
 
-        // 更新订单状态（使用固定费用）
+        // 更新订单状态
         await transaction.collection('orders').doc(orderId).update({
           data: {
             status: CONSTANTS.ORDER_STATUSES.COMPLETED,
             endTime: now,
-            // 保持固定费用不变
-            payAmount: CONSTANTS.FIXED_PRICES.total,
             updatedAt: now
           }
         })
@@ -255,8 +250,7 @@ exports.main = async (event, context) => {
 
         return { 
           success: true, 
-          rent: CONSTANTS.FIXED_PRICES.rent, 
-          total: CONSTANTS.FIXED_PRICES.total 
+          deposit: CONSTANTS.FIXED_DEPOSIT
         }
       })
     } catch (err) {
@@ -322,25 +316,41 @@ exports.main = async (event, context) => {
     }
 
     try {
-      const orderDoc = await db.collection('orders').doc(id).get()
-      if (!orderDoc.data) {
-        return { ok: false, errMsg: '订单不存在' }
-      }
+      return await db.runTransaction(async transaction => {
+        const orderDoc = await transaction.collection('orders').doc(id).get()
+        if (!orderDoc.data) {
+          throw new Error('订单不存在')
+        }
       
+      const order = orderDoc.data;
       // 验证订单是否可退款
       if (![CONSTANTS.ORDER_STATUSES.COMPLETED, CONSTANTS.ORDER_STATUSES.IN_PROGRESS].includes(orderDoc.data.status)) {
         return { ok: false, errMsg: `订单状态为${orderDoc.data.status}，不可退款` }
       }
 
+      // 查询用户账户
+      const userDoc = await transaction.collection('users').doc(order.userId).get()
+      if (!userDoc.data) throw new Error('用户不存在')
+      const user = userDoc.data
+
+      // 退还押金
+      await transaction.collection('users').doc(user._id).update({
+        data: {
+          deposit: user.deposit - CONSTANTS.FIXED_DEPOSIT,
+          updatedAt: now
+        }
+      })
+
       await db.collection('orders').doc(id).update({ 
         data: { 
           status: CONSTANTS.ORDER_STATUSES.REFUNDED, 
-          refundAmount: CONSTANTS.FIXED_PRICES.total, // 退还固定总金额
+          refundAmount: CONSTANTS.FIXED_DEPOSIT,
           refundTime: now,
           updatedAt: now 
         } 
       })
       return { ok: true }
+      })
     } catch (err) {
       console.error('退款操作失败', { orderId: id, error: err.message })
       return { ok: false, errMsg: err.message }
@@ -349,7 +359,7 @@ exports.main = async (event, context) => {
 
   // 7. 通过手机号和取件码查询订单
   if (action === 'queryByPhoneAndCode') {
-    const { phone, code } = event;
+    const { phone, code, cabinetNo} = event;
     
     // 参数校验
     const validation = validateParams(event, ['phone', 'code'])
@@ -367,6 +377,7 @@ exports.main = async (event, context) => {
         .field({
           _id: true,
           cabinetNo: true,
+          doorNo: true,
           status: true,
           lockerId: true,
           createdAt: true
@@ -376,7 +387,7 @@ exports.main = async (event, context) => {
         .get()
 
       if (data.length > 0) {
-        console.log(`匹配到订单：ID=${data[0]._id}，柜号=${data[0].cabinetNo}`)
+        console.log(`匹配到订单：ID=${data[0]._id}，柜门=${data[0].doorNo}`)
         return { success: true, data: data[0] }
       } else {
         console.log(`未找到手机号${phone}、取件码${code}的有效订单`)
@@ -408,6 +419,58 @@ exports.main = async (event, context) => {
     } catch (err) {
       console.error('查询订单失败', { orderId, error: err.message })
       return { success: false, errMsg: err.message }
+    }
+  }
+
+  if (action === 'recoverOrder') {
+    const { orderId, targetStatus } = event;
+  
+    // 参数校验
+    const validation = validateParams(event, ['orderId', 'targetStatus']);
+
+    if (!validation.valid) {
+      return { success: false, errMsg: validation.msg };
+    }
+    
+    const allowedStatus = ['已取消'];
+    if (!allowedStatus.includes(targetStatus)) {
+      return { success: false, errMsg: `参数错误：targetStatus允许值为${allowedStatus.join(',')}` };
+    }
+
+    try {
+      // 1. 查询订单当前状态
+      const orderRes = await db.collection('orders').doc(orderId).get();
+      if (!orderRes.data) {
+        return { success: false, errMsg: `订单 ${orderId} 不存在` };
+      }
+      const order = orderRes.data;
+  
+      // 2. 验证是否需要恢复（仅对异常状态的订单操作）
+      const abnormalStatuses = ['进行中', '待支付']; 
+      if (!abnormalStatuses.includes(order.status)) {
+        return { 
+          success: false, 
+          errMsg: `订单当前状态为${order.status}，无需恢复` 
+        };
+      }
+  
+      // 3. 更新订单状态为目标状态
+      await db.collection('orders').doc(orderId).update({
+        data: {
+          status: targetStatus,
+          recoverAt: Date.now(), // 记录恢复时间
+          updatedAt: Date.now()
+        }
+      });
+  
+      return { 
+        success: true, 
+        message: `订单 ${orderId} 已从${order.status}恢复为${targetStatus}`,
+        orderId
+      };
+    } catch (err) {
+      console.error(`恢复订单 ${orderId} 失败`, err);
+      return { success: false, errMsg: `恢复订单失败：${err.message}` };
     }
   }
 

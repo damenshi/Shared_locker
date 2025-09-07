@@ -1,26 +1,36 @@
 Page({
   // 常量定义：集中管理固定值，便于维护
-  constants: {
-    NAVIGATE_DELAY: 2000,        // 导航延迟时间(ms)
-    ORDER_DETAIL_PAGE: '/pages/orderDetail/orderDetail',
-    ORDER_STATUS_PROCESSING: '进行中' // 订单进行中状态
-  },
+  // constants: {
+  //   NAVIGATE_DELAY: 2000,        // 导航延迟时间(ms)
+  //   ORDER_STATUS_PROCESSING: '进行中' // 订单进行中状态
+  // },
 
+  // data: {
+  //   display: {},                 // 格式化的展示数据
+  //   currentOrderId: null,        // 当前订单ID
+  //   isLoading: false,            // 加载状态标记
+  //   phone: '',                   // 从首页传递的手机号
+  //   code: ''                     // 从首页传递的取件码
+  // },
   data: {
-    display: {},                 // 格式化的展示数据
-    currentOrderId: null,        // 当前订单ID
-    isLoading: false,            // 加载状态标记
-    phone: '',                   // 从首页传递的手机号
-    code: ''                     // 从首页传递的取件码
+    phone: '',       // 手机号
+    code: '',        // 取件码
+    isLoading: false,
+    cabinetNo: '',
+    constants: {
+      ORDER_STATUS_PROCESSING: '进行中',
+      NAVIGATE_DELAY: 2000,
+      // ORDER_DETAIL_PAGE: '/pages/order/detail'
+    }
   },
 
   onLoad(options) {
     // 接收并验证首页传递的参数
     this.setData({
       phone: options.phone || '',
-      code: options.code || ''
+      code: options.code || '',
+      cabinetNo: options.cabinetNo || null,
     });
-
     this.handleStoreItem();
   },
 
@@ -81,8 +91,8 @@ Page({
       wx.showToast({ title: '手机号格式不正确', icon: 'none' });
       return false;
     }
-    if (this.data.code.length !== 6) {
-      wx.showToast({ title: '取件码必须是6位', icon: 'none' });
+    if (this.data.code.length !== 4) {
+      wx.showToast({ title: '请输入4位取件码', icon: 'none' });
       return false;
     }
     return true;
@@ -94,9 +104,11 @@ Page({
    */
   async getAvailableCabinet() {
     try {
+      const cabinetNo = this.data.cabinetNo;
       const res = await wx.cloud.callFunction({
         name: "locker",
-        data: { action: "listFree" }
+        data: { action: "listFree" },
+        cabinetNo: cabinetNo ? parseInt(cabinetNo) : null
       });
       
       console.log("查询可用柜子结果：", res.result);
@@ -157,6 +169,18 @@ Page({
     }
   },
 
+  // 获取订单详情
+  async getOrderDetail(orderId) {
+    const res = await wx.cloud.callFunction({
+      name: "order",
+      data: {
+        action: "getOrder",
+        id: orderId
+      }
+    });
+    return res.result.data;
+  },
+
   /**
    * 模拟支付成功
    * @param {string} orderId - 订单ID
@@ -198,7 +222,7 @@ Page({
         return false;
       }
 
-      if (res.result.data.status !== this.constants.ORDER_STATUS_PROCESSING) {
+      if (res.result.data.status !== this.data.constants.ORDER_STATUS_PROCESSING) {
         wx.showToast({ 
           title: `订单状态异常（当前：${res.result.data.status}）`, 
           icon: 'none' 
@@ -225,8 +249,9 @@ Page({
         name: "locker",
         data: {
           action: "openDoor",
-          cabinetNo: lockerInfo.cabinetNo,
+          doorNo: lockerInfo.doorNo,
           orderId: orderId,
+          cabinetNo: lockerInfo.cabinetNo,
           type: "store"
         }
       });
@@ -241,23 +266,68 @@ Page({
 
   /**
    * 恢复柜子状态为空闲
-   * @param {number} cabinetNo - 柜号
+   * @param {number} doorNo - 柜门
    */
-  async recoverLocker(cabinetNo) {
-    if (!cabinetNo) return;
+  async recoverLocker(doorNo, cabinetNo) {
+    if (!doorNo) return;
     
     try {
       const res = await wx.cloud.callFunction({
         name: "locker",
         data: {
           action: "recoverLocker",
+          doorNo: doorNo,
           cabinetNo: cabinetNo
         }
       });
-      console.log(`柜号 ${cabinetNo} 恢复结果：`, res.result);
+      console.log(`柜门 ${doorNo} 恢复结果：`, res.result);
     } catch (e) {
-      console.error(`柜号 ${cabinetNo} 恢复失败`, e);
+      console.error(`柜门 ${doorNo} 恢复失败`, e);
     }
+  },
+
+  async recoverOrder(orderId, targetStatus = '已取消') {
+    if (!orderId) {
+      console.warn('恢复订单失败：订单ID不能为空');
+      return;
+    }
+    
+    try {
+      const res = await wx.cloud.callFunction({
+        name: "order",
+        data: {
+          action: "recoverOrder",
+          orderId: orderId,
+          targetStatus: targetStatus // 可选：指定恢复后的状态
+        }
+      });
+      console.log(`订单 ${orderId} 恢复结果：`, res.result);
+      if (res.result.success) {
+        wx.showToast({ title: `订单已恢复为${targetStatus}`, icon: 'none' });
+      } else {
+        wx.showToast({ title: res.result.errMsg, icon: 'none' });
+      }
+    } catch (e) {
+      console.error(`订单 ${orderId} 恢复失败`, e);
+      wx.showToast({ title: '订单恢复异常', icon: 'none' });
+    }
+  },
+
+  // 支付确认弹窗
+  showPaymentConfirmModal() {
+    return new Promise(resolve => {
+      // 只显示押金相关的支付信息
+      wx.showModal({
+        title: '确认支付',
+        content: `需支付押金 5元，取件后可退还`,
+        success: (res) => {
+          resolve(res.confirm);
+        },
+        fail: () => {
+          resolve(false);
+        }
+      });
+    });
   },
 
   /**
@@ -269,47 +339,58 @@ Page({
     wx.showLoading({ title: '处理中...' });
 
     let lockerInfo = null;
+    let orderId = null;
 
     try {
       // 1. 参数验证
       if (!this.validateParams()) {
-        setTimeout(() => wx.navigateBack({ delta: 1 }), this.constants.NAVIGATE_DELAY);
+        setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
         return;
       }
 
       // 2. 获取可用柜子
       lockerInfo = await this.getAvailableCabinet();
       if (!lockerInfo) {
-        setTimeout(() => wx.navigateBack({ delta: 1 }), this.constants.NAVIGATE_DELAY);
+        setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
         return;
       }
 
       // 3. 创建订单
-      const orderId = await this.createOrder(lockerInfo);
+      orderId = await this.createOrder(lockerInfo);
       if (!orderId) return;
 
-      // 4. 支付确认
-      const confirmPay = await this.showPaymentConfirmModal();
-      if (!confirmPay) {
-        await this.recoverLocker(lockerInfo.cabinetNo);
-        wx.navigateBack({ delta: 1 });
-        return;
-      }
+      // 4. 查询订单状态，判断是否需要支付
+      const order = await this.getOrderDetail(orderId);
+      if (order.status === this.data.constants.ORDER_STATUS_PROCESSING) {
+        // 有足够押金，直接跳过支付流程
+        wx.showToast({ title: '账户已有押金，无需额外支付', icon: 'none' });
+      } else {
+        // 押金不足，需要支付
+        const confirmPay = await this.showPaymentConfirmModal();
+        if (!confirmPay) {
+          await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+          await this.recoverOrder(orderId);
+          wx.navigateBack({ delta: 1 });
+          return;
+        }
 
-      // 5. 模拟支付
-      wx.showLoading({ title: '模拟支付中...' });
-      const paySuccess = await this.mockPaymentSuccess(orderId);
-      if (!paySuccess) {
-        wx.showToast({ title: '支付模拟失败', icon: 'none' });
-        await this.recoverLocker(lockerInfo.cabinetNo);
-        return;
-      }
+        // 模拟支付
+        wx.showLoading({ title: '支付押金中...' });
+        const paySuccess = await this.mockPaymentSuccess(orderId);
+        if (!paySuccess) {
+          wx.showToast({ title: '支付失败', icon: 'none' });
+          await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+          await this.recoverOrder(orderId);
+          return;
+        }
 
-      // 6. 验证订单状态
-      const isOrderValid = await this.verifyOrderStatus(orderId);
-      if (!isOrderValid) {
-        await this.recoverLocker(lockerInfo.cabinetNo);
-        return;
+        // 验证订单状态
+        const isOrderValid = await this.verifyOrderStatus(orderId);
+        if (!isOrderValid) {
+          await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+          await this.recoverOrder(orderId);
+          return;
+        }
       }
 
       // 7. 开柜操作
@@ -319,43 +400,29 @@ Page({
       if (openSuccess) {
         wx.hideLoading();
         wx.showToast({ 
-          title: `支付成功，柜号 ${lockerInfo.cabinetNo} 已打开`, 
+          title: `柜门 ${lockerInfo.doorNo} 已打开`, 
           icon: 'success',
           duration: 3000
         });
-        setTimeout(() => {
-          wx.navigateTo({
-            url: `${this.constants.ORDER_DETAIL_PAGE}?orderId=${orderId}&cabinetNo=${lockerInfo.cabinetNo}`
-          });
-        }, 3000);
+        // setTimeout(() => {
+        //   wx.navigateTo({
+        //     url: `${this.constants.ORDER_DETAIL_PAGE}?orderId=${orderId}&doorNo=${lockerInfo.doorNo}`
+        //   });
+        // }, 3000);
       } else {
         wx.hideLoading();
         wx.showToast({ title: '支付成功，开门失败', icon: 'none' });
-        await this.recoverLocker(lockerInfo.cabinetNo);
+        await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+        await this.recoverOrder(orderId);
       }
     } catch (e) {
       console.error("存包流程异常", e);
       wx.showToast({ title: '操作失败', icon: 'none' });
-      if (lockerInfo) await this.recoverLocker(lockerInfo.cabinetNo);
+      if (lockerInfo) await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+      if (orderId) await this.recoverOrder(orderId);
     } finally {
       this.setData({ isLoading: false });
       wx.hideLoading();
     }
-  },
-
-  /**
-   * 显示支付确认弹窗
-   * @returns {Promise<boolean>} 用户是否确认支付
-   */
-  showPaymentConfirmModal() {
-    return new Promise(resolve => {
-      wx.showModal({
-        title: '确认支付',
-        content: `预支付金额：${this.data.display.totalPrepay}\n（测试模式，确认即视为支付成功）`,
-        confirmText: '确认支付',
-        cancelText: '取消',
-        success: res => resolve(res.confirm)
-      });
-    });
   }
 });

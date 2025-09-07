@@ -2,13 +2,14 @@ Page({
   data: {
     phone: '',       // 从首页传递的手机号
     code: '',        // 从首页传递的取件码
+    cabinetNo: null,
     isLoading: false // 加载状态
   },
 
   onLoad(options) {
     // 接收首页传递的参数并验证
-    const { phone = '', code = '' } = options;
-    this.setData({ phone, code });
+    const { phone = '', code = '', cabinetNo = null } = options;
+    this.setData({ phone, code, cabinetNo});
 
     // 自动触发取件流程（参数完整时）
     if (phone && code) {
@@ -63,9 +64,9 @@ Page({
       return false;
     }
     
-    // 取件码验证（6位数字）
-    if (!/^\d{6}$/.test(code)) {
-      wx.showToast({ title: '取件码必须是6位数字', icon: 'none' });
+    // 取件码验证（4位数字）
+    if (!/^\d{4}$/.test(code)) {
+      wx.showToast({ title: '请输入4位取件码', icon: 'none' });
       return false;
     }
     
@@ -78,13 +79,14 @@ Page({
    */
   async queryMatchedOrder() {
     try {
-      const { phone, code } = this.data;
+      const { phone, code, cabinetNo} = this.data;
       const res = await wx.cloud.callFunction({
         name: "order",
         data: {
           action: "queryByPhoneAndCode",
           phone,
-          code
+          code,
+          cabinetNo: cabinetNo? parseInt(cabinetNo):null
         }
       });
 
@@ -110,18 +112,19 @@ Page({
 
   /**
    * 取包打开柜门
-   * @param {number} cabinetNo - 柜号
+   * @param {number} doorNo - 柜门
    * @param {string} orderId - 订单ID
    * @returns {Promise<boolean>} 开柜是否成功
    */
-  async openCabinetDoor(cabinetNo, orderId) {
+  async openCabinetDoor(doorNo, orderId, cabinetNo) {
     try {
       const res = await wx.cloud.callFunction({
         name: "locker",
         data: {
           action: "openDoor",
-          cabinetNo,
+          doorNo,
           orderId,
+          cabinetNo,
           type: "take"
         }
       });
@@ -219,7 +222,7 @@ Page({
       }
 
       // 4. 打开柜门
-      const isDoorOpen = await this.openCabinetDoor(order.cabinetNo, order._id);
+      const isDoorOpen = await this.openCabinetDoor(order.doorNo, order._id, order.cabinetNo);
       if (!isDoorOpen) {
         this.setData({ isLoading: false });
         wx.hideLoading();
@@ -238,13 +241,13 @@ Page({
 
       if (isOrderFinished) {
         this.showSuccess(
-          `取件成功，柜号 ${order.cabinetNo} 已打开`,
+          `取件成功，柜门 ${order.doorNo} 已打开`,
           () => { wx.navigateBack({ delta: 1 }); }
         );
       } else {
         // 订单状态更新失败但取件成功，仍提示成功
         this.showSuccess(
-          `取件成功，柜号 ${order.cabinetNo} 已打开`,
+          `取件成功，柜门 ${order.doorNo} 已打开`,
           () => { wx.navigateBack({ delta: 1 }); }
         );
       }
