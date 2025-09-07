@@ -184,8 +184,8 @@ exports.main = async (event, context) => {
           }
 
           // 模拟硬件开柜
-          //const openSuccess = true; // 实际项目中替换为硬件接口调用
-          const openSuccess = await callHardwareOpen(doorNo, cabinetNo);
+          const openSuccess = true; // 实际项目中替换为硬件接口调用
+          // const openSuccess = await callHardwareOpen(doorNo, cabinetNo);
           if (!openSuccess) {
             throw new Error(`柜门 ${doorNo} 硬件开柜失败`)
           }

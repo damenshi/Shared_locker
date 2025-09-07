@@ -14,6 +14,5 @@ Page({
       url: `/pages/take/take?mode=take&phone=${this.data.phone}&code=${this.data.code}` 
     });
   },
-  goOrders(){ wx.navigateTo({ url:'/pages/orders/list' }) },
-  goAdmin(){ wx.navigateTo({ url:'/pages/admin/dashboard' }) }
+  goAdmin(){ wx.navigateTo({ url:'/pages/admin/admin' }) }
 })

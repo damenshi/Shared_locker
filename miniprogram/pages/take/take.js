@@ -11,7 +11,7 @@ Page({
     const { phone = '', code = '', cabinetNo = null } = options;
     this.setData({ phone, code, cabinetNo});
 
-    // 自动触发取件流程（参数完整时）
+    // 自动触发取件流程
     if (phone && code) {
       this.handleTakeItem();
     } else {

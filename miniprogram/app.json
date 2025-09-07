@@ -3,9 +3,7 @@
     "pages/index/index",
     "pages/store/store",
     "pages/take/take",
-    "pages/admin/dashboard",
-    "pages/admin/rules",
-    "pages/admin/orders"
+    "pages/admin/admin"
   ],
   "window": {
     "navigationBarTitleText": "优享储物",

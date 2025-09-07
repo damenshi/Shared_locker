@@ -1,0 +1,120 @@
+<view class="container">
+  <view class="header">
+    <text class="title">管理员操作中心</text>
+    <text class="subtitle">储物柜系统管理功能</text>
+  </view>
+
+  <!-- 订单管理区域 -->
+  <view class="card">
+    <view class="card-title">订单管理</view>
+    <view class="input-item">
+      <text>订单ID：</text>
+      <input 
+        type="text" 
+        value="{{orderId}}" 
+        data-field="orderId"
+        bindinput="onInputChange"
+        placeholder="请输入要操作的订单ID"
+      />
+    </view>
+    <view class="button-group">
+      <button 
+        bindtap="forceFinishOrder" 
+        type="warn"
+        size="mini"
+      >
+        强制结束订单
+      </button>
+      <button 
+        bindtap="refundOrder" 
+        type="primary"
+        size="mini"
+      >
+        订单退款
+      </button>
+    </view>
+  </view>
+
+  <!-- 柜门控制区域 -->
+  <view class="card">
+    <view class="card-title">柜门控制</view>
+    <view class="input-item">
+      <text>柜子ID：</text>
+      <input 
+        type="text" 
+        value="{{lockerId}}" 
+        data-field="lockerId"
+        bindinput="onInputChange"
+        placeholder="请输入要操作的柜子ID"
+      />
+    </view>
+    <button 
+      bindtap="openAnyDoor" 
+      type="primary"
+    >
+      远程打开柜门
+    </button>
+  </view>
+
+  <!-- 批量生成储物柜区域 -->
+  <view class="card">
+    <view class="card-title">批量生成储物柜</view>
+    <view class="input-item">
+      <text>柜子总数：</text>
+      <input 
+        type="number" 
+        value="{{cabinetCount}}" 
+        data-field="cabinetCount"
+        bindinput="onInputChange"
+        placeholder="请输入要生成的柜子数量"
+      />
+    </view>
+    <view class="input-item">
+      <text>每个柜子的柜门数：</text>
+      <input 
+        type="number" 
+        value="{{lockersPerCabinet}}" 
+        data-field="lockersPerCabinet"
+        bindinput="onInputChange"
+        placeholder="请输入每个柜子的柜门数量"
+      />
+    </view>
+    <button 
+      bindtap="batchCreateLockers" 
+      type="primary"
+    >
+      批量生成储物柜数据
+    </button>
+  </view>
+
+  <!-- 生成二维码区域 -->
+  <view class="card">
+    <view class="card-title">生成储物柜二维码</view>
+    <view class="input-item">
+      <text>指定柜子编号（可选）：</text>
+      <input 
+        type="number" 
+        value="{{selectedCabinetNo}}" 
+        data-field="selectedCabinetNo"
+        bindinput="onInputChange"
+        placeholder="不填则生成所有柜子的二维码"
+      />
+    </view>
+    <button 
+      bindtap="generateLockerQrcodes" 
+      type="primary"
+    >
+      生成二维码
+    </button>
+    <!-- 二维码预览区域 -->
+    <view class="qrcode-preview" wx:if="{{qrcodeList.length > 0}}">
+      <text class="preview-title">二维码预览：</text>
+      <view class="qrcode-grid">
+        <view class="qrcode-item" wx:for="{{qrcodeList}}" wx:key="index">
+          <image src="{{item.qrcodeUrl}}" mode="widthFix" class="qrcode-img"></image>
+          <text class="qrcode-desc">柜号：{{item.cabinetNo}}-{{item.doorNo}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
