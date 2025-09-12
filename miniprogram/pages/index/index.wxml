@@ -2,7 +2,7 @@
   <view class="card">
     <view class="title">手机号与取包码</view>
     <input placeholder="请输入手机号" type="number" maxlength="11" bindinput="onPhone" />
-    <input placeholder="请输入取包码（4位数字）" type="number" maxlength="4" bindinput="onCode" />
+    <input placeholder="请输入取包码（4位数字）" type="number" maxlength="6" bindinput="onCode" />
     <button class="btn primary" bindtap="goStore">存包</button>
     <button class="btn" bindtap="goTake">取包</button>
   </view>
@@ -16,4 +16,9 @@
     <view class="title">管理入口（管理员）</view>
     <button class="btn" bindtap="goAdmin">管理看板</button>
   </view>
+
+   <!-- 新增：右下角“我的”按钮 -->
+   <button class="my-btn" bindtap="goMine">
+    <text class="my-btn-text">我的</text>
+   </button>
 </view>

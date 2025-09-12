@@ -11,7 +11,7 @@ Page({
     lockersPerCabinet: 5,
     
     // 生成二维码相关
-    selectedCabinetNo: null,
+    selectedDeviceId: null,
     qrcodeList: [],
     
     // 加载状态
@@ -137,10 +137,15 @@ Page({
 
   // 4. 批量生成储物柜数据
   async batchCreateLockers() {
-    const { cabinetCount, lockersPerCabinet } = this.data;
+    // 新增获取设备数量参数
+    const { deviceCount, cabinetCount, lockersPerCabinet } = this.data;
     
-    if (cabinetCount <= 0 || lockersPerCabinet <= 0) {
-      return wx.showToast({ title: '请输入有效的数量（大于0）', icon: 'none' });
+    // 验证所有参数（新增设备数量校验）
+    if (deviceCount <= 0 || cabinetCount <= 0 || lockersPerCabinet <= 0) {
+      return wx.showToast({ 
+        title: '请输入有效的数量（均需大于0）', 
+        icon: 'none' 
+      });
     }
 
     this.showLoading('生成中...');
@@ -150,6 +155,7 @@ Page({
         name: 'admin',
         data: {
           action: 'batchCreateLockers',
+          deviceCount: parseInt(deviceCount), // 新增设备数量参数
           cabinetCount: parseInt(cabinetCount),
           lockersPerCabinet: parseInt(lockersPerCabinet)
         }
@@ -176,9 +182,10 @@ Page({
     }
   },
 
+
   // 5. 生成储物柜二维码
   async generateLockerQrcodes() {
-    const { selectedCabinetNo } = this.data;
+    const { selectedDeviceId } = this.data;
 
     this.showLoading('生成二维码中...');
     
@@ -187,7 +194,7 @@ Page({
         name: 'admin',
         data: {
           action: 'generateLockerQrcodes',
-          cabinetNo: selectedCabinetNo ? parseInt(selectedCabinetNo) : null
+          deviceId: selectedDeviceId ? parseInt(selectedDeviceId) : null
         }
       });
 

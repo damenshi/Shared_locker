@@ -151,6 +151,7 @@ exports.main = async (event, context) => {
           phone,
           code: code || String(Math.floor(Math.random() * 9000) + 1000),
           lockerId,
+          deviceId: lockerDoc.data.deviceId,
           cabinetNo: lockerDoc.data.cabinetNo,
           doorNo: lockerDoc.data.doorNo,
           size: lockerDoc.data.size || 'M',
@@ -359,7 +360,7 @@ exports.main = async (event, context) => {
 
   // 7. 通过手机号和取件码查询订单
   if (action === 'queryByPhoneAndCode') {
-    const { phone, code, cabinetNo} = event;
+    const { phone, code, deviceId} = event;
     
     // 参数校验
     const validation = validateParams(event, ['phone', 'code'])
@@ -376,6 +377,7 @@ exports.main = async (event, context) => {
         })
         .field({
           _id: true,
+          deviceId: true,
           cabinetNo: true,
           doorNo: true,
           status: true,

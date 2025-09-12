@@ -1,1 +1,28 @@
 /* inherit */
+/* 我的按钮样式 */
+.mine-btn {
+  position: fixed;
+  right: 30rpx;
+  bottom: 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 120rpx;
+  height: 120rpx;
+  background-color: #07c160;
+  border-radius: 50%;
+  box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.1);
+  z-index: 999;
+}
+
+.mine-icon {
+  width: 60rpx;
+  height: 60rpx;
+  margin-bottom: 5rpx;
+}
+
+.mine-text {
+  font-size: 24rpx;
+  color: white;
+}

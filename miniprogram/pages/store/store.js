@@ -16,7 +16,7 @@ Page({
     phone: '',       // 手机号
     code: '',        // 取件码
     isLoading: false,
-    cabinetNo: '',
+    deviceId: 'L0001',
     constants: {
       ORDER_STATUS_PROCESSING: '进行中',
       NAVIGATE_DELAY: 2000,
@@ -29,7 +29,8 @@ Page({
     this.setData({
       phone: options.phone || '',
       code: options.code || '',
-      cabinetNo: options.cabinetNo || null,
+      // deviceId: options.deviceId || null,
+      deviceId: 'L0001'
     });
     this.handleStoreItem();
   },
@@ -104,11 +105,18 @@ Page({
    */
   async getAvailableCabinet() {
     try {
-      const cabinetNo = this.data.cabinetNo;
+      const deviceId = this.data.deviceId;
+      console.log("deviceId: ", deviceId);
+      if (!deviceId || !/^L\d+$/.test(deviceId)) {
+        wx.showToast({ title: '设备ID格式错误', icon: 'none' });
+        return null;
+      }
       const res = await wx.cloud.callFunction({
         name: "locker",
-        data: { action: "listFree" },
-        cabinetNo: cabinetNo ? parseInt(cabinetNo) : null
+        data: { 
+          action: "listFree",
+          deviceId: deviceId
+        } 
       });
       
       console.log("查询可用柜子结果：", res.result);
@@ -249,6 +257,7 @@ Page({
         name: "locker",
         data: {
           action: "openDoor",
+          deviceId: lockerInfo.deviceId,
           doorNo: lockerInfo.doorNo,
           orderId: orderId,
           cabinetNo: lockerInfo.cabinetNo,
@@ -268,7 +277,7 @@ Page({
    * 恢复柜子状态为空闲
    * @param {number} doorNo - 柜门
    */
-  async recoverLocker(doorNo, cabinetNo) {
+  async recoverLocker(deviceId, doorNo, cabinetNo) {
     if (!doorNo) return;
     
     try {
@@ -276,13 +285,14 @@ Page({
         name: "locker",
         data: {
           action: "recoverLocker",
+          deviceId: deviceId,
           doorNo: doorNo,
           cabinetNo: cabinetNo
         }
       });
-      console.log(`柜门 ${doorNo} 恢复结果：`, res.result);
+      console.log(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 恢复结果：`, res.result);
     } catch (e) {
-      console.error(`柜门 ${doorNo} 恢复失败`, e);
+      console.error(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 恢复失败`, e);
     }
   },
 
@@ -368,7 +378,7 @@ Page({
         // 押金不足，需要支付
         const confirmPay = await this.showPaymentConfirmModal();
         if (!confirmPay) {
-          await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+          await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
           await this.recoverOrder(orderId);
           wx.navigateBack({ delta: 1 });
           return;
@@ -379,7 +389,7 @@ Page({
         const paySuccess = await this.mockPaymentSuccess(orderId);
         if (!paySuccess) {
           wx.showToast({ title: '支付失败', icon: 'none' });
-          await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+          await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
           await this.recoverOrder(orderId);
           return;
         }
@@ -387,7 +397,7 @@ Page({
         // 验证订单状态
         const isOrderValid = await this.verifyOrderStatus(orderId);
         if (!isOrderValid) {
-          await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+          await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
           await this.recoverOrder(orderId);
           return;
         }
@@ -412,13 +422,13 @@ Page({
       } else {
         wx.hideLoading();
         wx.showToast({ title: '支付成功，开门失败', icon: 'none' });
-        await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+        await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
         await this.recoverOrder(orderId);
       }
     } catch (e) {
       console.error("存包流程异常", e);
       wx.showToast({ title: '操作失败', icon: 'none' });
-      if (lockerInfo) await this.recoverLocker(lockerInfo.doorNo, lockerInfo.cabinetNo);
+      if (lockerInfo) await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
       if (orderId) await this.recoverOrder(orderId);
     } finally {
       this.setData({ isLoading: false });

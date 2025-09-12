@@ -1,7 +1,6 @@
 <view class="container">
   <view class="header">
-    <text class="title">管理员操作中心</text>
-    <text class="subtitle">储物柜系统管理功能</text>
+    <text class="title">储物柜系统管理</text>
   </view>
 
   <!-- 订单管理区域 -->
@@ -60,6 +59,16 @@
   <view class="card">
     <view class="card-title">批量生成储物柜</view>
     <view class="input-item">
+      <text>设备总数：</text>
+      <input 
+        type="number" 
+        value="{{deviceCount}}" 
+        data-field="deviceCount"
+        bindinput="onInputChange"
+        placeholder="请输入设备总数"
+      />
+    </view>
+    <view class="input-item">
       <text>柜子总数：</text>
       <input 
         type="number" 
@@ -86,6 +95,7 @@
       批量生成储物柜数据
     </button>
   </view>
+    
 
   <!-- 生成二维码区域 -->
   <view class="card">
@@ -94,8 +104,8 @@
       <text>指定柜子编号（可选）：</text>
       <input 
         type="number" 
-        value="{{selectedCabinetNo}}" 
-        data-field="selectedCabinetNo"
+        value="{{selectedDeviceId}}" 
+        data-field="selectedDeviceId"
         bindinput="onInputChange"
         placeholder="不填则生成所有柜子的二维码"
       />
@@ -112,7 +122,7 @@
       <view class="qrcode-grid">
         <view class="qrcode-item" wx:for="{{qrcodeList}}" wx:key="index">
           <image src="{{item.qrcodeUrl}}" mode="widthFix" class="qrcode-img"></image>
-          <text class="qrcode-desc">柜号：{{item.cabinetNo}}-{{item.doorNo}}</text>
+          <text class="qrcode-desc">柜号：{{item.deviceId}}-{{item.doorNo}}</text>
         </view>
       </view>
     </view>

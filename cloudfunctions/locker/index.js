@@ -32,29 +32,29 @@ const validateParams = (params, rules) => {
 }
 
 // 工具函数：恢复柜子状态为空闲
-const recoverLockerStatus = async (doorNo) => {
-  try {
-    const locker = await db.collection('lockers')
-      .where({ doorNo })
-      .get()
+// const recoverLockerStatus = async (doorNo) => {
+//   try {
+//     const locker = await db.collection('lockers')
+//       .where({ doorNo })
+//       .get()
       
-    if (locker.data.length > 0) {
-      await db.collection('lockers').doc(locker.data[0]._id).update({
-        data: {
-          status: 'free',
-          currentOrderId: null,
-          updatedAt: Date.now()
-        }
-      })
-      console.log(`柜门 ${doorNo} 已自动恢复为空闲状态`)
-      return true
-    }
-    return false
-  } catch (err) {
-    console.error(`恢复柜门 ${doorNo} 状态失败`, err)
-    return false
-  }
-}
+//     if (locker.data.length > 0) {
+//       await db.collection('lockers').doc(locker.data[0]._id).update({
+//         data: {
+//           status: 'free',
+//           currentOrderId: null,
+//           updatedAt: Date.now()
+//         }
+//       })
+//       console.log(`柜门 ${doorNo} 已自动恢复为空闲状态`)
+//       return true
+//     }
+//     return false
+//   } catch (err) {
+//     console.error(`恢复柜门 ${doorNo} 状态失败`, err)
+//     return false
+//   }
+// }
 
 exports.main = async (event, context) => {
   const { action } = event
@@ -62,14 +62,15 @@ exports.main = async (event, context) => {
   // 1. 查询空闲柜子
   if (action === 'listFree') {
     try {
-      const { cabinetNo } = event;
+      const { deviceId } = event;
 
       const whereCondition = { 
         status: 'free',
         currentOrderId: _.eq(null)
       };
-      if (cabinetNo !== undefined && cabinetNo !== null) {
-        whereCondition.cabinetNo = parseInt(cabinetNo, 10);
+
+      if (deviceId !== undefined && deviceId !== null && deviceId.trim() !== '') {
+        whereCondition.deviceId = deviceId.trim();
       }
 
       const result = await db.collection('lockers')
@@ -80,7 +81,8 @@ exports.main = async (event, context) => {
           size: true,
           status: true,
           currentOrderId: true,
-          cabinetNo: true
+          cabinetNo: true,
+          deviceId: true
         })
         .get()
 
@@ -94,10 +96,11 @@ exports.main = async (event, context) => {
   // 2. 开门操作
   if (action === 'openDoor') {
     console.log('=== 执行开柜操作 ===', event)
-    const { doorNo, orderId, type, cabinetNo} = event
+    const { deviceId, doorNo, orderId, cabinetNo, type} = event
 
     // 参数校验
     const validation = validateParams(event, {
+      deviceId: {type: 'string'},
       doorNo: { type: 'number' },
       orderId: { type: 'string' },
       type: { enum: CONSTANTS.OPERATION_TYPES },
@@ -108,40 +111,52 @@ exports.main = async (event, context) => {
     }
 
     const HARDWARE_MAPPING = {
-      1: { ip: '192.168.1.101', port: 8080, deviceKey: 'locker-1' },
-      2: { ip: '192.168.1.102', port: 8080, deviceKey: 'locker-2' },
-      3: { ip: '192.168.1.103', port: 8080, deviceKey: 'locker-3' }
-      // 其他柜号的硬件配置...
+      1: { ip: '1.116.109.239', port: 3000, deviceKey: 'locker-1' }, 
+      2: { ip: '1.116.109.239', port: 3000, deviceKey: 'locker-2' },
     };
-
-    const callHardwareOpen = async (cabinetNo, doorNo) => {
-      // 1. 获取对应柜号的硬件信息
+  
+    const callHardwareOpen = async (deviceId, cabinetNo, doorNo) => {
+      // 1. 获取对应柜号的硬件信息（如果需要的话）
       const hardware = HARDWARE_MAPPING[cabinetNo];
       if (!hardware) {
-        throw new Error(`未配置柜号 ${cabinetNo} 的硬件信息`);
+        throw new Error(`未配置柜号 ${cabinetNo} 的信息`);
       }
-  
+    
       try {
-        // 2. 实际调用硬件接口（示例为HTTP请求，根据硬件协议修改）
+        // 2. 调用socket服务器接口
+        const formatNumber = (num) => {
+          return num.toString().padStart(2, '0');
+        };
+        const formattedCabinetNo = formatNumber(cabinetNo); // 2 → "02"
+        const formattedDoorNo = formatNumber(doorNo);       // 1 → "01"
+        const combinedCode = formattedCabinetNo + formattedDoorNo; // "0201"
+
         const axios = require('axios');
         const response = await axios.post(
-          `http://${hardware.ip}:${hardware.port}/openDoor`,
+          'http://1.116.109.239:3000/send-command', 
           {
-            deviceKey: hardware.deviceKey,
-            doorNo: doorNo,
-            timestamp: Date.now()
+            direct: 'openDoor',
+            deviceId: deviceId,
+            data: {
+              doorSort: combinedCode,
+            }
           },
-          { timeout: 5000 }  // 5秒超时设置
+          { timeout: 8000 }  // 8秒超时设置
         );
-  
-        // 3. 验证硬件返回结果
+    
+        // 3. 验证服务器返回结果
         if (response.data.code !== 200 || !response.data.success) {
-          throw new Error(`硬件响应异常: ${response.data.msg || '未知错误'}`);
+          throw new Error(`服务器响应异常: ${response.data.msg || '未知错误'}`);
         }
-  
         return true;
       } catch (err) {
-        throw new Error(`柜号 ${cabinetNo} 开柜失败: ${err.message}`);
+        if (err.code === 'ECONNABORTED') {
+          throw new Error(`连接超时，请检查服务器是否在线`);
+        }
+        if (err.response) {
+          throw new Error(`服务器返回错误: ${err.response.status} ${err.response.statusText}`);
+        }
+        throw new Error(`开柜接口调用失败: ${err.message}`);
       }
     };
 
@@ -149,7 +164,7 @@ exports.main = async (event, context) => {
       return await db.runTransaction(async transaction => {
         // 查询柜子信息
         const lockerQuery = await transaction.collection('lockers')
-          .where({ doorNo, cabinetNo})
+          .where({ deviceId, doorNo, cabinetNo})
           .get({ readFresh: true })
 
         if (lockerQuery.data.length === 0) {
@@ -184,10 +199,10 @@ exports.main = async (event, context) => {
           }
 
           // 模拟硬件开柜
-          const openSuccess = true; // 实际项目中替换为硬件接口调用
-          // const openSuccess = await callHardwareOpen(doorNo, cabinetNo);
+          // const openSuccess = true; // 实际项目中替换为硬件接口调用
+          const openSuccess = await callHardwareOpen(deviceId, cabinetNo, doorNo);
           if (!openSuccess) {
-            throw new Error(`柜门 ${doorNo} 硬件开柜失败`)
+            throw new Error(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 硬件开柜失败`)
           }
 
           // 更新柜子状态
@@ -202,12 +217,12 @@ exports.main = async (event, context) => {
 
           // 更新订单信息
           await transaction.collection('orders').doc(orderId).update({
-            data: { doorNo, cabinetNo, updatedAt: now }
+            data: { deviceId ,doorNo, cabinetNo, updatedAt: now }
           })
 
           return { 
             ok: true, 
-            message: `存包成功，柜门 ${doorNo} 已打开`, 
+            message: `存包成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`, 
             doorNo 
           }
         }
@@ -217,14 +232,14 @@ exports.main = async (event, context) => {
           // 状态校验
           if (locker.status !== 'occupied' || locker.currentOrderId !== orderId) {
             throw new Error(
-              `取包失败：柜门 ${doorNo} 与订单不匹配（当前关联：${locker.currentOrderId}，传入：${orderId}）`
+              `取包失败：柜门 ${deviceId}_${cabinetNo}_${doorNo} 与订单不匹配（当前关联：${locker.currentOrderId}，传入：${orderId}）`
             )
           }
 
           // 模拟硬件开柜
-          const openSuccess = true; // 实际项目中替换为硬件接口调用
+          const openSuccess = callHardwareOpen(deviceId, doorNo, cabinetNo);
           if (!openSuccess) {
-            throw new Error(`柜门 ${doorNo} 硬件开柜失败`)
+            throw new Error(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 硬件开柜失败`)
           }
 
           // 更新柜子状态为空闲
@@ -239,7 +254,7 @@ exports.main = async (event, context) => {
 
           return { 
             ok: true, 
-            message: `取包成功，柜门 ${doorNo} 已打开`, 
+            message: `取包成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`, 
             doorNo,
             cabinetNo
           }
@@ -247,6 +262,7 @@ exports.main = async (event, context) => {
       })
     } catch (err) {
       console.error('开柜操作失败', {
+        deviceId,
         doorNo,
         cabinetNo,
         orderId,
@@ -255,7 +271,7 @@ exports.main = async (event, context) => {
       })
 
       // 失败时尝试恢复柜子状态
-      await recoverLockerStatus(doorNo)
+      // await recoverLockerStatus(doorNo)
       return { ok: false, errMsg: err.message }
     }
   }
@@ -305,10 +321,11 @@ exports.main = async (event, context) => {
 
   // 4. 恢复柜子状态为空闲
   if (action === 'recoverLocker') {
-    const { doorNo, cabinetNo} = event
+    const { deviceId, doorNo, cabinetNo} = event
 
     // 参数校验
     const validation = validateParams(event, {
+      deviceId: {type: 'string'},
       doorNo: { type: 'number' },
       cabinetNo: { type: 'number' } 
     })
@@ -317,7 +334,7 @@ exports.main = async (event, context) => {
     }
 
     try {
-      const locker = await db.collection('lockers').where({ doorNo, cabinetNo}).get()
+      const locker = await db.collection('lockers').where({ deviceId, doorNo, cabinetNo}).get()
       
       if (locker.data.length === 0) {
         return { success: false, errMsg: `未找到柜门${doorNo}的记录` }

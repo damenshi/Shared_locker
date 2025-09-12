@@ -5,16 +5,16 @@ App({
       traceUser: true
     });
 
-    if (options.query && options.query.cabinetNo) {
-      this.globalData.cabinetNo = options.query.cabinetNo;
+    if (options.query && options.query.deviceId) {
+      this.globalData.deviceId = options.query.deviceId;
 
       // 自动跳转到存包页面，并携带柜子标识
       wx.navigateTo({
-        url: `/pages/store/store?cabinetNo=${options.query.cabinetNo}`
+        url: `/pages/store/store?deviceId=${options.query.deviceId}`
       });
     }
   },
   globalData: {
-    cabinetNo: null
+    deviceId: null
   }
 })

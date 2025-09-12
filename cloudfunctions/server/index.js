@@ -1,0 +1,263 @@
+const cloud = require('wx-server-sdk');
+cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
+
+// 数据库引用
+const db = cloud.database();
+const lockersCollection = db.collection('lockers');
+// const logsCollection = db.collection('device_logs');
+
+// 云函数主入口
+exports.main = async (event, context) => {
+    const body = event.body ? JSON.parse(event.body) : {};
+    const { type, deviceId, data, timestamp } = body;
+    console.log(`收到WebSocket转发消息:`, event);
+
+    try {
+        // 根据消息类型分发处理
+        switch (type) {
+            // 1. 设备登录请求处理
+            case 'device_login_request':
+                return handleDeviceLogin(deviceId, timestamp);
+                
+            // 2. 设备心跳消息处理
+            case 'device_heartbeat':
+                return handleDeviceHeartbeat(deviceId, data, timestamp);
+                
+            // 3. 手机号密码开门请求
+            case 'open_by_phone_request':
+                return handleOpenByPhone(deviceId, data);
+                
+            // 4. 手机号开门结果反馈
+            case 'open_by_phone_result':
+                return handleOpenByPhoneResult(deviceId, data);
+                
+            // 5. 开门结果反馈
+            case 'open_door_result':
+                return handleOpenDoorResult(deviceId, data);
+                
+            // 6. 柜门状态更新
+            case 'door_status_result':
+                return handleDoorStatusUpdate(deviceId, data);
+                
+            // 7. 设备离线通知
+            case 'device_offline':
+                return handleDeviceOffline(deviceId, timestamp);
+                
+            // 未知类型处理
+            default:
+                return {
+                    code: 400,
+                    message: `未知消息类型: ${type}`
+                };
+        }
+    } catch (error) {
+        console.error('云函数处理失败:', error);
+        return {
+            code: 500,
+            message: error.message || '服务器处理失败'
+        };
+    }
+};
+
+/**
+ * 1. 处理设备登录请求
+ * 验证设备ID是否存在于数据库中
+ */
+async function handleDeviceLogin(deviceId, timestamp) {
+    // 查询设备是否已注册
+    const lockerRes = await lockersCollection
+        .where({ deviceId })
+        .limit(1)
+        .get();
+
+    if (lockerRes.data.length === 0) {
+        // 设备未注册
+        return {
+            code: 404,
+            message: `设备 ${deviceId} 未注册`
+        };
+    }
+
+    // 更新设备在线状态
+    // await lockersCollection
+    //     .where({ deviceId })
+    //     .update({
+    //         isOnline: true,
+    //         lastLoginTime: timestamp,
+    //         updatedAt: db.serverDate()
+    //     });
+
+    // 记录登录日志
+    // await logsCollection.add({
+    //     deviceId,
+    //     type: 'login',
+    //     timestamp,
+    //     status: 'success',
+    //     createdAt: db.serverDate()
+    // });
+
+    // 返回设备编号（可自定义生成规则）
+    return {
+        code: 200,
+        data: {
+          deviceId: deviceId
+        }
+    };
+}
+
+/**
+ * 2. 处理设备心跳消息
+ * 更新设备最后活跃时间
+ */
+async function handleDeviceHeartbeat(deviceId, data, timestamp) {
+    await lockersCollection
+        .where({ deviceId })
+        .update({
+            lastHeartbeat: timestamp,
+            lastActiveTime: db.serverDate()
+        });
+
+    // 记录心跳日志（可选，视需求决定是否保存）
+    await logsCollection.add({
+        deviceId,
+        type: 'heartbeat',
+        data: {
+            clientTime: data.clientTime,
+            serverTime: data.serverTime
+        },
+        createdAt: db.serverDate()
+    });
+
+    return { code: 200, message: '心跳已记录' };
+}
+
+/**
+ * 3. 处理手机号密码开门请求
+ * 验证手机号和密码是否匹配有效订单
+ */
+async function handleOpenByPhone(deviceId, data) {
+    const { phone, password, time } = data;
+    
+    // 实际业务中需要查询订单表验证手机号和密码
+    const orderRes = await db.collection('orders')
+        .where({
+            phone,
+            password,
+            status: 'valid', // 有效订单
+            deviceId // 订单关联的设备ID
+        })
+        .limit(1)
+        .get();
+
+    if (orderRes.data.length === 0) {
+        return { code: 403, message: '手机号或密码错误' };
+    }
+
+    const order = orderRes.data[0];
+    return {
+        code: 200,
+        data: {
+            doorSort: order.doorSort // 返回要打开的柜门编号
+        }
+    };
+}
+
+/**
+ * 4. 处理手机号开门结果反馈
+ */
+async function handleOpenByPhoneResult(deviceId, data) {
+    const { doorSort, status } = data;
+    
+    // 更新订单状态（如果开门成功）
+    if (status === 'success') {
+        await db.collection('orders')
+            .where({ doorSort, deviceId, status: 'valid' })
+            .update({
+                status: 'opened',
+                openedAt: db.serverDate()
+            });
+    }
+
+    // 记录操作日志
+    await logsCollection.add({
+        deviceId,
+        type: 'open_by_phone_result',
+        data: { doorSort, status },
+        createdAt: db.serverDate()
+    });
+
+    return { code: 200, message: '开门结果已记录' };
+}
+
+/**
+ * 5. 处理开门结果反馈
+ */
+async function handleOpenDoorResult(deviceId, data) {
+    const { doorSort, time, status } = data;
+    
+    // 更新储物柜状态
+    await lockersCollection
+        .where({ deviceId, doorSort })
+        .update({
+            status: status === 'success' ? 'occupied' : 'fault',
+            lastOpenAt: time,
+            updatedAt: db.serverDate()
+        });
+
+    await logsCollection.add({
+        deviceId,
+        type: 'open_door',
+        data: { doorSort, time, status },
+        createdAt: db.serverDate()
+    });
+
+    return { code: 200, message: '开门结果已处理' };
+}
+
+/**
+ * 6. 处理柜门状态更新
+ */
+async function handleDoorStatusUpdate(deviceId, data) {
+    const { doorSort, status, time } = data;
+    
+    // 更新柜门状态（free/occupied/fault）
+    await lockersCollection
+        .where({ deviceId, doorSort })
+        .update({
+            status,
+            lastStatusChange: time,
+            updatedAt: db.serverDate()
+        });
+
+    await logsCollection.add({
+        deviceId,
+        type: 'door_status',
+        data: { doorSort, status, time },
+        createdAt: db.serverDate()
+    });
+
+    return { code: 200, message: '柜门状态已更新' };
+}
+
+/**
+ * 7. 处理设备离线通知
+ */
+async function handleDeviceOffline(deviceId, timestamp) {
+    // 更新设备离线状态
+    await lockersCollection
+        .where({ deviceId })
+        .update({
+            isOnline: false,
+            lastOfflineTime: timestamp,
+            updatedAt: db.serverDate()
+        });
+
+    await logsCollection.add({
+        deviceId,
+        type: 'offline',
+        timestamp,
+        createdAt: db.serverDate()
+    });
+
+    return { code: 200, message: '设备离线已记录' };
+}

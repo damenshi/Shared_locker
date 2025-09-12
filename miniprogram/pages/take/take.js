@@ -2,14 +2,20 @@ Page({
   data: {
     phone: '',       // 从首页传递的手机号
     code: '',        // 从首页传递的取件码
-    cabinetNo: null,
+    deviceId: null,
     isLoading: false // 加载状态
   },
 
   onLoad(options) {
     // 接收首页传递的参数并验证
-    const { phone = '', code = '', cabinetNo = null } = options;
-    this.setData({ phone, code, cabinetNo});
+    // const { phone = '', code = '', deviceId = null} = options;
+    this.setData({
+      phone: options.phone || '',
+      code: options.code || '',
+      // deviceId: options.deviceId || null,
+      deviceId: 'L0001'
+    });
+    this.setData({ phone, code, deviceId});
 
     // 自动触发取件流程
     if (phone && code) {
@@ -79,14 +85,18 @@ Page({
    */
   async queryMatchedOrder() {
     try {
-      const { phone, code, cabinetNo} = this.data;
+      const { phone, code, deviceId} = this.data;
+      if (!deviceId || !/^L\d+$/.test(deviceId)) {
+        wx.showToast({ title: '设备ID格式错误', icon: 'none' });
+        return null;
+      }
       const res = await wx.cloud.callFunction({
         name: "order",
         data: {
           action: "queryByPhoneAndCode",
           phone,
           code,
-          cabinetNo: cabinetNo? parseInt(cabinetNo):null
+          deviceId: deviceId
         }
       });
 
@@ -116,12 +126,13 @@ Page({
    * @param {string} orderId - 订单ID
    * @returns {Promise<boolean>} 开柜是否成功
    */
-  async openCabinetDoor(doorNo, orderId, cabinetNo) {
+  async openCabinetDoor(deviceId, doorNo, orderId, cabinetNo) {
     try {
       const res = await wx.cloud.callFunction({
         name: "locker",
         data: {
           action: "openDoor",
+          deviceId,
           doorNo,
           orderId,
           cabinetNo,
@@ -222,7 +233,7 @@ Page({
       }
 
       // 4. 打开柜门
-      const isDoorOpen = await this.openCabinetDoor(order.doorNo, order._id, order.cabinetNo);
+      const isDoorOpen = await this.openCabinetDoor(order.deviceId, order.doorNo, order._id, order.cabinetNo);
       if (!isDoorOpen) {
         this.setData({ isLoading: false });
         wx.hideLoading();

@@ -3,39 +3,49 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
 
-// 管理员openid列表（直接整合管理员判断逻辑）
+// 管理员openid列表（修正变量名，确保前后一致）
 const ADMIN_OPENIDS = [
-  // 'o_xxx_your_openid' // 替换为实际管理员openid
+  'oibJq1y_nw3YV0ne3tIemICTQ7Fs'
 ]
 
 // 工具函数：生成指定范围的随机数
 const randomBetween = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
 
-// 批量生成储物柜数据
 const batchCreateLockers = async (event) => {
-  const { cabinetCount, lockersPerCabinet} = event
+  // 新增deviceCount参数，指定设备数量
+  const { deviceCount = 1, cabinetCount, lockersPerCabinet } = event
   
-  // 参数验证
-  if (!cabinetCount || !lockersPerCabinet) {
-    return { success: false, errMsg: '请指定柜子数量和每个柜子的柜门数量' }
+  // 参数验证（增加设备数量校验）
+  if (!deviceCount || !cabinetCount || !lockersPerCabinet) {
+    return { 
+      success: false, 
+      errMsg: '请指定设备数量、柜子数量和每个柜子的柜门数量' 
+    }
   }
 
   try {
     const lockers = []
     const timestamp = Date.now()
 
-    // 批量生成locker数据
-    for (let cabinetNo = 1; cabinetNo <= cabinetCount; cabinetNo++) {
-      for (let doorNo = 1; doorNo <= lockersPerCabinet; doorNo++) {
-        // 随机分配尺寸        
-        lockers.push({
-          status: 'free',
-          currentOrderId: null,
-          lastOpenAt: timestamp,
-          updatedAt: timestamp,
-          doorNo: doorNo,
-          cabinetNo: cabinetNo
-        })
+    // 外层循环：设备（L0001、L0002...）
+    for (let deviceIndex = 1; deviceIndex <= deviceCount; deviceIndex++) {
+      // 设备ID格式：L0001、L0002（4位数字，不足补零）
+      const deviceId = `L${String(deviceIndex).padStart(4, '0')}`;
+      
+      // 中层循环：锁板（cabinetNo，保持原有逻辑）
+      for (let cabinetNo = 1; cabinetNo <= cabinetCount; cabinetNo++) {
+        // 内层循环：锁（doorNo，保持原有逻辑）
+        for (let doorNo = 1; doorNo <= lockersPerCabinet; doorNo++) {
+          lockers.push({
+            status: 'free',
+            currentOrderId: null,
+            lastOpenAt: timestamp,
+            updatedAt: timestamp,
+            doorNo: doorNo,
+            cabinetNo: cabinetNo,
+            deviceId: deviceId  // 添加设备ID
+          })
+        }
       }
     }
 
@@ -44,16 +54,30 @@ const batchCreateLockers = async (event) => {
       data: lockers
     })
 
+    // 检查result和stats是否存在
+    if (!result || !result.stats) {
+      console.error('批量插入返回格式异常', result)
+      return {
+        success: true,
+        count: lockers.length,
+        message: `尝试生成 ${lockers.length} 个储物柜数据（返回格式异常）`
+      }
+    }
+
+    // 兼容不同版本的返回字段（created或inserted）
+    const createdCount = result.stats.created || result.stats.inserted || 0
+    
     return {
       success: true,
-      count: result.stats.updated,
-      message: `成功生成 ${cabinetCount * lockersPerCabinet} 个储物柜数据`
+      count: createdCount,
+      message: `成功生成 ${createdCount} 个储物柜数据（共请求 ${lockers.length} 个）`
     }
   } catch (err) {
     console.error('批量生成储物柜失败', err)
-    return { success: false, errMsg: err.message }
+    return { success: false, errMsg: err.message || '批量插入数据失败' }
   }
 }
+
 
 // 生成储物柜二维码
 const generateLockerQrcodes = async (event) => {
@@ -120,8 +144,8 @@ const generateLockerQrcodes = async (event) => {
 exports.main = async (event, context) => {
   const { action } = event
   const { OPENID } = cloud.getWXContext()
-  
-  // 验证管理员权限
+
+  // 验证管理员权限（变量名已修正为ADMIN_OPENIDS）
   const isAdmin = ADMIN_OPENIDS.includes(OPENID)
   if (!isAdmin) {
     return { success: false, errMsg: '没有管理员权限' }
