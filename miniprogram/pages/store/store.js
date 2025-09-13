@@ -14,7 +14,7 @@ Page({
   // },
   data: {
     phone: '',       // 手机号
-    code: '',        // 取件码
+    password: '',        // 取件码
     isLoading: false,
     deviceId: 'L0001',
     constants: {
@@ -28,7 +28,7 @@ Page({
     // 接收并验证首页传递的参数
     this.setData({
       phone: options.phone || '',
-      code: options.code || '',
+      password: options.password || '',
       // deviceId: options.deviceId || null,
       deviceId: 'L0001'
     });
@@ -84,7 +84,7 @@ Page({
    * @returns {boolean} 验证是否通过
    */
   validateParams() {
-    if (!this.data.phone || !this.data.code) {
+    if (!this.data.phone || !this.data.password) {
       wx.showToast({ title: '请先输入手机号和取件码', icon: 'none' });
       return false;
     }
@@ -92,7 +92,7 @@ Page({
       wx.showToast({ title: '手机号格式不正确', icon: 'none' });
       return false;
     }
-    if (this.data.code.length !== 4) {
+    if (this.data.password.length !== 4) {
       wx.showToast({ title: '请输入4位取件码', icon: 'none' });
       return false;
     }
@@ -152,7 +152,7 @@ Page({
           action: "createOrder",
           lockerId: lockerInfo._id,
           phone: this.data.phone,
-          code: this.data.code
+          password: this.data.password
         }
       });
 
@@ -329,7 +329,7 @@ Page({
       // 只显示押金相关的支付信息
       wx.showModal({
         title: '确认支付',
-        content: `需支付押金 5元，取件后可退还`,
+        content: `需支付押金 15元，取件后可退还`,
         success: (res) => {
           resolve(res.confirm);
         },

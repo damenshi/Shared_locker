@@ -55,44 +55,65 @@
     </button>
   </view>
 
-  <!-- 批量生成储物柜区域 -->
+  <!-- 批量生成设备区域 -->
   <view class="card">
-    <view class="card-title">批量生成储物柜</view>
+    <view class="card-title">批量生成设备</view>
     <view class="input-item">
-      <text>设备总数：</text>
+      <text>设备数量：</text>
       <input 
         type="number" 
         value="{{deviceCount}}" 
         data-field="deviceCount"
         bindinput="onInputChange"
-        placeholder="请输入设备总数"
+        placeholder="请输入设备数量（如1、2）"
+      />
+    </view>
+    <button 
+      bindtap="batchCreateDevices" 
+      type="primary"
+    >
+      批量生成设备
+    </button>
+  </view>
+
+  <!-- 基于设备生成锁具区域 -->
+  <view class="card">
+    <view class="card-title">基于设备生成锁具</view>
+    <view class="input-item">
+      <text>设备ID：</text>
+      <input 
+        type="text" 
+        value="{{selectedDeviceId}}" 
+        data-field="selectedDeviceId"
+        bindinput="onInputChange"
+        placeholder="请输入设备ID（如L0001）"
       />
     </view>
     <view class="input-item">
-      <text>柜子总数：</text>
+      <text>锁板数量：</text>
       <input 
         type="number" 
         value="{{cabinetCount}}" 
         data-field="cabinetCount"
         bindinput="onInputChange"
-        placeholder="请输入要生成的柜子数量"
+        placeholder="每个设备的锁板数量"
       />
     </view>
     <view class="input-item">
-      <text>每个柜子的柜门数：</text>
+      <text>每个锁板的锁数量：</text>
       <input 
         type="number" 
         value="{{lockersPerCabinet}}" 
         data-field="lockersPerCabinet"
         bindinput="onInputChange"
-        placeholder="请输入每个柜子的柜门数量"
+        placeholder="每个锁板的锁数量"
       />
     </view>
     <button 
-      bindtap="batchCreateLockers" 
+      bindtap="batchCreateLockersByDevice" 
       type="primary"
     >
-      批量生成储物柜数据
+      基于设备生成锁具
     </button>
   </view>
     

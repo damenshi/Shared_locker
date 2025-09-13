@@ -3,8 +3,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 // 数据库引用
 const db = cloud.database();
-const lockersCollection = db.collection('lockers');
-// const logsCollection = db.collection('device_logs');
+const devicesCollection = db.collection('devices');
 
 // 云函数主入口
 exports.main = async (event, context) => {
@@ -17,31 +16,31 @@ exports.main = async (event, context) => {
         switch (type) {
             // 1. 设备登录请求处理
             case 'device_login_request':
-                return handleDeviceLogin(deviceId, timestamp);
+                return handleDeviceLogin(deviceId);
                 
             // 2. 设备心跳消息处理
             case 'device_heartbeat':
-                return handleDeviceHeartbeat(deviceId, data, timestamp);
+                return handleDeviceHeartbeat(deviceId);
                 
             // 3. 手机号密码开门请求
             case 'open_by_phone_request':
                 return handleOpenByPhone(deviceId, data);
                 
             // 4. 手机号开门结果反馈
-            case 'open_by_phone_result':
-                return handleOpenByPhoneResult(deviceId, data);
+            // case 'open_by_phone_result':
+            //     return handleOpenByPhoneResult(deviceId, data);
                 
             // 5. 开门结果反馈
-            case 'open_door_result':
-                return handleOpenDoorResult(deviceId, data);
+            // case 'open_door_result':
+            //     return handleOpenDoorResult(deviceId, data);
                 
             // 6. 柜门状态更新
-            case 'door_status_result':
-                return handleDoorStatusUpdate(deviceId, data);
+            // case 'door_status_result':
+            //     return handleDoorStatusUpdate(deviceId, data);
                 
             // 7. 设备离线通知
-            case 'device_offline':
-                return handleDeviceOffline(deviceId, timestamp);
+            // case 'device_offline':
+            //     return handleDeviceOffline(deviceId, timestamp);
                 
             // 未知类型处理
             default:
@@ -59,18 +58,54 @@ exports.main = async (event, context) => {
     }
 };
 
+async function startOfflineCheckTask() {
+  const _ = db.command; // 确保引入数据库命令对象
+  const checkInterval = 60 * 1000; // 1分钟检查一次
+  const offlineThreshold = 5 * 60 * 1000; // 5分钟阈值
+
+  setInterval(async () => {
+      try {
+          const fiveMinutesAgo = new Date(Date.now() - offlineThreshold);
+          
+          // 查询超过5分钟未心跳且在线的设备
+          const offlineDevices = await devicesCollection
+              .where({
+                  isOnline: true,
+                  updatedAt: _.lt(fiveMinutesAgo)
+              })
+              .get();
+
+          if (offlineDevices.data.length > 0) {
+              // 批量更新离线状态
+              await devicesCollection
+                  .where({
+                      deviceId: _.in(offlineDevices.data.map(d => d.deviceId))
+                  })
+                  .update({
+                      isOnline: false,
+                      updatedAt: db.serverDate()
+                  });
+
+              console.log(`已标记 ${offlineDevices.data.length} 个设备为离线`);
+          }
+      } catch (error) {
+          console.error('设备离线检查任务失败:', error);
+      }
+  }, checkInterval);
+}
+
 /**
  * 1. 处理设备登录请求
  * 验证设备ID是否存在于数据库中
  */
 async function handleDeviceLogin(deviceId, timestamp) {
     // 查询设备是否已注册
-    const lockerRes = await lockersCollection
+    const deviceRes = await devicesCollection
         .where({ deviceId })
         .limit(1)
         .get();
 
-    if (lockerRes.data.length === 0) {
+    if (deviceRes.data.length === 0) {
         // 设备未注册
         return {
             code: 404,
@@ -79,22 +114,15 @@ async function handleDeviceLogin(deviceId, timestamp) {
     }
 
     // 更新设备在线状态
-    // await lockersCollection
-    //     .where({ deviceId })
-    //     .update({
-    //         isOnline: true,
-    //         lastLoginTime: timestamp,
-    //         updatedAt: db.serverDate()
-    //     });
-
-    // 记录登录日志
-    // await logsCollection.add({
-    //     deviceId,
-    //     type: 'login',
-    //     timestamp,
-    //     status: 'success',
-    //     createdAt: db.serverDate()
-    // });
+    await devicesCollection
+        .where({ deviceId })
+        .update({
+          data: {
+            isOnline: true,
+            lastLoginTime: timestamp,
+            updatedAt: db.serverDate()
+          }
+        });
 
     // 返回设备编号（可自定义生成规则）
     return {
@@ -110,25 +138,16 @@ async function handleDeviceLogin(deviceId, timestamp) {
  * 更新设备最后活跃时间
  */
 async function handleDeviceHeartbeat(deviceId, data, timestamp) {
-    await lockersCollection
+    await devicesCollection
         .where({ deviceId })
         .update({
-            lastHeartbeat: timestamp,
-            lastActiveTime: db.serverDate()
+          data: {
+            isOnline: true,
+            updatedAt: db.serverDate()
+          }
         });
 
-    // 记录心跳日志（可选，视需求决定是否保存）
-    await logsCollection.add({
-        deviceId,
-        type: 'heartbeat',
-        data: {
-            clientTime: data.clientTime,
-            serverTime: data.serverTime
-        },
-        createdAt: db.serverDate()
-    });
-
-    return { code: 200, message: '心跳已记录' };
+    return { code: 200, message: 'heartbeat recv' };
 }
 
 /**
@@ -136,30 +155,65 @@ async function handleDeviceHeartbeat(deviceId, data, timestamp) {
  * 验证手机号和密码是否匹配有效订单
  */
 async function handleOpenByPhone(deviceId, data) {
-    const { phone, password, time } = data;
-    
-    // 实际业务中需要查询订单表验证手机号和密码
-    const orderRes = await db.collection('orders')
-        .where({
-            phone,
-            password,
-            status: 'valid', // 有效订单
-            deviceId // 订单关联的设备ID
-        })
-        .limit(1)
-        .get();
+  const { phone, password, time } = data;
+  
+  // 1. 验证订单信息
+  const orderRes = await db.collection('orders')
+      .where({
+          phone,
+          password,
+          status: '进行中', // 有效订单
+          deviceId // 订单关联的设备ID
+      })
+      .limit(1)
+      .get();
 
-    if (orderRes.data.length === 0) {
-        return { code: 403, message: '手机号或密码错误' };
-    }
+  if (orderRes.data.length === 0) {
+      return { code: 500, message: '手机号或密码错误' };
+  }
 
-    const order = orderRes.data[0];
-    return {
-        code: 200,
-        data: {
-            doorSort: order.doorSort // 返回要打开的柜门编号
-        }
-    };
+  const order = orderRes.data[0];
+  
+  // 2. 调用locker云函数的openDoor方法开柜
+  try {
+      const openResult = await cloud.callFunction({
+          name: 'locker',
+          data: {
+              action: 'openDoor',
+              deviceId: deviceId,
+              doorNo: order.doorNo,
+              orderId: order._id,
+              cabinetNo: order.cabinetNo,
+              type: 'take' // 取件操作类型
+          }
+      });
+
+      // 3. 处理开柜结果
+      if (openResult.result?.ok) {
+          // 生成doorSort返回格式
+          const cabinetNoStr = String(order.cabinetNo).padStart(2, '0');
+          const doorNoStr = String(order.doorNo).padStart(2, '0');
+          const doorSort = cabinetNoStr + doorNoStr;
+
+          return {
+              code: 200,
+              data: {
+                  doorSort: doorSort,
+              }
+          };
+      } else {
+          return {
+              code: 500,
+              message: '手机号或密码错误', 
+          };
+      }
+  } catch (error) {
+      console.error('调用开柜函数失败:', error);
+      return {
+          code: 500,
+          message: 'opendoor unsuccess'
+      };
+  }
 }
 
 /**
@@ -177,15 +231,7 @@ async function handleOpenByPhoneResult(deviceId, data) {
                 openedAt: db.serverDate()
             });
     }
-
-    // 记录操作日志
-    await logsCollection.add({
-        deviceId,
-        type: 'open_by_phone_result',
-        data: { doorSort, status },
-        createdAt: db.serverDate()
-    });
-
+  
     return { code: 200, message: '开门结果已记录' };
 }
 
@@ -261,3 +307,5 @@ async function handleDeviceOffline(deviceId, timestamp) {
 
     return { code: 200, message: '设备离线已记录' };
 }
+
+startOfflineCheckTask();

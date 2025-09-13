@@ -70,7 +70,7 @@ exports.main = async (event, context) => {
 
         // 1. 更新用户账户
         await transaction.collection('users').doc(user._id).update({
-          data: { deposit: newDeposit, updatedAt: now }
+          data: { deposit: newDeposit, updatedAt: db.serverDate() }
         })
 
         // 更新订单状态
@@ -78,8 +78,8 @@ exports.main = async (event, context) => {
           data: {
             status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
             payAmount: CONSTANTS.FIXED_DEPOSIT,
-            payTime: now,
-            updatedAt: now
+            payTime: db.serverDate(),
+            updatedAt: db.serverDate()
           }
         })
 
@@ -93,7 +93,7 @@ exports.main = async (event, context) => {
 
   // 2. 创建订单
   if (action === 'createOrder') {
-    const { lockerId, phone, code} = event
+    const { lockerId, phone, password} = event
   
     // 参数校验
     const validation = validateParams(event, ['lockerId', 'phone'])
@@ -133,8 +133,8 @@ exports.main = async (event, context) => {
               data: {
                 phone,
                 deposit: 0,
-                createdAt: Date.now(),
-                updatedAt: Date.now()
+                createdAt: db.serverDate(),
+                updatedAt: db.serverDate()
               }
             });
             return { _id: res._id, phone, deposit: 0 };
@@ -149,7 +149,7 @@ exports.main = async (event, context) => {
         const order = {
           openid: OPENID,
           phone,
-          code: code || String(Math.floor(Math.random() * 9000) + 1000),
+          password: password || String(Math.floor(Math.random() * 9000) + 1000),
           lockerId,
           deviceId: lockerDoc.data.deviceId,
           cabinetNo: lockerDoc.data.cabinetNo,
@@ -158,11 +158,11 @@ exports.main = async (event, context) => {
           status: hasEnoughDeposit 
             ? CONSTANTS.ORDER_STATUSES.IN_PROGRESS 
             : CONSTANTS.ORDER_STATUSES.PENDING_PAY,
-          startTime: now,
+          startTime: db.serverDate(),
           deposit: CONSTANTS.FIXED_DEPOSIT, // 固定押金
           userId: user._id, //关联用户ID
-          createdAt: now,
-          updatedAt: now
+          createdAt: db.serverDate(),
+          updatedAt: db.serverDate()
         }
 
         // 创建订单
@@ -173,7 +173,7 @@ exports.main = async (event, context) => {
           data: { 
             status: 'occupied', 
             currentOrderId: addRes._id,
-            updatedAt: now
+            updatedAt: db.serverDate()
           }
         })
         return { orderId: addRes._id }
@@ -233,21 +233,21 @@ exports.main = async (event, context) => {
         await transaction.collection('orders').doc(orderId).update({
           data: {
             status: CONSTANTS.ORDER_STATUSES.COMPLETED,
-            endTime: now,
-            updatedAt: now
+            endTime: db.serverDate(),
+            updatedAt: db.serverDate()
           }
         })
 
         // 释放柜子
-        if (orderDoc.data.lockerId) {
-          await transaction.collection('lockers').doc(orderDoc.data.lockerId).update({
-            data: {
-              status: 'free',
-              currentOrderId: null,
-              updatedAt: now
-            }
-          })
-        }
+        // if (orderDoc.data.lockerId) {
+        //   await transaction.collection('lockers').doc(orderDoc.data.lockerId).update({
+        //     data: {
+        //       status: 'free',
+        //       currentOrderId: null,
+        //       updatedAt: db.serverDate()
+        //     }
+        //   })
+        // }
 
         return { 
           success: true, 
@@ -282,8 +282,8 @@ exports.main = async (event, context) => {
         await transaction.collection('orders').doc(orderId).update({
           data: {
             status: CONSTANTS.ORDER_STATUSES.FORCE_FINISHED,
-            endTime: now,
-            updatedAt: now
+            endTime: db.serverDate(),
+            updatedAt: db.serverDate()
           }
         })
 
@@ -293,7 +293,7 @@ exports.main = async (event, context) => {
             data: {
               status: 'free',
               currentOrderId: null,
-              updatedAt: now
+              updatedAt: db.serverDate()
             }
           })
         }
@@ -346,8 +346,8 @@ exports.main = async (event, context) => {
         data: { 
           status: CONSTANTS.ORDER_STATUSES.REFUNDED, 
           refundAmount: CONSTANTS.FIXED_DEPOSIT,
-          refundTime: now,
-          updatedAt: now 
+          refundTime: db.serverDate(),
+          updatedAt: db.serverDate() 
         } 
       })
       return { ok: true }
@@ -359,11 +359,11 @@ exports.main = async (event, context) => {
   }
 
   // 7. 通过手机号和取件码查询订单
-  if (action === 'queryByPhoneAndCode') {
-    const { phone, code, deviceId} = event;
+  if (action === 'queryByPhoneAndPassword') {
+    const { phone, password, deviceId} = event;
     
     // 参数校验
-    const validation = validateParams(event, ['phone', 'code'])
+    const validation = validateParams(event, ['phone', 'password'])
     if (!validation.valid) {
       return { success: false, errMsg: validation.msg }
     }
@@ -372,7 +372,7 @@ exports.main = async (event, context) => {
       const { data } = await db.collection('orders')
         .where({
           phone,
-          code,
+          password,
           status: _.in(CONSTANTS.VALID_STATUSES_FOR_QUERY)
         })
         .field({
@@ -392,11 +392,11 @@ exports.main = async (event, context) => {
         console.log(`匹配到订单：ID=${data[0]._id}，柜门=${data[0].doorNo}`)
         return { success: true, data: data[0] }
       } else {
-        console.log(`未找到手机号${phone}、取件码${code}的有效订单`)
+        console.log(`未找到手机号${phone}、取件码${password}的有效订单`)
         return { success: true, data: null }
       }
     } catch (err) {
-      console.error('查询订单失败', { phone, code, error: err.message })
+      console.error('查询订单失败', { phone, password, error: err.message })
       return { success: false, errMsg: err.message }
     }
   }
@@ -460,8 +460,8 @@ exports.main = async (event, context) => {
       await db.collection('orders').doc(orderId).update({
         data: {
           status: targetStatus,
-          recoverAt: Date.now(), // 记录恢复时间
-          updatedAt: Date.now()
+          recoverAt: db.serverDate(), // 记录恢复时间
+          updatedAt: db.serverDate()
         }
       });
   

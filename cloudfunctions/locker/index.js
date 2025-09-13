@@ -111,8 +111,8 @@ exports.main = async (event, context) => {
     }
 
     const HARDWARE_MAPPING = {
-      1: { ip: '1.116.109.239', port: 3000, deviceKey: 'locker-1' }, 
-      2: { ip: '1.116.109.239', port: 3000, deviceKey: 'locker-2' },
+      1: { ip: '1.116.109.239', port: 3000, deviceId: 'L0001' }, 
+      2: { ip: '1.116.109.239', port: 3000, deviceId: 'L0002' },
     };
   
     const callHardwareOpen = async (deviceId, cabinetNo, doorNo) => {
@@ -143,10 +143,10 @@ exports.main = async (event, context) => {
           },
           { timeout: 8000 }  // 8秒超时设置
         );
-    
+
         // 3. 验证服务器返回结果
-        if (response.data.code !== 200 || !response.data.success) {
-          throw new Error(`服务器响应异常: ${response.data.msg || '未知错误'}`);
+        if (response.data.code !== 200) {
+          throw new Error(`服务器响应异常`);
         }
         return true;
       } catch (err) {
@@ -210,14 +210,14 @@ exports.main = async (event, context) => {
             data: {
               status: 'occupied',
               currentOrderId: orderId,
-              lastOpenAt: now,
-              updatedAt: now
+              lastOpenAt: db.serverDate(),
+              updatedAt: db.serverDate()
             }
           })
 
           // 更新订单信息
           await transaction.collection('orders').doc(orderId).update({
-            data: { deviceId ,doorNo, cabinetNo, updatedAt: now }
+            data: { deviceId ,doorNo, cabinetNo, updatedAt: db.serverDate() }
           })
 
           return { 
@@ -237,7 +237,7 @@ exports.main = async (event, context) => {
           }
 
           // 模拟硬件开柜
-          const openSuccess = callHardwareOpen(deviceId, doorNo, cabinetNo);
+          const openSuccess = callHardwareOpen(deviceId, cabinetNo, doorNo);
           if (!openSuccess) {
             throw new Error(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 硬件开柜失败`)
           }
@@ -247,8 +247,8 @@ exports.main = async (event, context) => {
             data: {
               status: 'free',
               currentOrderId: null,
-              lastOpenAt: now,
-              updatedAt: now
+              lastOpenAt: db.serverDate(),
+              updatedAt: db.serverDate()
             }
           })
 
@@ -295,7 +295,7 @@ exports.main = async (event, context) => {
     try {
       const updateData = {
         status,
-        updatedAt: Date.now()
+        updatedAt: db.serverDate()
       }
       // 占用状态需关联订单，空闲状态需清空订单
       updateData.currentOrderId = status === 'occupied' ? orderId : null
@@ -344,7 +344,7 @@ exports.main = async (event, context) => {
         data: {
           status: 'free',
           currentOrderId: null,
-          updatedAt: Date.now()
+          updatedAt: db.serverDate()
         }
       })
       

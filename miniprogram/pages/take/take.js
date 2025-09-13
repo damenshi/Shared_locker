@@ -1,24 +1,23 @@
 Page({
   data: {
     phone: '',       // 从首页传递的手机号
-    code: '',        // 从首页传递的取件码
+    password: '',        // 从首页传递的取件码
     deviceId: null,
     isLoading: false // 加载状态
   },
 
   onLoad(options) {
     // 接收首页传递的参数并验证
-    // const { phone = '', code = '', deviceId = null} = options;
     this.setData({
       phone: options.phone || '',
-      code: options.code || '',
+      password: options.password || '',
       // deviceId: options.deviceId || null,
       deviceId: 'L0001'
     });
-    this.setData({ phone, code, deviceId});
+    // this.setData({ phone, password, deviceId});
 
     // 自动触发取件流程
-    if (phone && code) {
+    if (this.data.phone && this.data.password) {
       this.handleTakeItem();
     } else {
       this.showError('请先输入手机号和取件码', () => {
@@ -62,7 +61,7 @@ Page({
    * @returns {boolean} 验证结果
    */
   validateInput() {
-    const { phone, code } = this.data;
+    const { phone, password } = this.data;
     
     // 手机号验证（11位数字）
     if (!/^\d{11}$/.test(phone)) {
@@ -71,7 +70,7 @@ Page({
     }
     
     // 取件码验证（4位数字）
-    if (!/^\d{4}$/.test(code)) {
+    if (!/^\d{4}$/.test(password)) {
       wx.showToast({ title: '请输入4位取件码', icon: 'none' });
       return false;
     }
@@ -85,7 +84,7 @@ Page({
    */
   async queryMatchedOrder() {
     try {
-      const { phone, code, deviceId} = this.data;
+      const { phone, password, deviceId} = this.data;
       if (!deviceId || !/^L\d+$/.test(deviceId)) {
         wx.showToast({ title: '设备ID格式错误', icon: 'none' });
         return null;
@@ -93,9 +92,9 @@ Page({
       const res = await wx.cloud.callFunction({
         name: "order",
         data: {
-          action: "queryByPhoneAndCode",
+          action: "queryByPhoneAndPassword",
           phone,
-          code,
+          password,
           deviceId: deviceId
         }
       });
