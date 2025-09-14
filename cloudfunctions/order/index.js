@@ -297,25 +297,25 @@ exports.main = async (event, context) => {
 
   // 6. 退款操作
   if (action === 'refund') {
-    const { id } = event
+    const { phone } = event
     
     // 参数校验
-    const validation = validateParams(event, ['id'])
+    const validation = validateParams(event, ['phone'])
     if (!validation.valid) {
       return { ok: false, errMsg: validation.msg }
     }
 
     try {
       return await db.runTransaction(async transaction => {
-        const orderDoc = await transaction.collection('orders').doc(id).get()
+        const orderDoc = await transaction.collection('orders').doc(phone).get()
         if (!orderDoc.data) {
           throw new Error('订单不存在')
         }
       
       const order = orderDoc.data;
       // 验证订单是否可退款
-      if (![CONSTANTS.ORDER_STATUSES.COMPLETED, CONSTANTS.ORDER_STATUSES.IN_PROGRESS].includes(orderDoc.data.status)) {
-        return { ok: false, errMsg: `订单状态为${orderDoc.data.status}，不可退款` }
+      if (![CONSTANTS.ORDER_STATUSES.COMPLETED, CONSTANTS.ORDER_STATUSES.CANCELLED].includes(order.status)) {
+        return { ok: false, errMsg: `使用中，请先取包再退款` }
       }
 
       // 查询用户账户
@@ -327,15 +327,13 @@ exports.main = async (event, context) => {
       await transaction.collection('users').doc(user._id).update({
         data: {
           deposit: user.deposit - CONSTANTS.FIXED_DEPOSIT,
-          updatedAt: now
+          updatedAt: db.serverDate()
         }
       })
 
-      await db.collection('orders').doc(id).update({ 
+      await db.collection('orders').doc(user._id).update({ 
         data: { 
           status: CONSTANTS.ORDER_STATUSES.REFUNDED, 
-          refundAmount: CONSTANTS.FIXED_DEPOSIT,
-          refundTime: db.serverDate(),
           updatedAt: db.serverDate() 
         } 
       })
@@ -392,7 +390,7 @@ exports.main = async (event, context) => {
   }
 
   // 8. 根据订单ID查询
-  if (action === 'queryById') {
+  if (action === 'getCurrentUser') {
     const { orderId } = event;
     
     // 参数校验

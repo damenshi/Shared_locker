@@ -1,12 +1,26 @@
 <view class="container">
   <!-- 顶部用户信息 -->
   <view class="user-info">
-    <view class="avatar">
-      <image src="/images/avatar-default.png" mode="widthFix"></image>
+    <view class="avatar" bindtap="getUserProfile">
+      <!-- 显示用户头像或默认图标 -->
+      <image 
+        wx:if="{{userInfo.avatarUrl}}" 
+        src="{{userInfo.avatarUrl}}" 
+        mode="widthFix"
+        style="width: 120rpx; height: 120rpx; border-radius: 50%;"
+      />
+      <icon wx:else type="user" size="60" color="#ffffff" />
     </view>
     <view class="user-detail">
-      <view class="phone">{{phone || '未登录'}}</view>
+      <view class="phone">{{userInfo.nickName || phone || '未登录'}}</view>
       <view class="deposit">账户余额：¥{{deposit.toFixed(2)}}</view>
+      <button 
+        class="refund-all-btn" 
+        bindtap="handleAllRefund"
+        wx:if="{{deposit > 0 && phone}}"
+      >
+        退款
+      </button>
     </view>
   </view>
 
@@ -15,7 +29,7 @@
     <!-- 我的订单 -->
     <view class="menu-item" bindtap="goMyOrders">
       <view class="menu-icon">
-        <image src="/images/icon-order.png" mode="widthFix"></image>
+        <icon type="list" size="40" color="#666" />
       </view>
       <view class="menu-text">我的订单</view>
       <view class="menu-arrow">→</view>
@@ -24,7 +38,7 @@
     <!-- 退款记录 -->
     <view class="menu-item" bindtap="goRefundRecords">
       <view class="menu-icon">
-        <image src="/images/icon-refund.png" mode="widthFix"></image>
+        <icon type="refresh" size="40" color="#666" />
       </view>
       <view class="menu-text">退款记录</view>
       <view class="menu-arrow">→</view>
