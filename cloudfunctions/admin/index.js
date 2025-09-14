@@ -72,13 +72,13 @@ const batchCreateDevices = async (event) => {
 }
 
 const batchCreateLockers = async (event) => {
-  const { deviceId, cabinetCount, lockersPerCabinet } = event
+  const { deviceId, deviceAddress, cabinetCount, lockersPerCabinet } = event
   
   // 验证参数
-  if (!deviceId || !cabinetCount || !lockersPerCabinet) {
+  if (!deviceId || !deviceAddress || !cabinetCount || !lockersPerCabinet) {
     return { 
       success: false, 
-      errMsg: '请指定设备ID、锁板数量和每个锁板的锁数量' 
+      errMsg: '请指定设备ID、设备地址、锁板数量和每个锁板的锁数量' 
     }
   }
 
@@ -101,6 +101,7 @@ const batchCreateLockers = async (event) => {
       for (let doorNo = 1; doorNo <= lockersPerCabinet; doorNo++) {
         lockers.push({
           deviceId: deviceId,    // 关联设备ID
+          deviceAddress: deviceAddress,
           cabinetNo: cabinetNo,  // 锁板编号
           doorNo: doorNo,        // 锁编号
           status: 'free',        // 初始空闲

@@ -238,17 +238,6 @@ exports.main = async (event, context) => {
           }
         })
 
-        // 释放柜子
-        // if (orderDoc.data.lockerId) {
-        //   await transaction.collection('lockers').doc(orderDoc.data.lockerId).update({
-        //     data: {
-        //       status: 'free',
-        //       currentOrderId: null,
-        //       updatedAt: db.serverDate()
-        //     }
-        //   })
-        // }
-
         return { 
           success: true, 
           deposit: CONSTANTS.FIXED_DEPOSIT
@@ -373,6 +362,7 @@ exports.main = async (event, context) => {
         .where({
           phone,
           password,
+          deviceId,
           status: _.in(CONSTANTS.VALID_STATUSES_FOR_QUERY)
         })
         .field({

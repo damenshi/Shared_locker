@@ -86,7 +86,7 @@ Page({
     try {
       const { phone, password, deviceId} = this.data;
       if (!deviceId || !/^L\d+$/.test(deviceId)) {
-        wx.showToast({ title: '设备ID格式错误', icon: 'none' });
+        wx.showToast({ title: '设备错误', icon: 'none' });
         return null;
       }
       const res = await wx.cloud.callFunction({
@@ -99,19 +99,14 @@ Page({
         }
       });
 
-      // 检查云函数调用是否成功
-      if (!res.result) {
-        throw new Error('查询接口返回异常');
-      }
-      if (!res.result.success) {
+      if (!res.result || !res.result.success) {
         throw new Error(res.result.errMsg || '查询订单失败');
       }
-
       return res.result.data || null;
     } catch (e) {
       console.error("查询订单失败:", e);
       wx.showToast({ 
-        title: `查询失败: ${e.message}`, 
+        title: `无有效订单`, 
         icon: 'none',
         duration: 3000
       });
@@ -140,12 +135,10 @@ Page({
       });
 
       console.log("开柜接口返回:", res.result);
-
       // 验证开柜结果
       if (!res.result || res.result.ok !== true) {
-        throw new Error(res.result?.errMsg || '开柜失败，未知原因');
+        throw new Error(res.result?.errMsg || '开柜失败');
       }
-
       return true;
     } catch (e) {
       console.error("开柜操作失败:", e);
@@ -176,12 +169,11 @@ Page({
       if (!res.result || !res.result.success) {
         throw new Error(res.result?.errMsg || '完成订单失败');
       }
-
       return true;
     } catch (e) {
       console.error("完成订单失败:", e);
       wx.showToast({ 
-        title: `订单状态更新失败: ${e.message}`, 
+        title: `结束订单失败`, 
         icon: 'none',
         duration: 3000
       });

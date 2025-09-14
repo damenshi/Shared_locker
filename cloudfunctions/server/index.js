@@ -8,7 +8,7 @@ const devicesCollection = db.collection('devices');
 // 云函数主入口
 exports.main = async (event, context) => {
     const body = event.body ? JSON.parse(event.body) : {};
-    const { type, deviceId, data, timestamp } = body;
+    const { type, deviceId, data} = body;
     console.log(`收到WebSocket转发消息:`, event);
 
     try {

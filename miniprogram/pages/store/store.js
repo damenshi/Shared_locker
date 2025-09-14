@@ -1,17 +1,4 @@
 Page({
-  // 常量定义：集中管理固定值，便于维护
-  // constants: {
-  //   NAVIGATE_DELAY: 2000,        // 导航延迟时间(ms)
-  //   ORDER_STATUS_PROCESSING: '进行中' // 订单进行中状态
-  // },
-
-  // data: {
-  //   display: {},                 // 格式化的展示数据
-  //   currentOrderId: null,        // 当前订单ID
-  //   isLoading: false,            // 加载状态标记
-  //   phone: '',                   // 从首页传递的手机号
-  //   code: ''                     // 从首页传递的取件码
-  // },
   data: {
     phone: '',       // 手机号
     password: '',        // 取件码
@@ -34,50 +21,6 @@ Page({
     });
     this.handleStoreItem();
   },
-
-  /**
-   * 初始化计费规则
-   * 加载远程规则，失败时使用默认值
-   */
-  // async initBillingRules() {
-  //   try {
-  //     const res = await wx.cloud.callFunction({ 
-  //       name: "billing", 
-  //       data: { action: "getRules" } 
-  //     });
-  //     const rules = res.result.data || {};
-  //     this.setBillingDisplay(rules);
-  //   } catch (e) {
-  //     console.error("获取计费规则失败，使用默认规则", e);
-  //     // 加载失败时使用默认规则
-  //     const defaultRules = {
-  //       freeMinutes: 15,
-  //       firstPeriodMinutes: 60,
-  //       firstPeriodPrice: 300,
-  //       unitMinutes: 30,
-  //       unitPrice: 100,
-  //       capPrice: 2000,
-  //       depositPrice: 500
-  //     };
-  //     this.setBillingDisplay(defaultRules);
-  //   }
-  // },
-
-  /**
-   * 格式化计费规则为展示文本
-   * @param {Object} rules - 计费规则数据
-   */
-  // setBillingDisplay(rules) {
-  //   const display = {
-  //     free: `免费${rules.freeMinutes || 15}分钟`,
-  //     first: `首${rules.firstPeriodMinutes || 60}分钟￥${((rules.firstPeriodPrice || 300) / 100).toFixed(2)}`,
-  //     unit: `续费每${rules.unitMinutes || 30}分钟￥${((rules.unitPrice || 100) / 100).toFixed(2)}`,
-  //     cap: `封顶￥${((rules.capPrice || 2000) / 100).toFixed(2)}`,
-  //     deposit: `押金￥${((rules.depositPrice || 500) / 100).toFixed(2)}`,
-  //     totalPrepay: `预支付:￥${(((rules.firstPeriodPrice || 300) + (rules.depositPrice || 500)) / 100).toFixed(2)}`
-  //   };
-  //   this.setData({ rules, display });
-  // },
 
   /**
    * 参数验证
@@ -124,7 +67,7 @@ Page({
       if (res.result?.success && res.result.data?.length > 0) {
         return res.result.data[0];
       } else {
-        wx.showToast({ title: '暂无可用柜子', icon: 'none' });
+        wx.showToast({ title: '储物柜已满', icon: 'none' });
         return null;
       }
     } catch (e) {
@@ -159,14 +102,7 @@ Page({
       if (res.result?.orderId) {
         this.setData({ currentOrderId: res.result.orderId });
         return res.result.orderId;
-      } else if (res.result?.error) {
-        wx.showToast({ 
-          title: `创建失败: ${res.result.error}`, 
-          icon: 'none', 
-          duration: 3000 
-        });
-        return null;
-      } else {
+      }else {
         wx.showToast({ title: '创建订单失败', icon: 'none' });
         return null;
       }
@@ -215,35 +151,35 @@ Page({
    * @param {string} orderId - 订单ID
    * @returns {boolean} 状态是否有效
    */
-  async verifyOrderStatus(orderId) {
-    try {
-      const res = await wx.cloud.callFunction({
-        name: "order",
-        data: {
-          action: "getOrder",
-          id: orderId
-        }
-      });
+// async verifyOrderStatus(orderId) {
+//     try {
+//       const res = await wx.cloud.callFunction({
+//         name: "order",
+//         data: {
+//           action: "getOrder",
+//           id: orderId
+//         }
+//       });
       
-      if (!res.result?.data) {
-        wx.showToast({ title: '查询订单失败', icon: 'none' });
-        return false;
-      }
+//       if (!res.result?.data) {
+//         wx.showToast({ title: '查询订单失败', icon: 'none' });
+//         return false;
+//       }
 
-      if (res.result.data.status !== this.data.constants.ORDER_STATUS_PROCESSING) {
-        wx.showToast({ 
-          title: `订单状态异常（当前：${res.result.data.status}）`, 
-          icon: 'none' 
-        });
-        return false;
-      }
-      return true;
-    } catch (e) {
-      console.error("验证订单状态异常", e);
-      wx.showToast({ title: '验证订单状态失败', icon: 'none' });
-      return false;
-    }
-  },
+//       if (res.result.data.status !== this.data.constants.ORDER_STATUS_PROCESSING) {
+//         wx.showToast({ 
+//           title: `订单状态异常（当前：${res.result.data.status}）`, 
+//           icon: 'none' 
+//         });
+//         return false;
+//       }
+//       return true;
+//     } catch (e) {
+//       console.error("验证订单状态异常", e);
+//       wx.showToast({ title: '验证订单状态失败', icon: 'none' });
+//       return false;
+//     }
+//   },
 
   /**
    * 打开柜门
@@ -393,35 +329,23 @@ Page({
           await this.recoverOrder(orderId);
           return;
         }
-
-        // 验证订单状态
-        const isOrderValid = await this.verifyOrderStatus(orderId);
-        if (!isOrderValid) {
-          await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
-          await this.recoverOrder(orderId);
-          return;
-        }
       }
 
       // 7. 开柜操作
       wx.showLoading({ title: '打开柜门中...' });
       const openSuccess = await this.openCabinet(lockerInfo, orderId);
-      
+      const opennum = (lockerInfo.cabinetNo - 1) * 2 + lockerInfo.doorNo;//每个锁板包含两个锁
+
       if (openSuccess) {
         wx.hideLoading();
         wx.showToast({ 
-          title: `柜门 ${lockerInfo.doorNo} 已打开`, 
+          title: `柜门 ${opennum} 已打开`, 
           icon: 'success',
           duration: 3000
         });
-        // setTimeout(() => {
-        //   wx.navigateTo({
-        //     url: `${this.constants.ORDER_DETAIL_PAGE}?orderId=${orderId}&doorNo=${lockerInfo.doorNo}`
-        //   });
-        // }, 3000);
       } else {
         wx.hideLoading();
-        wx.showToast({ title: '支付成功，开门失败', icon: 'none' });
+        wx.showToast({ title: '开门失败', icon: 'none' });
         await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
         await this.recoverOrder(orderId);
       }

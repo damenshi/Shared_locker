@@ -110,17 +110,7 @@ exports.main = async (event, context) => {
       return { ok: false, errMsg: validation.msg }
     }
 
-    const HARDWARE_MAPPING = {
-      1: { ip: '1.116.109.239', port: 3000, deviceId: 'L0001' }, 
-      2: { ip: '1.116.109.239', port: 3000, deviceId: 'L0002' },
-    };
-  
     const callHardwareOpen = async (deviceId, cabinetNo, doorNo) => {
-      // 1. 获取对应柜号的硬件信息（如果需要的话）
-      const hardware = HARDWARE_MAPPING[cabinetNo];
-      if (!hardware) {
-        throw new Error(`未配置柜号 ${cabinetNo} 的信息`);
-      }
     
       try {
         // 2. 调用socket服务器接口
@@ -145,7 +135,7 @@ exports.main = async (event, context) => {
         );
 
         // 3. 验证服务器返回结果
-        if (response.data.code !== 200) {
+        if (response.data.code !== 200 || response.data.doorSort != combinedCode) {
           throw new Error(`服务器响应异常`);
         }
         return true;
@@ -277,47 +267,47 @@ exports.main = async (event, context) => {
   }
 
   // 3. 更新柜子状态
-  if (action === 'updateStatus') {
-    const { lockerId, status, orderId } = event
+  // if (action === 'updateStatus') {
+  //   const { lockerId, status, orderId } = event
 
-    // 参数校验
-    const validation = validateParams(event, {
-      lockerId: { type: 'string' },
-      status: { enum: CONSTANTS.LOCKER_STATUSES }
-    })
-    if (!validation.valid) {
-      return { success: false, errMsg: validation.msg }
-    }
-    if (status === 'occupied' && (!orderId || typeof orderId !== 'string')) {
-      return { success: false, errMsg: '标记为占用状态时，orderId不能为空且必须为字符串' }
-    }
+  //   // 参数校验
+  //   const validation = validateParams(event, {
+  //     lockerId: { type: 'string' },
+  //     status: { enum: CONSTANTS.LOCKER_STATUSES }
+  //   })
+  //   if (!validation.valid) {
+  //     return { success: false, errMsg: validation.msg }
+  //   }
+  //   if (status === 'occupied' && (!orderId || typeof orderId !== 'string')) {
+  //     return { success: false, errMsg: '标记为占用状态时，orderId不能为空且必须为字符串' }
+  //   }
 
-    try {
-      const updateData = {
-        status,
-        updatedAt: db.serverDate()
-      }
-      // 占用状态需关联订单，空闲状态需清空订单
-      updateData.currentOrderId = status === 'occupied' ? orderId : null
+  //   try {
+  //     const updateData = {
+  //       status,
+  //       updatedAt: db.serverDate()
+  //     }
+  //     // 占用状态需关联订单，空闲状态需清空订单
+  //     updateData.currentOrderId = status === 'occupied' ? orderId : null
 
-      await db.collection('lockers').doc(lockerId).update({ data: updateData })
-      return { success: true, message: `柜状态已更新为${status}` }
-    } catch (err) {
-      console.error('更新柜子状态失败', err)
-      // 占用状态更新失败时，自动恢复为空闲
-      if (status === 'occupied') {
-        try {
-          await db.collection('lockers').doc(lockerId).update({
-            data: { status: 'free', currentOrderId: null, updatedAt: Date.now() }
-          })
-          return { success: false, errMsg: `${err.message}，已自动恢复为空闲状态` }
-        } catch (recoverErr) {
-          console.error('恢复状态失败', recoverErr)
-        }
-      }
-      return { success: false, errMsg: `更新状态失败：${err.message}` }
-    }
-  }
+  //     await db.collection('lockers').doc(lockerId).update({ data: updateData })
+  //     return { success: true, message: `柜状态已更新为${status}` }
+  //   } catch (err) {
+  //     console.error('更新柜子状态失败', err)
+  //     // 占用状态更新失败时，自动恢复为空闲
+  //     if (status === 'occupied') {
+  //       try {
+  //         await db.collection('lockers').doc(lockerId).update({
+  //           data: { status: 'free', currentOrderId: null, updatedAt: Date.now() }
+  //         })
+  //         return { success: false, errMsg: `${err.message}，已自动恢复为空闲状态` }
+  //       } catch (recoverErr) {
+  //         console.error('恢复状态失败', recoverErr)
+  //       }
+  //     }
+  //     return { success: false, errMsg: `更新状态失败：${err.message}` }
+  //   }
+  // }
 
   // 4. 恢复柜子状态为空闲
   if (action === 'recoverLocker') {
@@ -356,35 +346,86 @@ exports.main = async (event, context) => {
   }
 
   // 5. 根据柜门查询柜号
-  if (action === 'getByIdByNo') {
-    const { doorNo } = event
+  // if (action === 'getByIdByNo') {
+  //   const { doorNo } = event
 
-    // 参数校验
+  //   // 参数校验
+  //   const validation = validateParams(event, {
+  //     doorNo: { type: 'number' }
+  //   })
+  //   if (!validation.valid) {
+  //     return { success: false, errMsg: validation.msg }
+  //   }
+
+  //   try {
+  //     const res = await db.collection('lockers').where({ doorNo }).get()
+      
+  //     if (res.data.length > 0) {
+  //       return { 
+  //         success: true, 
+  //         lockerId: res.data[0]._id, 
+  //         data: res.data[0] 
+  //       }
+  //     } else {
+  //       return { success: false, errMsg: `未找到柜门${doorNo}的记录` }
+  //     }
+  //   } catch (err) {
+  //     console.error('查询柜门失败', err)
+  //     return { success: false, errMsg: `查询柜门失败：${err.message}` }
+  //   }
+  // }
+
+  if (action === 'queryDoorStatus') {
+    const { deviceId, cabinetNo, doorNo} = event;
     const validation = validateParams(event, {
-      doorNo: { type: 'number' }
+      deviceId: {type: 'string'},
+      doorNo: { type: 'number' },
+      cabinetNo: { type: 'number' } 
     })
     if (!validation.valid) {
       return { success: false, errMsg: validation.msg }
     }
 
     try {
-      const res = await db.collection('lockers').where({ doorNo }).get()
+      const axios = require('axios');
+      const formattedCabinetNo = String(cabinetNo).padStart(2, '0');
+      const formattedDoorNo = String(doorNo).padStart(2, '0');
+      const combinedCode = formattedCabinetNo + formattedDoorNo;
+      const response = await axios.post(
+        'http://1.116.109.239:3000/send-command', 
+        {
+          direct: 'doorStatus',
+          deviceId: deviceId,
+          data: {
+            doorSort: combinedCode,
+          }
+        },
+        { timeout: 8000 }  // 8秒超时设置
+      );
       
-      if (res.data.length > 0) {
-        return { 
-          success: true, 
-          lockerId: res.data[0]._id, 
-          data: res.data[0] 
-        }
-      } else {
-        return { success: false, errMsg: `未找到柜门${doorNo}的记录` }
+      if (response.data.code !== 200 || response.data.doorSort != combinedCode) {
+        throw new Error(`服务器响应异常`);
       }
-    } catch (err) {
-      console.error('查询柜门失败', err)
-      return { success: false, errMsg: `查询柜门失败：${err.message}` }
+      return {
+        success: true,
+        data: {
+          status: response.data.status, // 字符串状态（'open'/'closed'等）
+          doorNo,
+          cabinetNo,
+          deviceId
+        }
+      };
+    }catch (err) {
+      if (err.code === 'ECONNABORTED') {
+        throw new Error(`连接超时，请检查服务器是否在线`);
+      }
+      if (err.response) {
+        throw new Error(`服务器返回错误: ${err.response.status} ${err.response.statusText}`);
+      }
     }
   }
 
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 }
+

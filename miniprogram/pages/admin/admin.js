@@ -18,6 +18,11 @@ Page({
     // selectedDeviceId: null,
     // qrcodeList: [],
     
+    queryDeviceId: '',      // 要查询的设备ID
+    queryCabinetNo: '',     // 要查询的锁板号
+    queryDoorNo: '',        // 要查询的柜门号
+    doorStatusResult: null,  // 查询结果（存储柜门状态）
+
     // 加载状态
     loading: false
   },
@@ -184,9 +189,9 @@ Page({
   
   //基于设备生成锁
   async batchCreateLockersByDevice() {
-    const { selectedDeviceId, cabinetCount, lockersPerCabinet } = this.data;
+    const { selectedDeviceId, deviceAddress, cabinetCount, lockersPerCabinet } = this.data;
     
-    if (!selectedDeviceId || cabinetCount <= 0 || lockersPerCabinet <= 0) {
+    if (!deviceAddress || !selectedDeviceId || cabinetCount <= 0 || lockersPerCabinet <= 0) {
       return wx.showToast({ 
         title: '请选择设备并输入有效的锁板/锁数量', 
         icon: 'none' 
@@ -201,6 +206,7 @@ Page({
         data: {
           action: 'batchCreateLockers',
           deviceId: selectedDeviceId, // 指定设备ID
+          deviceAddress: deviceAddress,
           cabinetCount: parseInt(cabinetCount),
           lockersPerCabinet: parseInt(lockersPerCabinet)
         }
@@ -227,7 +233,53 @@ Page({
     }
   },
 
+  // 4. 查询柜门状态（新增方法）
+  async queryDoorStatus() {
+    const { queryDeviceId, queryCabinetNo, queryDoorNo } = this.data;
+    
+    // 参数校验
+    if (!queryDeviceId || !queryCabinetNo || !queryDoorNo) {
+      return wx.showToast({ title: '请输入设备ID、锁板号和柜门号', icon: 'none' });
+    }
+    if (!/^L\d+$/.test(queryDeviceId)) { // 验证设备ID格式（如L0001）
+      return wx.showToast({ title: '设备ID格式错误（如L0001）', icon: 'none' });
+    }
+    if (isNaN(queryCabinetNo) || isNaN(queryDoorNo)) { // 验证数字格式
+      return wx.showToast({ title: '锁板号和柜门号必须为数字', icon: 'none' });
+    }
 
+    this.showLoading('查询柜门状态中...');
+    
+    try {
+      const result = await wx.cloud.callFunction({
+        name: 'locker', // 调用locker云函数的queryDoorStatus接口
+        data: {
+          action: 'queryDoorStatus',
+          deviceId: queryDeviceId,
+          cabinetNo: parseInt(queryCabinetNo), // 转换为数字
+          doorNo: parseInt(queryDoorNo)       // 转换为数字
+        }
+      });
+
+      this.hideLoading();
+      
+      if (result.result.success) {
+        // 存储查询结果，用于页面展示
+        this.setData({
+          doorStatusResult: `柜门状态：${result.result.data.status}（最后更新：${new Date().toLocaleString()}）`
+        });
+        wx.showToast({ title: '查询成功', icon: 'success' });
+      } else {
+        this.setData({ doorStatusResult: null });
+        wx.showToast({ title: result.result.errMsg || '查询失败', icon: 'none' });
+      }
+    } catch (err) {
+      this.hideLoading();
+      this.setData({ doorStatusResult: null });
+      console.error('查询柜门状态失败：', err);
+      wx.showToast({ title: '操作失败，请重试', icon: 'none' });
+    }
+  },
   // 5. 生成储物柜二维码
   // async generateLockerQrcodes() {
   //   const { selectedDeviceId } = this.data;

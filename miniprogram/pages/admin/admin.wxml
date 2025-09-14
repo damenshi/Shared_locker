@@ -89,6 +89,16 @@
         placeholder="请输入设备ID（如L0001）"
       />
     </view>
+      <view class="input-item">
+      <text>设备地址：</text>
+      <input 
+        type="text" 
+        value="{{deviceAddress}}" 
+        data-field="deviceAddress"
+        bindinput="onInputChange"
+        placeholder="请输入设备安装地址"
+      />
+    </view>
     <view class="input-item">
       <text>锁板数量：</text>
       <input 
@@ -147,5 +157,50 @@
         </view>
       </view>
     </view>
+  </view>
+</view>
+
+<!-- 柜门状态查询区域（新增） -->
+<view class="card">
+  <view class="card-title">柜门状态查询</view>
+  <view class="input-item">
+    <text>设备ID：</text>
+    <input 
+      type="text" 
+      value="{{queryDeviceId}}" 
+      data-field="queryDeviceId"
+      bindinput="onInputChange"
+      placeholder="如L0001"
+    />
+  </view>
+  <view class="input-item">
+    <text>锁板号：</text>
+    <input 
+      type="number" 
+      value="{{queryCabinetNo}}" 
+      data-field="queryCabinetNo"
+      bindinput="onInputChange"
+      placeholder="如1、2"
+    />
+  </view>
+  <view class="input-item">
+    <text>柜门号：</text>
+    <input 
+      type="number" 
+      value="{{queryDoorNo}}" 
+      data-field="queryDoorNo"
+      bindinput="onInputChange"
+      placeholder="如1、2"
+    />
+  </view>
+  <button 
+    bindtap="queryDoorStatus" 
+    type="primary"
+  >
+    查询柜门状态
+  </button>
+  <!-- 展示查询结果 -->
+  <view class="status-result" wx:if="{{doorStatusResult}}">
+    {{doorStatusResult}}
   </view>
 </view>
