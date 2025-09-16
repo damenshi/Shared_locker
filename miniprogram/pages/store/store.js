@@ -1,13 +1,16 @@
+const app = getApp();
+
 Page({
   data: {
     phone: '',       // 手机号
     password: '',        // 取件码
+    openid: '',
     isLoading: false,
-    deviceId: 'L0001',
+    deviceId: '',
     constants: {
       ORDER_STATUS_PROCESSING: '进行中',
+      DEPOSIT: 15,
       NAVIGATE_DELAY: 2000,
-      // ORDER_DETAIL_PAGE: '/pages/order/detail'
     }
   },
 
@@ -16,8 +19,9 @@ Page({
     this.setData({
       phone: options.phone || '',
       password: options.password || '',
-      // deviceId: options.deviceId || null,
-      deviceId: 'L0001'
+      openid: app.globalData.openid || '',
+      deviceId: app.globalData.deviceId || '',
+      // deviceId: '6de04f165a9c7e88'
     });
     this.handleStoreItem();
   },
@@ -50,8 +54,8 @@ Page({
     try {
       const deviceId = this.data.deviceId;
       console.log("deviceId: ", deviceId);
-      if (!deviceId || !/^L\d+$/.test(deviceId)) {
-        wx.showToast({ title: '设备ID格式错误', icon: 'none' });
+      if (!deviceId) {
+        wx.showToast({ title: '无法获取设备id', icon: 'none' });
         return null;
       }
       const res = await wx.cloud.callFunction({
@@ -77,6 +81,40 @@ Page({
     }
   },
 
+   /**
+   * 查询可用柜子
+   * @returns {Object|null} 可用柜子信息或null
+   */
+  async checkOrder() {
+    try {
+      const openid = this.data.openid;
+      const deviceId = this.data.deviceId;
+      if (!openid) {
+        wx.showToast({ title: '无法获取用户信息', icon: 'none' });
+        return null;
+      }
+      const res = await wx.cloud.callFunction({
+        name: "order",
+        data: { 
+          action: "queryByOpenid",
+          openid: openid,
+          deviceId: deviceId
+        } 
+      });
+      
+      console.log("查询订单结果：", res.result);
+      if (res.result?.success) {
+        return res.result;
+      } else {
+        wx.showToast({ title: '存包查询订单失败：', icon: 'none' });
+        return null;
+      }
+    } catch (e) {
+      console.error("存包查询订单失败", e);
+      return null;
+    }
+  },
+
   /**
    * 创建订单
    * @param {Object} lockerInfo - 柜子信息
@@ -88,14 +126,15 @@ Page({
       if (!this.validateParams()) {
         return null;
       }
-
+      console.log(`createOrder openid:`, this.data.openid);
       const res = await wx.cloud.callFunction({
         name: "order",
         data: {
           action: "createOrder",
           lockerId: lockerInfo._id,
           phone: this.data.phone,
-          password: this.data.password
+          password: this.data.password,
+          openid: this.data.openid
         }
       });
 
@@ -114,14 +153,15 @@ Page({
   },
 
   // 获取订单详情
-  async getOrderDetail(orderId) {
+  async getUserDeposit(openid) {
     const res = await wx.cloud.callFunction({
-      name: "order",
+      name: "user",
       data: {
-        action: "getOrder",
-        id: orderId
+        action: "getDeposit",
+        openid: openid
       }
     });
+    console.log("getUserDeposit res.result.data", res.result.data);
     return res.result.data;
   },
 
@@ -286,6 +326,7 @@ Page({
 
     let lockerInfo = null;
     let orderId = null;
+    let checkRes = null;
 
     try {
       // 1. 参数验证
@@ -301,15 +342,22 @@ Page({
         return;
       }
 
-      // 3. 创建订单
+      //3.检查是否有进行中的订单
+      checkRes = await this.checkOrder();
+      if (checkRes?.data && checkRes.data.status == this.data.constants.ORDER_STATUS_PROCESSING) {
+        wx.showToast({ title: '已有订单，请先取件', icon: 'none' });
+        setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
+        return;
+      }
+      // 4. 创建订单
       orderId = await this.createOrder(lockerInfo);
       if (!orderId) return;
 
       // 4. 查询订单状态，判断是否需要支付
-      const order = await this.getOrderDetail(orderId);
-      if (order.status === this.data.constants.ORDER_STATUS_PROCESSING) {
-        // 有足够押金，直接跳过支付流程
-        wx.showToast({ title: '账户已有押金，无需额外支付', icon: 'none' });
+      // 4. 查询用户是否有余额
+      const depositRes = await this.getUserDeposit(this.data.openid);
+      if (depositRes.deposit === this.data.constants.DEPOSIT) {
+        wx.showToast({ title: '余额充足，无需额外支付', icon: 'none' });
       } else {
         // 押金不足，需要支付
         const confirmPay = await this.showPaymentConfirmModal();

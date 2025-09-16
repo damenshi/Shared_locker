@@ -1,26 +1,17 @@
 <view class="container">
   <!-- 顶部用户信息 -->
   <view class="user-info">
-    <view class="avatar" bindtap="getUserProfile">
-      <!-- 显示用户头像或默认图标 -->
+    <view class="avatar">
       <image 
-        wx:if="{{userInfo.avatarUrl}}" 
-        src="{{userInfo.avatarUrl}}" 
+        src="{{userInfo ? userInfo.avatarUrl : '/images/avatar-default.png'}}" 
         mode="widthFix"
-        style="width: 120rpx; height: 120rpx; border-radius: 50%;"
-      />
-      <icon wx:else type="user" size="60" color="#ffffff" />
+      ></image>
     </view>
     <view class="user-detail">
-      <view class="phone">{{userInfo.nickName || phone || '未登录'}}</view>
+      <view class="phone">
+        {{userInfo ? userInfo.nickName : (phone || '未登录')}}
+      </view>
       <view class="deposit">账户余额：¥{{deposit.toFixed(2)}}</view>
-      <button 
-        class="refund-all-btn" 
-        bindtap="handleAllRefund"
-        wx:if="{{deposit > 0 && phone}}"
-      >
-        退款
-      </button>
     </view>
   </view>
 
@@ -28,45 +19,12 @@
   <view class="menu-list">
     <!-- 我的订单 -->
     <view class="menu-item" bindtap="goMyOrders">
-      <view class="menu-icon">
-        <icon type="list" size="40" color="#666" />
-      </view>
       <view class="menu-text">我的订单</view>
-      <view class="menu-arrow">→</view>
     </view>
 
-    <!-- 退款记录 -->
-    <view class="menu-item" bindtap="goRefundRecords">
-      <view class="menu-icon">
-        <icon type="refresh" size="40" color="#666" />
-      </view>
-      <view class="menu-text">退款记录</view>
-      <view class="menu-arrow">→</view>
-    </view>
-  </view>
-
-  <!-- 订单列表（最近3条） -->
-  <view class="section">
-    <view class="section-title">最近订单</view>
-    <view class="order-list">
-      <view class="order-item" wx:for="{{recentOrders}}" wx:key="_id" bindtap="goOrderDetail" data-id="{{item._id}}">
-        <view class="order-info">
-          <view class="order-no">订单号：{{item._id.slice(-6)}}</view>
-          <view class="order-status {{item.status === '已完成' ? 'status-success' : item.status === '已退款' ? 'status-refund' : 'status-processing'}}">
-            {{item.status}}
-          </view>
-        </view>
-        <view class="order-detail">
-          <view>柜子：{{item.deviceId}}-{{item.doorNo}}</view>
-          <view>时间：{{formatTime(item.startTime)}}</view>
-        </view>
-        <button class="refund-btn" wx:if="{{canRefund(item)}}" bindtap="handleRefund" data-id="{{item._id}}">
-          申请退款
-        </button>
-      </view>
-      <view class="empty" wx:if="{{recentOrders.length === 0}}">
-        暂无订单记录
-      </view>
+    <!-- 申请退款 -->
+    <view class="menu-item" bindtap="handleRefund">
+      <view class="menu-text">申请退款</view>
     </view>
   </view>
 </view>

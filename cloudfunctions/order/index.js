@@ -93,7 +93,7 @@ exports.main = async (event, context) => {
 
   // 2. 创建订单
   if (action === 'createOrder') {
-    const { lockerId, phone, password} = event
+    const { lockerId, phone, password, openid} = event
   
     // 参数校验
     const validation = validateParams(event, ['lockerId', 'phone'])
@@ -122,36 +122,36 @@ exports.main = async (event, context) => {
           throw new Error('柜门不可用（状态异常或已被占用）')
         }
         
-        // 获取或创建用户账户
-        const getUserAccount = async (phone) => {
-          const user = await transaction.collection('users').where({ phone }).get();
-          if (user.data.length > 0) {
-            return user.data[0];
+        // 创建用户账户
+        const getUserAccount = async (openid, phone) => {
+          const userRes = await cloud.callFunction({
+            name: 'user',
+            data: {
+              action: 'createUser',
+              openid: openid,
+              phone: phone,
+            }
+          });
+        
+          if (userRes.result && userRes.result._id) {
+            return userRes.result;
           } else {
-            // 新建账户
-            const res = await transaction.collection('users').add({
-              data: {
-                phone,
-                deposit: 0,
-                createdAt: db.serverDate(),
-                updatedAt: db.serverDate()
-              }
-            });
-            return { _id: res._id, phone, deposit: 0 };
+            throw new Error(`创建/获取用户失败：${userRes.result?.message || '未知错误'}`);
           }
-        }
-        const user = await getUserAccount(phone);
+        };
+        const user = await getUserAccount(openid, phone);
       
-      // 判断用户是否有余额
-      const hasEnoughDeposit = user.deposit >= CONSTANTS.FIXED_DEPOSIT;
+        // 判断用户是否有余额
+        const hasEnoughDeposit = user.deposit >= CONSTANTS.FIXED_DEPOSIT;
 
         // 构建订单数据
         const order = {
-          openid: OPENID,
+          openid: openid,
           phone,
           password: password || String(Math.floor(Math.random() * 9000) + 1000),
           lockerId,
           deviceId: lockerDoc.data.deviceId,
+          internalNo: lockerDoc.data.internalNo,
           cabinetNo: lockerDoc.data.cabinetNo,
           doorNo: lockerDoc.data.doorNo,
           size: lockerDoc.data.size || 'M',
@@ -345,12 +345,12 @@ exports.main = async (event, context) => {
     }
   }
 
-  // 7. 通过手机号和取件码查询订单
-  if (action === 'queryByPhoneAndPassword') {
-    const { phone, password, deviceId} = event;
-    
+  // 7. 通过openid查询订单
+  if (action === 'queryByOpenid') {
+    // const {openid, phone, password, deviceId} = event;
+    const {openid, deviceId} = event;
     // 参数校验
-    const validation = validateParams(event, ['phone', 'password'])
+    const validation = validateParams(event, ['openid', 'deviceId'])
     if (!validation.valid) {
       return { success: false, errMsg: validation.msg }
     }
@@ -358,8 +358,7 @@ exports.main = async (event, context) => {
     try {
       const { data } = await db.collection('orders')
         .where({
-          phone,
-          password,
+          openid,
           deviceId,
           status: _.in(CONSTANTS.VALID_STATUSES_FOR_QUERY)
         })
@@ -380,7 +379,7 @@ exports.main = async (event, context) => {
         console.log(`匹配到订单：ID=${data[0]._id}，柜门=${data[0].doorNo}`)
         return { success: true, data: data[0] }
       } else {
-        console.log(`未找到手机号${phone}、取件码${password}的有效订单`)
+        console.log(`未找到有效订单`)
         return { success: true, data: null }
       }
     } catch (err) {

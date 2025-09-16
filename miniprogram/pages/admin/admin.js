@@ -145,53 +145,53 @@ Page({
   },
 
   //批量生成设备
-  async batchCreateDevices() {
-    const { deviceCount } = this.data;
+  // async batchCreateDevices() {
+  //   const { deviceCount } = this.data;
     
-    if (deviceCount <= 0) {
-      return wx.showToast({ 
-        title: '请输入有效的设备数量（需大于0）', 
-        icon: 'none' 
-      });
-    }
+  //   if (deviceCount <= 0) {
+  //     return wx.showToast({ 
+  //       title: '请输入有效的设备数量（需大于0）', 
+  //       icon: 'none' 
+  //     });
+  //   }
 
-    this.showLoading('生成设备中...');
+  //   this.showLoading('生成设备中...');
     
-    try {
-      const result = await wx.cloud.callFunction({
-        name: 'admin',
-        data: {
-          action: 'batchCreateDevices',
-          deviceCount: parseInt(deviceCount)
-        }
-      });
+  //   try {
+  //     const result = await wx.cloud.callFunction({
+  //       name: 'admin',
+  //       data: {
+  //         action: 'batchCreateDevices',
+  //         deviceCount: parseInt(deviceCount)
+  //       }
+  //     });
 
-      this.hideLoading();
+  //     this.hideLoading();
       
-      if (result.result.success) {
-        wx.showToast({
-          title: `成功生成 ${result.result.count} 个设备`,
-          icon: 'success',
-          duration: 2000
-        });
-      } else {
-        wx.showToast({
-          title: result.result.errMsg || '生成失败',
-          icon: 'none'
-        });
-      }
-    } catch (err) {
-      this.hideLoading();
-      console.error('批量生成设备失败：', err);
-      wx.showToast({ title: '网络错误，请重试', icon: 'none' });
-    }
-  },
+  //     if (result.result.success) {
+  //       wx.showToast({
+  //         title: `成功生成 ${result.result.count} 个设备`,
+  //         icon: 'success',
+  //         duration: 2000
+  //       });
+  //     } else {
+  //       wx.showToast({
+  //         title: result.result.errMsg || '生成失败',
+  //         icon: 'none'
+  //       });
+  //     }
+  //   } catch (err) {
+  //     this.hideLoading();
+  //     console.error('批量生成设备失败：', err);
+  //     wx.showToast({ title: '网络错误，请重试', icon: 'none' });
+  //   }
+  // },
   
   //基于设备生成锁
   async batchCreateLockersByDevice() {
-    const { selectedDeviceId, deviceAddress, cabinetCount, lockersPerCabinet } = this.data;
+    const { internalNo, deviceAddress, cabinetCount, lockersPerCabinet } = this.data;
     
-    if (!deviceAddress || !selectedDeviceId || cabinetCount <= 0 || lockersPerCabinet <= 0) {
+    if (!deviceAddress || !internalNo || cabinetCount <= 0 || lockersPerCabinet <= 0) {
       return wx.showToast({ 
         title: '请选择设备并输入有效的锁板/锁数量', 
         icon: 'none' 
@@ -205,7 +205,7 @@ Page({
         name: 'admin',
         data: {
           action: 'batchCreateLockers',
-          deviceId: selectedDeviceId, // 指定设备ID
+          internalNo: internalNo, // 指定设备ID
           deviceAddress: deviceAddress,
           cabinetCount: parseInt(cabinetCount),
           lockersPerCabinet: parseInt(lockersPerCabinet)

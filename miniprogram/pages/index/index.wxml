@@ -8,17 +8,14 @@
   </view>
 
   <view class="card">
-    <view class="title">我的订单</view>
-    <button class="btn" bindtap="goOrders">查看订单列表</button>
-  </view>
-
-  <view class="card">
     <view class="title">管理入口（管理员）</view>
     <button class="btn" bindtap="goAdmin">管理看板</button>
   </view>
 
-   <!-- 新增：右下角“我的”按钮 -->
-   <button class="my-btn" bindtap="goMine">
-    <text class="my-btn-text">我的</text>
-   </button>
+   <!-- 右下角“我的”按钮 -->
+   <button class="mine-btn" bindtap="goMine">
+    <image src="/images/mine-icon.png" class="mine-icon" mode="widthFix"></image>
+    <text class="mine-text">我的</text>
+  </button>
+
 </view>

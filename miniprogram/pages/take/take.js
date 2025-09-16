@@ -1,7 +1,10 @@
+const app = getApp();
+
 Page({
   data: {
-    phone: '',       // 从首页传递的手机号
-    password: '',        // 从首页传递的取件码
+    phone: '', 
+    password: '',        
+    openid: '',
     deviceId: null,
     isLoading: false // 加载状态
   },
@@ -11,8 +14,8 @@ Page({
     this.setData({
       phone: options.phone || '',
       password: options.password || '',
-      // deviceId: options.deviceId || null,
-      deviceId: 'L0001'
+      openid: app.globalData.openid || '',
+      deviceId: app.globalData.deviceId || '',
     });
     // this.setData({ phone, password, deviceId});
 
@@ -84,27 +87,26 @@ Page({
    */
   async queryMatchedOrder() {
     try {
-      const { phone, password, deviceId} = this.data;
-      if (!deviceId || !/^L\d+$/.test(deviceId)) {
+      const { openid, deviceId} = this.data;
+      if (!deviceId) {
         wx.showToast({ title: '设备错误', icon: 'none' });
         return null;
       }
       const res = await wx.cloud.callFunction({
         name: "order",
         data: {
-          action: "queryByPhoneAndPassword",
-          phone,
-          password,
+          action: "queryByOpenid",
+          openid,
           deviceId: deviceId
         }
       });
 
       if (!res.result || !res.result.success) {
-        throw new Error(res.result.errMsg || '查询订单失败');
+        throw new Error(res.result.errMsg || '取包查询订单失败');
       }
       return res.result.data || null;
     } catch (e) {
-      console.error("查询订单失败:", e);
+      console.error("取包查询订单失败:", e);
       wx.showToast({ 
         title: `无有效订单`, 
         icon: 'none',
@@ -190,6 +192,7 @@ Page({
     this.setData({ isLoading: true });
     wx.showLoading({ title: '正在验证取件信息...' });
 
+    console.log("take deviceid:", this.data.deviceId);
     try {
       // 1. 验证输入参数
       if (!this.validateInput()) {

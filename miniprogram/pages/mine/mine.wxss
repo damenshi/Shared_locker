@@ -96,15 +96,6 @@
   font-size: 36rpx;
 }
 
-/* 最近订单区域 */
-.section {
-  margin: 20rpx 0;
-  background-color: white;
-  border-radius: 16rpx;
-  padding: 20rpx 30rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
-}
-
 .section-title {
   font-size: 34rpx;
   color: #333;
@@ -192,18 +183,6 @@
   padding: 60rpx 0;
   color: #999;
   font-size: 28rpx;
-}
-
-/* 全额退款按钮样式 */
-.refund-all-btn {
-  margin-top: 10rpx;
-  padding: 8rpx 20rpx;
-  background-color: #ff4d4f;
-  color: white;
-  font-size: 24rpx;
-  border-radius: 20rpx;
-  line-height: normal;
-  width: auto;
 }
 
 .refund-all-btn:active {

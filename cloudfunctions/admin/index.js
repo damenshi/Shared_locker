@@ -11,71 +11,11 @@ const ADMIN_OPENIDS = [
 // 工具函数：生成指定范围的随机数
 const randomBetween = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
 
-const batchCreateDevices = async (event) => {
-  const { deviceCount } = event
-  
-  if (!deviceCount || deviceCount <= 0) {
-    return { 
-      success: false, 
-      errMsg: '请指定有效的设备数量' 
-    }
-  }
-
-  try {
-    const maxDeviceRes = await db.collection('devices')
-      .where({}) // 查询所有设备
-      .field({ deviceId: true }) // 只返回deviceId字段
-      .get();
-
-    // 提取所有设备ID并解析数字部分（如从"L0002"中提取2）
-    const deviceIds = maxDeviceRes.data.map(item => item.deviceId || '');
-    const deviceNumbers = deviceIds
-      .filter(id => /^L\d+$/.test(id)) // 筛选符合"L+数字"格式的ID
-      .map(id => parseInt(id.replace('L', ''), 10)) // 提取数字部分
-      .filter(num => !isNaN(num)); // 过滤无效数字
-
-    // 计算起始序号（无现有设备则从1开始）
-    const maxNumber = deviceNumbers.length > 0 ? Math.max(...deviceNumbers) : 0;
-    const startNumber = maxNumber + 1;
-
-    const devices = []
-    const timestamp = Date.now()
-
-    // 生成设备数据
-    for (let i = 0; i < deviceCount; i++) {
-      const currentNumber = startNumber + i; // 递增序号
-      const deviceId = `L${String(currentNumber).padStart(4, '0')}`; // 格式化为L000X
-      devices.push({
-        deviceId: deviceId,
-        isOnline: false,       // 初始离线
-        lastLoginTime: null,
-        createdAt: db.serverDate(),
-        updatedAt: db.serverDate()
-      })
-    }
-
-    // 批量插入devices集合
-    const result = await db.collection('devices').add({
-      data: devices
-    })
-
-    const createdCount = result._ids.length;
-    return {
-      success: true,
-      count: createdCount,
-      message: `成功生成 ${createdCount} 个设备`
-    }
-  } catch (err) {
-    console.error('批量生成设备失败', err)
-    return { success: false, errMsg: err.message }
-  }
-}
-
 const batchCreateLockers = async (event) => {
-  const { deviceId, deviceAddress, cabinetCount, lockersPerCabinet } = event
+  const { internalNo, deviceAddress, cabinetCount, lockersPerCabinet } = event
   
   // 验证参数
-  if (!deviceId || !deviceAddress || !cabinetCount || !lockersPerCabinet) {
+  if (!internalNo || !deviceAddress || !cabinetCount || !lockersPerCabinet) {
     return { 
       success: false, 
       errMsg: '请指定设备ID、设备地址、锁板数量和每个锁板的锁数量' 
@@ -84,15 +24,28 @@ const batchCreateLockers = async (event) => {
 
   // 验证设备是否存在
   const deviceCheck = await db.collection('devices')
-    .where({ deviceId: deviceId })
+    .where({ internalNo: internalNo })
     .get()
   if (deviceCheck.data.length === 0) {
     return { 
       success: false, 
       errMsg: `设备 ${deviceId} 不存在，请先创建设备` 
     }
+  }else{
+    await db.collection('devices')
+      .where({ internalNo: internalNo })
+      .update({
+        data: {
+          cabinetCount: parseInt(cabinetCount),  // 锁板数量
+          doorCount: parseInt(lockersPerCabinet),          // 柜门数量
+          isConfigured: true,                    // 标记为已配置
+          deviceAddress: deviceAddress,          // 设备地址
+          updatedAt: db.serverDate()             // 更新时间
+        }
+      });
   }
 
+  const deviceId = deviceCheck.data[0].deviceId;
   try {
     const lockers = []
 
@@ -101,6 +54,7 @@ const batchCreateLockers = async (event) => {
       for (let doorNo = 1; doorNo <= lockersPerCabinet; doorNo++) {
         lockers.push({
           deviceId: deviceId,    // 关联设备ID
+          internalNo: internalNo,
           deviceAddress: deviceAddress,
           cabinetNo: cabinetNo,  // 锁板编号
           doorNo: doorNo,        // 锁编号
@@ -284,9 +238,9 @@ exports.main = async (event, context) => {
   }
   
   // 生成储物柜二维码
-  if (action === 'batchCreateLockers') {
-    return await batchCreateLockers(event)
-  }
+  // if (action === 'batchCreateLockers') {
+  //   return await batchCreateLockers(event)
+  // }
 
   return { error: 'unknown action' }
 }

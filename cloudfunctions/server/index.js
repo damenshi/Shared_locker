@@ -1,5 +1,6 @@
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
+const axios = require('axios')
 
 // 数据库引用
 const db = cloud.database();
@@ -25,7 +26,10 @@ exports.main = async (event, context) => {
             // 3. 手机号密码开门请求
             case 'open_by_phone_request':
                 return handleOpenByPhone(deviceId, data);
-                
+            
+            // 4. 设备离线通知
+            case 'device_offline':
+                return handleDeviceOffline(deviceId);
             // 4. 手机号开门结果反馈
             // case 'open_by_phone_result':
             //     return handleOpenByPhoneResult(deviceId, data);
@@ -38,9 +42,7 @@ exports.main = async (event, context) => {
             // case 'door_status_result':
             //     return handleDoorStatusUpdate(deviceId, data);
                 
-            // 7. 设备离线通知
-            // case 'device_offline':
-            //     return handleDeviceOffline(deviceId, timestamp);
+            
                 
             // 未知类型处理
             default:
@@ -96,42 +98,144 @@ async function startOfflineCheckTask() {
 
 /**
  * 1. 处理设备登录请求
- * 验证设备ID是否存在于数据库中
+**/
+
+let cachedToken = null;
+let tokenExpireTime = 0;
+/**
+ * 获取微信小程序 access_token
+ * @returns {Promise<string>} access_token
  */
-async function handleDeviceLogin(deviceId, timestamp) {
+async function getAccessToken() {
+    const now = Date.now();
+
+    // 如果缓存的 token 仍然有效，直接返回
+    if (cachedToken && now < tokenExpireTime) {
+        return cachedToken;
+    }
+
+    const APPID = 'wx40f5e5c7a53bdbc2';
+    const APPSECRET = '38264c51bf51bc2d6ce1ce27f0ab4770';
+
+    try {
+        const res = await axios.get('https://api.weixin.qq.com/cgi-bin/token', {
+            params: {
+                grant_type: 'client_credential',
+                appid: APPID,
+                secret: APPSECRET
+            }
+        });
+
+        const data = res.data;
+
+        if (!data.access_token) {
+            throw new Error('获取 access_token 失败: ' + JSON.stringify(data));
+        }
+
+        // 缓存 token，并提前1分钟刷新
+        cachedToken = data.access_token;
+        tokenExpireTime = now + (data.expires_in - 60) * 1000;
+
+        console.log('[微信access_token] 获取成功', cachedToken);
+        return cachedToken;
+    } catch (err) {
+        console.error('[微信access_token] 获取失败', err.message);
+        throw err;
+    }
+}
+
+async function generateInternalNumber() {
+
+  // 获取已有设备最大编号
+  const res = await devicesCollection
+      .orderBy('internalNumber', 'desc')
+      .limit(1)
+      .get();
+
+  if (res.data.length === 0) {
+      return 'L0001';
+  }
+
+  const maxNumber = res.data[0].internalNumber; // L0003
+  const num = parseInt(maxNumber.slice(1)) + 1; // 3 + 1 = 4
+  return 'L' + String(num).padStart(4, '0');    // L0004
+}
+
+async function generateQRCodeNumber(deviceId) {
+  const accessToken = await getAccessToken() // 获取微信接口 access_token
+
+  // scene 参数可以放 deviceId，长度最大32
+  const scene = deviceId;
+
+  const res = await axios.post(
+      `https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${accessToken}`,
+      {
+          scene: scene,
+          page: 'pages/index/index', // 扫码进入的小程序页面
+          width: 280
+      },
+      { responseType: 'arraybuffer' }
+  );
+
+  // 返回二维码图片二进制，转base64
+  const qrBase64 = Buffer.from(res.data, 'binary').toString('base64');
+  return qrBase64;
+}
+
+async function handleDeviceLogin(deviceId) {
     // 查询设备是否已注册
     const deviceRes = await devicesCollection
         .where({ deviceId })
         .limit(1)
         .get();
+    
+    let qrCodeBase64;
+    let internalNo;
 
     if (deviceRes.data.length === 0) {
         // 设备未注册
-        return {
-            code: 404,
-            message: `设备 ${deviceId} 未注册`
-        };
+        internalNo = await generateInternalNumber();
+        qrCodeBase64 = await generateQRCodeNumber(deviceId);
+
+        await devicesCollection.add({
+          data: {
+              deviceId: deviceId,       // 终端提供的设备ID
+              internalNo: internalNo,
+              cabinetCount: 0,
+              doorCount: 0,
+              deviceAddress:null,
+              isOnline: true,           // 新注册设备默认在线
+              isConfigured: false,
+              qrCodeBase64: qrCodeBase64,
+              lastLoginTime: db.serverDate(), // 记录登录时间
+              createdAt: db.serverDate(),  // 创建时间
+              updatedAt: db.serverDate()
+          }
+      });
+      console.log(`设备 ${deviceId}已自动完成注册`);
+    }else{
+      // 更新设备在线状态
+      qrCodeBase64 = deviceRes.data[0].qrCodeBase64;
+      await devicesCollection
+      .where({ deviceId })
+      .update({
+        data: {
+          isOnline: true,
+          lastLoginTime: db.serverDate(),
+          updatedAt: db.serverDate()
+        }
+      });
     }
 
-    // 更新设备在线状态
-    await devicesCollection
-        .where({ deviceId })
-        .update({
-          data: {
-            isOnline: true,
-            lastLoginTime: timestamp,
-            updatedAt: db.serverDate()
-          }
-        });
-
-    // 返回设备编号（可自定义生成规则）
+    // 返回设备二维码
     return {
         code: 200,
         data: {
-          deviceId: deviceId
+          number: qrCodeBase64
         }
     };
 }
+
 
 /**
  * 2. 处理设备心跳消息
@@ -288,24 +392,15 @@ async function handleDoorStatusUpdate(deviceId, data) {
 /**
  * 7. 处理设备离线通知
  */
-async function handleDeviceOffline(deviceId, timestamp) {
+async function handleDeviceOffline(deviceId) {
     // 更新设备离线状态
     await lockersCollection
         .where({ deviceId })
         .update({
             isOnline: false,
-            lastOfflineTime: timestamp,
             updatedAt: db.serverDate()
         });
-
-    await logsCollection.add({
-        deviceId,
-        type: 'offline',
-        timestamp,
-        createdAt: db.serverDate()
-    });
-
-    return { code: 200, message: '设备离线已记录' };
+    // return { code: 200, message: '设备离线已记录' };
 }
 
 startOfflineCheckTask();
