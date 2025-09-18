@@ -5,7 +5,7 @@ const _ = db.command
 
 // 管理员openid列表（修正变量名，确保前后一致）
 const ADMIN_OPENIDS = [
-  'oibJq1y_nw3YV0ne3tIemICTQ7Fs'
+  'oFThN1yR0zzomK0r1LRwvx4GSqoU'
 ]
 
 // 工具函数：生成指定范围的随机数
@@ -217,6 +217,7 @@ exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext()
 
   // 验证管理员权限（变量名已修正为ADMIN_OPENIDS）
+  console.log("OPENID:", OPENID);
   const isAdmin = ADMIN_OPENIDS.includes(OPENID)
   if (!isAdmin) {
     return { success: false, errMsg: '没有管理员权限' }

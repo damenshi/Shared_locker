@@ -296,54 +296,54 @@ exports.main = async (event, context) => {
   }
 
   // 6. 退款操作
-  if (action === 'refund') {
-    const { phone } = event
+  // if (action === 'refund') {
+  //   const { openid } = event
     
-    // 参数校验
-    const validation = validateParams(event, ['phone'])
-    if (!validation.valid) {
-      return { ok: false, errMsg: validation.msg }
-    }
+  //   // 参数校验
+  //   const validation = validateParams(event, ['openid'])
+  //   if (!validation.valid) {
+  //     return { ok: false, errMsg: validation.msg }
+  //   }
 
-    try {
-      return await db.runTransaction(async transaction => {
-        const orderDoc = await transaction.collection('orders').doc(phone).get()
-        if (!orderDoc.data) {
-          throw new Error('订单不存在')
-        }
+  //   try {
+  //     return await db.runTransaction(async transaction => {
+  //       const orderDoc = await transaction.collection('orders').doc(phone).get()
+  //       if (!orderDoc.data) {
+  //         throw new Error('订单不存在')
+  //       }
       
-      const order = orderDoc.data;
-      // 验证订单是否可退款
-      if (![CONSTANTS.ORDER_STATUSES.COMPLETED, CONSTANTS.ORDER_STATUSES.CANCELLED].includes(order.status)) {
-        return { ok: false, errMsg: `使用中，请先取包再退款` }
-      }
+  //     const order = orderDoc.data;
+  //     // 验证订单是否可退款
+  //     if (![CONSTANTS.ORDER_STATUSES.COMPLETED, CONSTANTS.ORDER_STATUSES.CANCELLED].includes(order.status)) {
+  //       return { ok: false, errMsg: `使用中，请先取包再退款` }
+  //     }
 
-      // 查询用户账户
-      const userDoc = await transaction.collection('users').doc(order.userId).get()
-      if (!userDoc.data) throw new Error('用户不存在')
-      const user = userDoc.data
+  //     // 查询用户账户
+  //     const userDoc = await transaction.collection('users').doc(order.userId).get()
+  //     if (!userDoc.data) throw new Error('用户不存在')
+  //     const user = userDoc.data
 
-      // 退还押金
-      await transaction.collection('users').doc(user._id).update({
-        data: {
-          deposit: user.deposit - CONSTANTS.FIXED_DEPOSIT,
-          updatedAt: db.serverDate()
-        }
-      })
+  //     // 退还押金
+  //     await transaction.collection('users').doc(user._id).update({
+  //       data: {
+  //         deposit: user.deposit - CONSTANTS.FIXED_DEPOSIT,
+  //         updatedAt: db.serverDate()
+  //       }
+  //     })
 
-      await db.collection('orders').doc(user._id).update({ 
-        data: { 
-          status: CONSTANTS.ORDER_STATUSES.REFUNDED, 
-          updatedAt: db.serverDate() 
-        } 
-      })
-      return { ok: true }
-      })
-    } catch (err) {
-      console.error('退款操作失败', { orderId: id, error: err.message })
-      return { ok: false, errMsg: err.message }
-    }
-  }
+  //     await db.collection('orders').doc(user._id).update({ 
+  //       data: { 
+  //         status: CONSTANTS.ORDER_STATUSES.REFUNDED, 
+  //         updatedAt: db.serverDate() 
+  //       } 
+  //     })
+  //     return { ok: true }
+  //     })
+  //   } catch (err) {
+  //     console.error('退款操作失败', { orderId: id, error: err.message })
+  //     return { ok: false, errMsg: err.message }
+  //   }
+  // }
 
   // 7. 通过openid查询订单
   if (action === 'queryByOpenid') {

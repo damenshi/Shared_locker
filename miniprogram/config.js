@@ -1,3 +1,3 @@
 module.exports = {
-  envId: 'cloud1-1gakitrk8951244d' // replace your envId
+  envId: 'cloudbase-3gnr17whd71a5b45' // replace your envId
 }

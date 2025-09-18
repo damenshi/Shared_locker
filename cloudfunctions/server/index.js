@@ -114,8 +114,8 @@ async function getAccessToken() {
         return cachedToken;
     }
 
-    const APPID = 'wx40f5e5c7a53bdbc2';
-    const APPSECRET = '38264c51bf51bc2d6ce1ce27f0ab4770';
+    const APPID = 'wxc447a8e66f5f8294';
+    const APPSECRET = '5b41ba2cdb527822e2e43c2fbb2a9db9';
 
     try {
         const res = await axios.get('https://api.weixin.qq.com/cgi-bin/token', {
@@ -152,34 +152,36 @@ async function generateInternalNumber() {
       .limit(1)
       .get();
 
-  if (res.data.length === 0) {
+  if (!res.data || res.data.length === 0) {
       return 'L0001';
   }
-
-  const maxNumber = res.data[0].internalNumber; // L0003
+  const maxNumber = res.data[0].internalNo; // L0003
   const num = parseInt(maxNumber.slice(1)) + 1; // 3 + 1 = 4
   return 'L' + String(num).padStart(4, '0');    // L0004
 }
 
-async function generateQRCodeNumber(deviceId) {
-  const accessToken = await getAccessToken() // 获取微信接口 access_token
+async function generateUrlLink(deviceId) {
+  const accessToken = await getAccessToken(); // 获取微信 access_token
 
-  // scene 参数可以放 deviceId，长度最大32
-  const scene = deviceId;
-
+  // 生成 URL Link 请求
   const res = await axios.post(
-      `https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${accessToken}`,
-      {
-          scene: scene,
-          page: 'pages/index/index', // 扫码进入的小程序页面
-          width: 280
-      },
-      { responseType: 'arraybuffer' }
+    `https://api.weixin.qq.com/wxa/generate_urllink?access_token=${accessToken}`,
+    {
+      // 跳转的小程序页面
+      path: 'pages/index/index',
+      // 携带参数，等价于小程序中 onLoad(options)
+      query: `deviceId=${deviceId}`,
+      // 可选配置：比如有效期、是否生成短链等
+      is_expire: false
+    }
   );
 
-  // 返回二维码图片二进制，转base64
-  const qrBase64 = Buffer.from(res.data, 'binary').toString('base64');
-  return qrBase64;
+  if (res.data.url_link) {
+    return res.data.url_link;
+  } else {
+    console.error('生成 URL Link 失败:', res.data);
+    throw new Error(res.data.errmsg || 'generateUrlLink failed');
+  }
 }
 
 async function handleDeviceLogin(deviceId) {
@@ -189,14 +191,14 @@ async function handleDeviceLogin(deviceId) {
         .limit(1)
         .get();
     
-    let qrCodeBase64;
+    let urlLink;
     let internalNo;
-
+    console.log('deviceRes:',deviceRes);
     if (deviceRes.data.length === 0) {
         // 设备未注册
         internalNo = await generateInternalNumber();
-        qrCodeBase64 = await generateQRCodeNumber(deviceId);
-
+        // urlLink = await generateUrlLink(deviceId);//上线版可用
+        urlLink = '体验版暂无';
         await devicesCollection.add({
           data: {
               deviceId: deviceId,       // 终端提供的设备ID
@@ -206,7 +208,7 @@ async function handleDeviceLogin(deviceId) {
               deviceAddress:null,
               isOnline: true,           // 新注册设备默认在线
               isConfigured: false,
-              qrCodeBase64: qrCodeBase64,
+              urlLink: urlLink,
               lastLoginTime: db.serverDate(), // 记录登录时间
               createdAt: db.serverDate(),  // 创建时间
               updatedAt: db.serverDate()
@@ -215,7 +217,8 @@ async function handleDeviceLogin(deviceId) {
       console.log(`设备 ${deviceId}已自动完成注册`);
     }else{
       // 更新设备在线状态
-      qrCodeBase64 = deviceRes.data[0].qrCodeBase64;
+      urlLink = deviceRes.data[0].urlLink;
+      internalNo = deviceRes.data[0].internalNo;
       await devicesCollection
       .where({ deviceId })
       .update({
@@ -226,12 +229,14 @@ async function handleDeviceLogin(deviceId) {
         }
       });
     }
-
+    console.log('internalNo:', internalNo);
+    console.log('urlLink:', urlLink);
     // 返回设备二维码
     return {
         code: 200,
         data: {
-          number: qrCodeBase64
+          number: internalNo,
+          url: urlLink
         }
     };
 }
@@ -394,13 +399,15 @@ async function handleDoorStatusUpdate(deviceId, data) {
  */
 async function handleDeviceOffline(deviceId) {
     // 更新设备离线状态
-    await lockersCollection
+    await devicesCollection
         .where({ deviceId })
         .update({
-            isOnline: false,
-            updatedAt: db.serverDate()
+            data: {
+              isOnline: false,
+              updatedAt: db.serverDate()
+            }
         });
-    // return { code: 200, message: '设备离线已记录' };
+      return { code: 200, message: '设备离线已确认' };
 }
 
 startOfflineCheckTask();

@@ -23,7 +23,6 @@ App({
         deviceId = decodeURIComponent(options.query.scene);
       } 
     }
-    console.log("app deviceid:", deviceId);
     // 保存deviceId到全局
     if (deviceId) {
       this.globalData.deviceId = deviceId;
@@ -39,6 +38,7 @@ App({
       const cachedOpenid = wx.getStorageSync('openid');
       if (cachedOpenid) {
         this.globalData.openid = cachedOpenid;
+        console.log('全局获取到的openid:', cachedOpenid);
         return;
       }
 

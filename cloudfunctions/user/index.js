@@ -4,6 +4,7 @@ cloud.init({
   env: cloud.DYNAMIC_CURRENT_ENV // 使用当前环境
 });
 const db = cloud.database();
+const _ = db.command;
 
 exports.main = async (event, context) => {
 
@@ -20,23 +21,23 @@ exports.main = async (event, context) => {
   if (action === 'getUserInfo') {
     try {
       const userRes = await db.collection('users')
-        .where({ openid: wxContext.OPENID })
+        .where({ openid: openid })
         .get();
       if (userRes.data.length > 0) {
         return {
-          code: 200,
+          success: true,
           data: userRes.data[0],
           message: '获取用户信息成功'
         };
       } else {
         return {
-          code: 404,
+          success: false,
           message: '用户信息不存在'
         };
       }
     } catch (error) {
       return {
-        code: 500,
+        success: false,
         message: '获取用户信息失败：' + error.message
       };
     }
@@ -108,6 +109,71 @@ exports.main = async (event, context) => {
     } catch (error) {
       return {
         message: '获取用户信息失败：' + error.message
+      };
+    }
+  }
+
+  if (action === 'refundDeposit') {
+    if (!openid) {
+      return {
+        success: false,
+        message: '缺少openid参数'
+      };
+    }
+    
+    try {
+      // 1. 查询用户信息及余额
+      const userRes = await db.collection('users')
+        .where({ openid: openid })
+        .get();
+
+      if (userRes.data.length === 0) {
+        return {
+          success: false,
+          message: '用户不存在'
+        };
+      }
+
+      const user = userRes.data[0];
+      const currentDeposit = user.deposit || 0;
+      console.log("user:", user);
+      console.log("currentDeposit:", currentDeposit);
+      // 2. 验证余额是否充足
+      if (currentDeposit <= 0) {
+        return {
+          success: false,
+          message: '用户余额为0，无需退款',
+          currentDeposit
+        };
+      }
+
+      let actualRefundAmount = currentDeposit; // 默认全额退款
+      // 4. 执行退款（更新余额）
+      await db.collection('users')
+        .where({ openid: openid })
+        .update({
+          data: {
+            deposit: _.inc(-actualRefundAmount), // 减少余额
+            updatedAt: db.serverDate(),
+          }
+        });
+
+      // 5. 查询更新后的用户信息
+      // const updatedUser = await db.collection('users')
+      //   .where({ openid: openid })
+      //   .get();
+
+      return {
+        success: true,
+        message: '退款成功',
+        // refundAmount: actualRefundAmount,
+        // remainingDeposit: updatedUser.data[0].deposit,
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        message: '退款失败：' + error.message
       };
     }
   }

@@ -1,9 +1,12 @@
 // pages/mine/mine.js
+const app = getApp();
+
 Page({
   data: {
     userInfo: {},    // 存储用户头像昵称信息
     phone: '',       // 初始化手机号为空
     password: '',
+    openid: '',
     deposit: 0,      // 初始化余额为0
   },
 
@@ -16,7 +19,8 @@ Page({
     this.setData({
       phone: options.phone || '',
       password: options.password || '',
-      deviceId: 'L0001'
+      openid: app.globalData.openid || '',
+      deviceId: app.globalData.deviceId || '',
     });
   },
 
@@ -38,8 +42,11 @@ Page({
     try {
       // 调用云函数获取当前用户信息
       const res = await wx.cloud.callFunction({
-        name: 'order',
-        data: { action: 'getCurrentUser' }
+        name: 'user',
+        data: { 
+          action: 'getUserInfo',
+          openid: this.data.openid,
+        }
       });
 
       if (res.result.success && res.result.data) {
@@ -69,8 +76,8 @@ Page({
    * 全额退款按钮点击事件
    */
   async handleRefund() {
-    const { deposit, phone } = this.data;
-    if (!phone) {
+    const { deposit, openid } = this.data;
+    if (!openid) {
       return wx.showToast({ title: '请先登录', icon: 'none' });
     }
     if (deposit <= 0) {
@@ -80,7 +87,7 @@ Page({
     // 显示确认弹窗
     wx.showModal({
       title: '确认退款',
-      content: `确定要将余额 ${deposit.toFixed(2)} 元全部退款吗？`,
+      content: `确认全部退款？`,
       confirmText: '确认退款',
       cancelText: '取消',
       success: async (res) => {
@@ -88,11 +95,10 @@ Page({
           wx.showLoading({ title: '处理中...', mask: true });
           try {
             const res = await wx.cloud.callFunction({
-              name: 'order',
+              name: 'user',
               data: {
-                action: 'refund',
-                phone,
-                amount: deposit
+                action: 'refundDeposit',
+                openid,
               }
             });
 

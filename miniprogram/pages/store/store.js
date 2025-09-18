@@ -76,7 +76,7 @@ Page({
       }
     } catch (e) {
       console.error("查询可用柜失败", e);
-      wx.showToast({ title: '查询柜子异常', icon: 'none' });
+      wx.showToast({ title: '无可用储物柜', icon: 'none' });
       return null;
     }
   },
