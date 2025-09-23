@@ -1,21 +1,64 @@
 <view class="page">
-  <view class="card">
-    <view class="title">手机号与取包码</view>
-    <input placeholder="请输入手机号" type="number" maxlength="11" bindinput="onPhone" />
-    <input placeholder="请输入取包码（4位数字）" type="number" maxlength="6" bindinput="onPassword" />
-    <button class="btn primary" bindtap="goStore">存包</button>
-    <button class="btn" bindtap="goTake">取包</button>
+  <!-- 头部信息 -->
+  <view class="header">
+    <view class="school-name">贵阳XX驾校</view>
+    <view class="business-hours">营业时间：00:00~24:00</view>
   </view>
+  
+  <!-- 帮助提示 -->
+  <view class="help-box">
+    <view class="help-question">
+      <icon type="info_circle" color="#ff6b3b" size="16"></icon>
+      <text class="question-text">手机存进去怎么取?</text>
+    </view>
+    <view class="help-answer">
+      <icon type="success_circle" color="#666" size="16"></icon>
+      <text class="answer-text">在显示屏上用【手机号+4位密码】取包</text>
+    </view>
+  </view>
+  
+  <!-- 输入区域 -->
+  <view class="input-container">
+    <view class="input-title">设置取包 手机号及密码</view>
+    
+    <view class="input-item">
+      <text class="input-label">手机号</text>
+      <input 
+        class="input-field" 
+        type="number" 
+        placeholder="请输入手机号" 
+        maxlength="11"
+        bindinput="onPhoneInput"
+      ></input>
+    </view>
+    
+    <view class="input-item">
+      <text class="input-label">取包密码</text>
+      <input 
+        class="input-field" 
+        type="number" 
+        placeholder="4位数字，建议使用出生日期" 
+        maxlength="4"
+        bindinput="onPasswordInput"
+      ></input>
+    </view>
+    
+    <view class="password-hint">
+      建议生日日期，例：0109（01月09日）
+    </view>
+  </view>
+  
+  <!-- 下一步按钮 -->
+  <view 
+    class="next-btn {{!canProceed ? 'disabled' : ''}}" 
+    bindtap="{{canProceed ? 'goToNextPage' : ''}}">
+    下一步
+  </view>
+
 
   <view class="card">
     <view class="title">管理入口（管理员）</view>
     <button class="btn" bindtap="goAdmin">管理看板</button>
   </view>
-
-   <!-- 右下角“我的”按钮 -->
-   <button class="mine-btn" bindtap="goMine">
-    <image src="/images/mine-icon.png" class="mine-icon" mode="widthFix"></image>
-    <text class="mine-text">我的</text>
-  </button>
 
 </view>

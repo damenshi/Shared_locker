@@ -5,6 +5,7 @@ const axios = require('axios')
 // 数据库引用
 const db = cloud.database();
 const devicesCollection = db.collection('devices');
+const _ = db.command;
 
 // 云函数主入口
 exports.main = async (event, context) => {
@@ -144,21 +145,61 @@ async function getAccessToken() {
     }
 }
 
-async function generateInternalNumber() {
-
-  // 获取已有设备最大编号
-  const res = await devicesCollection
-      .orderBy('internalNumber', 'desc')
-      .limit(1)
-      .get();
-
-  if (!res.data || res.data.length === 0) {
-      return 'L0001';
+async function ensureCounterDoc() {
+  const docRef = db.collection('counters').doc('deviceCounter');
+  try {
+    const res = await docRef.get();
+    if (!res.data) {
+      // 文档不存在，创建初始文档
+      await docRef.set({ internalNoSeq: 0 });
+    }
+  } catch (err) {
+    // 如果 get 报错（文档不存在），也创建
+    await docRef.set({ internalNoSeq: 0 });
   }
-  const maxNumber = res.data[0].internalNo; // L0003
-  const num = parseInt(maxNumber.slice(1)) + 1; // 3 + 1 = 4
-  return 'L' + String(num).padStart(4, '0');    // L0004
 }
+
+async function generateInternalNumber() {
+  const counterDocId = 'deviceCounter';
+  const MAX_RETRIES = 20; // 更多重试次数（模拟长队列）
+  let retryCount = 0;
+  const BASE_DELAY = 200; // 基础延迟稍大，给前一个事务足够时间完成
+
+  while (retryCount < MAX_RETRIES) {
+    try {
+      return await db.runTransaction(async transaction => {
+        const counterDocRef = transaction.collection('counters').doc(counterDocId);
+        let counterRes;
+
+        try {
+          counterRes = await counterDocRef.get();
+        } catch (err) {
+          await counterDocRef.set({ data: { internalNoSeq: 1 } });
+          return 'L0001';
+        }
+
+        const currentSeq = counterRes.data?.internalNoSeq || 0;
+        const newSeq = currentSeq + 1;
+        await counterDocRef.update({ data: { internalNoSeq: newSeq } });
+        return 'L' + String(newSeq).padStart(4, '0');
+      });
+    } catch (err) {
+      if (err.message.includes('TransactionConflict') && retryCount < MAX_RETRIES - 1) {
+        retryCount++;
+        // 延迟随重试次数线性增长，模拟排队等待时间
+        // 公式：基础延迟 × (重试次数) → 让后到的请求等更久
+        const delay = BASE_DELAY * retryCount; 
+        console.log(`冲突，排队等待 ${delay}ms 后重试（第${retryCount}次）`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error('最终失败：', err);
+        throw new Error('编号生成失败，请稍后重试');
+      }
+    }
+  }
+}
+    
+
 
 async function generateUrlLink(deviceId) {
   const accessToken = await getAccessToken(); // 获取微信 access_token

@@ -1,0 +1,30 @@
+
+<view class="button-section">
+  <!-- 存包按钮 -->
+  <view class="store-btn" bindtap="goStore">
+    <view class="btn-icon">
+      <text>📦</text> <!-- emoji 图标，可换成 iconfont -->
+    </view>
+    <text class="btn-text">存 包</text>
+  </view>
+
+  <!-- 取包按钮 -->
+  <view class="take-btn" bindtap="goTake">
+    <view class="btn-icon">
+      <text>👜</text>
+    </view>
+    <text class="btn-text">取 包</text>
+  </view>
+</view>
+
+<!-- 底部 Tab 栏 -->
+<view class="tab-bar">
+  <view class="tab-item active" bindtap="goHome">
+    <view class="tab-icon">🏠</view>
+    <text>首页</text>
+  </view>
+  <view class="tab-item" bindtap="goMine">
+    <view class="tab-icon">👤</view>
+    <text>我的</text>
+  </view>
+</view>

@@ -1,66 +1,49 @@
 const db = wx.cloud.database()
 const app = getApp(); 
 Page({
-  data:{ phone:'', password:'', deviceId: ''},
-
-  onLoad() {
-    if (app.globalData.deviceId) {
-      this.setData({
-        deviceId: app.globalData.deviceId
-      });
-      console.log('index页面获取到的deviceId:', app.globalData.deviceId);
-    }
-
-    if (app.globalData.openid) {
-      this.setData({
-        openid: app.globalData.openid
-      });
-      console.log('index页面获取到的openid:', app.globalData.openid);
-    }
+  data: {
+    phone: '',
+    password: '',
+    canProceed: false
   },
 
-  onPhone(e){ this.setData({phone:e.detail.value}) },
-  onPassword(e){ this.setData({password:e.detail.value}) },
-  goStore(){
-    if(!/^\d{11}$/.test(this.data.phone)) return wx.showToast({title:'手机号不正确', icon:'none'})
-    wx.navigateTo({ url: `/pages/store/store?phone=${this.data.phone}&password=${this.data.password}` })
+  // 监听手机号输入
+  onPhoneInput(e) {
+    const phone = e.detail.value;
+    this.setData({
+      phone: phone
+    });
+    this.checkCanProceed();
   },
-  goTake(){
-    console.log('取包按钮被点击，准备跳转'); // 新增打印
-  console.log('传递的参数：', { phone: this.data.phone, password: this.data.password }); // 打印参数
-    wx.navigateTo({ 
-      url: `/pages/take/take?mode=take&phone=${this.data.phone}&password=${this.data.password}` 
+
+  // 监听密码输入
+  onPasswordInput(e) {
+    const pwd = e.detail.value;
+    this.setData({
+      password: pwd
+    });
+    this.checkCanProceed();
+  },
+
+  // 检查是否可以进入下一步
+  checkCanProceed() {
+    const { phone, password } = this.data;
+    // 手机号11位，密码4位
+    const canProceed = phone.length === 11 && password.length === 4;
+    this.setData({
+      canProceed: canProceed
     });
   },
-  goAdmin(){ wx.navigateTo({ url:'/pages/admin/admin' }) },
 
-  goMine() {
-    wx.removeStorageSync('userInfo');
-    const userInfo = wx.getStorageSync('userInfo');
-    if (userInfo) {
-      // 已经授权过，直接跳转
-      wx.navigateTo({ 
-        url: `/pages/mine/mine?phone=${this.data.phone}&password=${this.data.password}` 
-      });
-    } else {
-      wx.getUserProfile({
-        desc: '用于完善个人资料',
-        success: (res) => {
-          const userInfo = res.userInfo;
-          this.setData({ userInfo });
-          wx.setStorageSync('userInfo', userInfo);
-          // 授权成功后再跳转
-          wx.navigateTo({ 
-            url: `/pages/mine/mine?phone=${this.data.phone}&password=${this.data.password}` 
-          });
-        },
-        fail: () => {
-          wx.showToast({
-            title: '授权后可使用完整功能',
-            icon: 'none'
-          });
-        }
-      });
-    }
-  }  
-})
+  // 前往下一步（支付页面）
+  goToNextPage() {
+    // 保存用户输入的手机号和密码
+    wx.setStorageSync('phone', this.data.phone);
+    wx.setStorageSync('password', this.data.password);
+    
+    // 跳转到支付页面
+    wx.navigateTo({
+      url: `/pages/store/store?phone=${this.data.phone}&password=${this.data.password}`
+    });
+  },
+});

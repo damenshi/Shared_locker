@@ -1,30 +1,35 @@
-/* pages/mine/mine.wxss */
+/* 页面容器 */
 .container {
   min-height: 100vh;
-  background-color: #f5f5f5;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #f7f8fa;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", sans-serif;
+  padding-bottom: 20rpx;
 }
 
 /* 用户信息区域 */
 .user-info {
-  background: linear-gradient(135deg, #3498db, #2980b9);
-  padding: 40rpx 30rpx;
+  background: linear-gradient(135deg, #5ac8fa, #4da6f7); /* 柔和蓝色渐变 */
+  padding: 48rpx 32rpx 40rpx 32rpx;
   color: white;
   display: flex;
   align-items: center;
+  border-bottom-left-radius: 24rpx;
+  border-bottom-right-radius: 24rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.08);
 }
 
 .avatar {
   width: 120rpx;
   height: 120rpx;
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255,255,255,0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-right: 30rpx;
   overflow: hidden;
   cursor: pointer;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.1);
 }
 
 .avatar image {
@@ -37,33 +42,33 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
 .phone {
   font-size: 36rpx;
-  margin-bottom: 10rpx;
-  font-weight: 500;
+  font-weight: 600;
+  margin-bottom: 8rpx;
 }
 
 .deposit {
   font-size: 28rpx;
   opacity: 0.9;
-  margin-bottom: 15rpx;
 }
 
 /* 功能菜单 */
 .menu-list {
-  background-color: white;
-  margin: 20rpx 0;
-  border-radius: 16rpx;
+  background-color: #fff;
+  margin: 20rpx 16rpx;
+  border-radius: 20rpx;
   overflow: hidden;
-  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  padding: 30rpx;
+  padding: 28rpx 24rpx;
   border-bottom: 1rpx solid #f1f1f1;
   transition: background-color 0.2s;
 }
@@ -73,44 +78,33 @@
 }
 
 .menu-item:active {
-  background-color: #f9f9f9;
-}
-
-.menu-icon {
-  margin-right: 30rpx;
-  width: 50rpx;
-  height: 50rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background-color: #f2f5f8;
 }
 
 .menu-text {
   flex: 1;
   font-size: 32rpx;
   color: #333;
-}
-
-.menu-arrow {
-  color: #ccc;
-  font-size: 36rpx;
-}
-
-.section-title {
-  font-size: 34rpx;
-  color: #333;
-  padding: 15rpx 0;
-  border-bottom: 1rpx solid #f1f1f1;
-  margin-bottom: 20rpx;
   font-weight: 500;
 }
 
+/* 箭头提示 */
+.menu-arrow {
+  color: #ccc;
+  font-size: 32rpx;
+}
+
+/* 订单列表 */
 .order-list {
-  padding: 10rpx 0;
+  margin: 20rpx 16rpx;
+  border-radius: 20rpx;
+  overflow: hidden;
+  background-color: #fff;
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
 }
 
 .order-item {
-  padding: 20rpx 0;
+  padding: 24rpx 20rpx;
   border-bottom: 1rpx solid #f5f5f5;
   transition: background-color 0.2s;
 }
@@ -120,13 +114,13 @@
 }
 
 .order-item:active {
-  background-color: #f9f9f9;
+  background-color: #f2f5f8;
 }
 
 .order-info {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 15rpx;
+  margin-bottom: 12rpx;
 }
 
 .order-no {
@@ -137,7 +131,8 @@
 .order-status {
   font-size: 28rpx;
   padding: 4rpx 12rpx;
-  border-radius: 4rpx;
+  border-radius: 12rpx;
+  font-weight: 500;
 }
 
 .status-success {
@@ -162,29 +157,39 @@
   font-size: 26rpx;
   color: #999;
   line-height: 1.6;
-  margin-bottom: 15rpx;
+  margin-bottom: 12rpx;
 }
 
+/* 按钮 */
 .refund-btn {
   background-color: #1890ff;
   color: white;
-  font-size: 24rpx;
-  padding: 8rpx 20rpx;
-  border-radius: 4rpx;
+  font-size: 28rpx;
+  padding: 10rpx 24rpx;
+  border-radius: 16rpx;
   line-height: normal;
+  text-align: center;
+  display: inline-block;
+  transition: background 0.2s, transform 0.15s;
 }
 
 .refund-btn:active {
   background-color: #096dd9;
+  transform: scale(0.97);
 }
 
+.refund-all-btn {
+  background-color: #ff4d4f;
+}
+
+.refund-all-btn:active {
+  background-color: #d93025;
+}
+
+/* 空状态 */
 .empty {
   text-align: center;
   padding: 60rpx 0;
   color: #999;
   font-size: 28rpx;
-}
-
-.refund-all-btn:active {
-  background-color: #d93025;
 }

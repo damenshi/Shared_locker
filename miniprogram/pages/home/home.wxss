@@ -1,0 +1,126 @@
+/* 顶部导航栏 */
+.nav-bar {
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-bottom: 1rpx solid #eee;
+  background-color: #fff;
+  color: #333;
+  box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.05);
+}
+
+/* 按钮区域 */
+.button-section {
+  padding: 60rpx 30rpx; 
+  display: flex;
+  flex-direction: column;
+  gap: 40rpx; 
+  margin-bottom: 160rpx; /* 给底部 tab 留空间 */
+}
+
+/* 通用按钮 */
+.store-btn, .take-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20rpx;
+  height: 200rpx;
+  border-radius: 28rpx;        
+  font-size: 48rpx;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  box-shadow: 0 8rpx 16rpx rgba(0,0,0,0.08);
+}
+
+/* 存包按钮 - 蓝色渐变 */
+.store-btn {
+  background: linear-gradient(135deg, #66b3ff, #4aa5ff);
+  color: white;
+}
+
+/* 取包按钮 - 绿色渐变 */
+.take-btn {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: white;
+}
+
+/* 点击效果 */
+.store-btn:active, .take-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 4rpx 10rpx rgba(0,0,0,0.12);
+}
+
+/* 按钮图标 */
+.btn-icon {
+  width: 80rpx;
+  height: 80rpx;
+  flex-shrink: 0;
+  border-radius: 50%; 
+  background-color: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 8rpx rgba(0,0,0,0.08);
+  font-size: 48rpx;
+}
+
+/* 按钮文字 */
+.btn-text {
+  text-shadow: 0 1rpx 2rpx rgba(0,0,0,0.1);
+}
+
+/* 底部 Tab 栏 - 浮起圆角 */
+.tab-bar {
+  display: flex;
+  position: fixed;
+  bottom: 20rpx;
+  left: 20rpx;
+  right: 20rpx;
+  height: 98rpx;
+  border-radius: 40rpx;
+  background-color: #fff;
+  box-shadow: 0 8rpx 16rpx rgba(0,0,0,0.08);
+  padding: 0 20rpx;
+}
+
+/* Tab 按钮 */
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: #999;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+/* Tab 图标 */
+.tab-item .tab-icon {
+  font-size: 40rpx;
+  margin-bottom: 6rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background-color: rgba(102,179,255,0.1);
+  color: #66b3ff;
+  transition: all 0.2s ease;
+}
+
+/* 选中状态 */
+.tab-item.active {
+  color: #66b3ff;
+}
+.tab-item.active .tab-icon {
+  transform: scale(1.2);
+  background-color: rgba(102,179,255,0.2);
+}

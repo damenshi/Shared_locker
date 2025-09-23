@@ -1,28 +1,175 @@
-/* inherit */
-/* 我的按钮样式 */
-.mine-btn {
-  position: fixed;
-  right: 30rpx;
-  bottom: 30rpx;
+/* 页面容器 */
+.container {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
+  background: #f7f8fa;
+  padding: 24rpx;
+  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Segoe UI", sans-serif;
+}
+
+/* 返回首页按钮 */
+.home-btn {
+  position: absolute;
+  top: 28rpx;
+  left: 28rpx;
+  z-index: 10;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background-color: #ffffff;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 120rpx;
-  height: 120rpx;
-  background-color: #07c160;
-  border-radius: 50%;
-  box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.1);
-  z-index: 999;
+  box-shadow: 0 6rpx 14rpx rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.home-btn:active {
+  transform: scale(0.94);
+  box-shadow: 0 3rpx 7rpx rgba(0,0,0,0.15);
 }
 
-.mine-icon {
-  width: 60rpx;
-  height: 60rpx;
-  margin-bottom: 5rpx;
+/* 顶部信息 */
+.header {
+  margin-bottom: 36rpx;
+}
+.school-name {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 8rpx;
+}
+.business-hours {
+  font-size: 28rpx;
+  color: #888;
 }
 
-.mine-text {
-  font-size: 24rpx;
-  color: white;
+/* 帮助提示框 */
+.help-box {
+  background-color: #fff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 44rpx;
+  box-shadow: 0 6rpx 20rpx rgba(0,0,0,0.04);
+  border: 1rpx solid #f0f0f0;
 }
+
+.help-question, .help-answer {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 14rpx;
+}
+
+.help-question:last-child, .help-answer:last-child {
+  margin-bottom: 0;
+}
+
+.question-text {
+  color: #ff5a3c;
+  font-size: 30rpx;
+  margin-left: 10rpx;
+  font-weight: 500;
+}
+
+.answer-text {
+  color: #333;
+  font-size: 30rpx;
+  margin-left: 10rpx;
+  line-height: 42rpx;
+}
+
+/* 输入表单区域 */
+.input-container {
+  background-color: #fff;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 44rpx;
+  box-shadow: 0 6rpx 20rpx rgba(0,0,0,0.04);
+  border: 1rpx solid #f0f0f0;
+}
+
+.input-title {
+  font-size: 34rpx;
+  color: #222;
+  margin-bottom: 32rpx;
+  font-weight: 600;
+}
+
+.input-item {
+  display: flex;
+  align-items: center;
+  border: 1rpx solid #e6e6e6;
+  border-radius: 14rpx;
+  padding: 0 20rpx;
+  height: 82rpx;
+  margin-bottom: 20rpx;
+  background-color: #fafafa;
+  box-shadow: inset 0 2rpx 4rpx rgba(0,0,0,0.02);
+  transition: all 0.2s ease;
+}
+.input-item:focus-within {
+  border-color: #1677ff;
+  box-shadow: 0 4rpx 10rpx rgba(22,119,255,0.15);
+}
+
+.input-label {
+  width: 140rpx;
+  font-size: 30rpx;
+  color: #333;
+}
+
+.input-field {
+  flex: 1;
+  font-size: 30rpx;
+  height: 100%;
+  background-color: transparent;
+  outline: none;
+  color: #333;
+}
+
+.input-field::placeholder {
+  color: #bbb;
+}
+
+/* 密码提示文字 */
+.password-hint {
+  font-size: 26rpx;
+  color: #007aff;
+  margin-top: 12rpx;
+  text-align: right;
+}
+
+.next-btn {
+  background: #ffffff;
+  color: #1677ff;          /* 深蓝文字 */
+  font-size: 32rpx;
+  height: 90rpx;
+  line-height: 90rpx;
+  border-radius: 45rpx;
+  border: 2rpx solid #1677ff; /* 描边突出按钮 */
+  margin-top: 24rpx;
+  text-align: center;
+  font-weight: 600;
+  box-shadow: 0 6rpx 12rpx rgba(22,119,255,0.15);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+  cursor: pointer;
+}
+
+.next-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 3rpx 8rpx rgba(22,119,255,0.25);
+  background: #f0f7ff; /* 点击微灰 */
+}
+
+.next-btn[disabled] {
+  background-color: #f5f5f5;
+  color: #999;
+  box-shadow: none;
+  border-color: #ccc;
+  cursor: not-allowed;
+}
+
+
+

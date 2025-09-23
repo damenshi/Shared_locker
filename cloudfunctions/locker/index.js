@@ -136,7 +136,7 @@ exports.main = async (event, context) => {
 
         // 3. 验证服务器返回结果
         if (response.data.code !== 200 || response.data.doorSort != combinedCode) {
-          throw new Error(`服务器响应异常`);
+          throw new Error(`服务器响应异常: ${response.data.message || '未知错误'}`);
         }
         return true;
       } catch (err) {
@@ -144,7 +144,9 @@ exports.main = async (event, context) => {
           throw new Error(`连接超时，请检查服务器是否在线`);
         }
         if (err.response) {
-          throw new Error(`服务器返回错误: ${err.response.status} ${err.response.statusText}`);
+          const errorMsg = err.response.data?.message || err.response.statusText;
+          console.error(`服务器返回错误: 设备${deviceId}，状态码${err.response.status}，message: ${errorMsg}`);
+          throw new Error(`服务器返回错误: ${err.response.status} ${errorMsg}`);
         }
         throw new Error(`开柜接口调用失败: ${err.message}`);
       }
