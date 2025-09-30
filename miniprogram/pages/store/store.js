@@ -7,9 +7,11 @@ Page({
     openid: '',
     isLoading: false,
     deviceId: '',
+    showPayModal: false,
+    payDeposit: 0,        
+    lockerNo: '',
     constants: {
       ORDER_STATUS_PROCESSING: '进行中',
-      DEPOSIT: 15,
       NAVIGATE_DELAY: 2000,
     }
   },
@@ -46,113 +48,18 @@ Page({
     return true;
   },
 
-  /**
-   * 查询可用柜子
-   * @returns {Object|null} 可用柜子信息或null
-   */
-  async getAvailableCabinet() {
+  async saveUserCredentials(openid, phone, password) {
     try {
-      const deviceId = this.data.deviceId;
-      console.log("deviceId: ", deviceId);
-      if (!deviceId) {
-        wx.showToast({ title: '无法获取设备id', icon: 'none' });
-        return null;
-      }
-      const res = await wx.cloud.callFunction({
-        name: "locker",
-        data: { 
-          action: "listFree",
-          deviceId: deviceId
-        } 
-      });
-      
-      console.log("查询可用柜子结果：", res.result);
-      
-      if (res.result?.success && res.result.data?.length > 0) {
-        return res.result.data[0];
-      } else {
-        wx.showToast({ title: '储物柜已满', icon: 'none' });
-        return null;
-      }
-    } catch (e) {
-      console.error("查询可用柜失败", e);
-      wx.showToast({ title: '无可用储物柜', icon: 'none' });
-      return null;
+      const userCache = wx.getStorageSync('userCredentials') || {};
+      userCache[openid] = { phone, password };
+      wx.setStorageSync('userCredentials', userCache);
+      console.log('手机号密码已缓存', userCache[openid]);
+    } catch (err) {
+      console.error('缓存失败:', err);
     }
   },
-
-   /**
-   * 查询可用柜子
-   * @returns {Object|null} 可用柜子信息或null
-   */
-  async checkOrder() {
-    try {
-      const openid = this.data.openid;
-      const deviceId = this.data.deviceId;
-      if (!openid) {
-        wx.showToast({ title: '无法获取用户信息', icon: 'none' });
-        return null;
-      }
-      const res = await wx.cloud.callFunction({
-        name: "order",
-        data: { 
-          action: "queryByOpenid",
-          openid: openid,
-          deviceId: deviceId
-        } 
-      });
-      
-      console.log("查询订单结果：", res.result);
-      if (res.result?.success) {
-        return res.result;
-      } else {
-        wx.showToast({ title: '存包查询订单失败：', icon: 'none' });
-        return null;
-      }
-    } catch (e) {
-      console.error("存包查询订单失败", e);
-      return null;
-    }
-  },
-
-  /**
-   * 创建订单
-   * @param {Object} lockerInfo - 柜子信息
-   * @returns {string|null} 订单ID或null
-   */
-  async createOrder(lockerInfo) {
-    try {
-      // 调用参数验证
-      if (!this.validateParams()) {
-        return null;
-      }
-      console.log(`createOrder openid:`, this.data.openid);
-      const res = await wx.cloud.callFunction({
-        name: "order",
-        data: {
-          action: "createOrder",
-          lockerId: lockerInfo._id,
-          phone: this.data.phone,
-          password: this.data.password,
-          openid: this.data.openid
-        }
-      });
-
-      if (res.result?.orderId) {
-        this.setData({ currentOrderId: res.result.orderId });
-        return res.result.orderId;
-      }else {
-        wx.showToast({ title: '创建订单失败', icon: 'none' });
-        return null;
-      }
-    } catch (e) {
-      console.error("创建订单异常", e);
-      wx.showToast({ title: '创建订单异常', icon: 'none' });
-      return null;
-    }
-  },
-
-  // 获取订单详情
+  
+  // 获取用户余额
   async getUserDeposit(openid) {
     const res = await wx.cloud.callFunction({
       name: "user",
@@ -162,7 +69,31 @@ Page({
       }
     });
     console.log("getUserDeposit res.result.data", res.result.data);
-    return res.result.data;
+    if(res.result?.success)
+      return res.result.data;
+    else{
+      wx.showToast({ title: '用户账户异常', icon: 'none' });
+      return null;
+    }
+  },
+
+  // 获取设备收费标准
+  async getDeviceDeposit(deviceId) {
+    const res = await wx.cloud.callFunction({
+      name: "device",
+      data: {
+        action: "getDevicesDeposit",
+        deviceId: deviceId
+      }
+    });
+    console.log("getDeviceDeposi: ", res.result.data);
+    if(res.result?.success){
+      return res.result.data;
+    } else {
+      wx.showToast({ title: '设备异常', icon: 'none' });
+      return null;
+    }
+
   },
 
   /**
@@ -170,13 +101,14 @@ Page({
    * @param {string} orderId - 订单ID
    * @returns {boolean} 支付是否成功
    */
-  async mockPaymentSuccess(orderId) {
+  async mockPaymentSuccess(orderId, deviceDeposit) {
     try {
       const res = await wx.cloud.callFunction({
         name: "order",
         data: {
           action: "mockPaySuccess",
-          orderId: orderId
+          orderId: orderId,
+          deviceDeposit: deviceDeposit
         }
       });
       return !!res.result?.success;
@@ -186,65 +118,49 @@ Page({
     }
   },
 
-  /**
-   * 验证订单状态是否为进行中
-   * @param {string} orderId - 订单ID
-   * @returns {boolean} 状态是否有效
-   */
-// async verifyOrderStatus(orderId) {
-//     try {
-//       const res = await wx.cloud.callFunction({
-//         name: "order",
-//         data: {
-//           action: "getOrder",
-//           id: orderId
-//         }
-//       });
-      
-//       if (!res.result?.data) {
-//         wx.showToast({ title: '查询订单失败', icon: 'none' });
-//         return false;
-//       }
-
-//       if (res.result.data.status !== this.data.constants.ORDER_STATUS_PROCESSING) {
-//         wx.showToast({ 
-//           title: `订单状态异常（当前：${res.result.data.status}）`, 
-//           icon: 'none' 
-//         });
-//         return false;
-//       }
-//       return true;
-//     } catch (e) {
-//       console.error("验证订单状态异常", e);
-//       wx.showToast({ title: '验证订单状态失败', icon: 'none' });
-//       return false;
-//     }
-//   },
-
-  /**
-   * 打开柜门
-   * @param {Object} lockerInfo - 柜子信息
-   * @param {string} orderId - 订单ID
-   * @returns {boolean} 开柜是否成功
-   */
-  async openCabinet(lockerInfo, orderId) {
+  async payment(orderId, deviceDeposit) {
     try {
       const res = await wx.cloud.callFunction({
-        name: "locker",
+        name: 'order',
         data: {
-          action: "openDoor",
-          deviceId: lockerInfo.deviceId,
-          doorNo: lockerInfo.doorNo,
+          action: 'createPrepay',  
           orderId: orderId,
-          cabinetNo: lockerInfo.cabinetNo,
-          type: "store"
+          amount: Math.round(deviceDeposit * 100),
+          openid: this.data.openid
         }
       });
-      
-      console.log("开柜接口返回：", res.result);
-      return res.result?.ok === true;
+  
+      if (!res.result?.success || !res.result.data) {
+        throw new Error('createPrepay failed');
+      }
+  
+      const payParams = res.result.data; // { timeStamp, nonceStr, package, signType, paySign }
+  
+      // 2) 调起微信支付
+      return await new Promise((resolve) => {
+        wx.requestPayment({
+          timeStamp: String(payParams.timeStamp),
+          nonceStr: payParams.nonceStr,
+          package: payParams.package, // 格式: prepay_id=xxx
+          signType: payParams.signType || 'RSA',
+          paySign: payParams.paySign,
+          success: (r) => {
+            console.log('wx.requestPayment success', r);
+            // 注意：虽然请求返回 success，但最终订单以服务器端异步回调为准。
+            // 可以在这里简单返回 true，并依赖后端回调来最终更新状态。
+            resolve(true);
+          },
+          fail: (err) => {
+            console.error('wx.requestPayment fail', err);
+            wx.showToast({ title: '支付未完成', icon: 'none' });
+            resolve(false);
+          }
+        });
+      });
+  
     } catch (e) {
-      console.error("开门失败", e);
+      console.error('realPayment error', e);
+      wx.showToast({ title: '支付异常', icon: 'none' });
       return false;
     }
   },
@@ -299,21 +215,48 @@ Page({
     }
   },
 
-  // 支付确认弹窗
-  showPaymentConfirmModal() {
+   //自定义支付确认弹窗
+   showPaymentConfirmModal(deviceDeposit, lockerNo) {
     return new Promise(resolve => {
-      // 只显示押金相关的支付信息
-      wx.showModal({
-        title: '确认支付',
-        content: `需支付押金 15元，取件后可退还`,
-        success: (res) => {
-          resolve(res.confirm);
-        },
-        fail: () => {
-          resolve(false);
-        }
+      wx.hideLoading();
+      this.setData({
+        showPayModal: true,
+        payDeposit: deviceDeposit,
+        lockerNo: lockerNo,
+        _resolvePay: resolve 
       });
     });
+  },
+
+  //用户点击确认支付
+  confirmPay() {
+    if (this.data._resolvePay) {
+      this.data._resolvePay(true);
+    }
+    this.setData({ showPayModal: false, _resolvePay: null });
+  },
+
+  //用户点击取消
+  cancelPay() {
+    if (this.data._resolvePay) {
+      this.data._resolvePay(false);
+    }
+    this.setData({ showPayModal: false, _resolvePay: null });
+  },
+
+  async waitForPayment(orderId) {
+    let retries = 5; // 最多查询 5次
+    while (retries-- > 0) {
+      const res = await wx.cloud.callFunction({
+        name: 'order',
+        data: { action: 'getOrder', orderId }
+      });
+      if (res.result?.success && res.result.data?.status === this.data.constants.ORDER_STATUS_PROCESSING) {
+        return true; // 支付已确认
+      }
+      await new Promise(r => setTimeout(r, 1000)); // 每 1 秒查一次
+    }
+    return false; // 超时
   },
 
   /**
@@ -326,7 +269,6 @@ Page({
 
     let lockerInfo = null;
     let orderId = null;
-    let checkRes = null;
 
     try {
       // 1. 参数验证
@@ -335,71 +277,156 @@ Page({
         return;
       }
 
-      // 2. 获取可用柜子
-      lockerInfo = await this.getAvailableCabinet();
-      if (!lockerInfo) {
-        setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
-        return;
+      //2.检查是否有进行中的订单
+      const checkRes = await wx.cloud.callFunction({
+        name: "order",
+        data: { 
+          action: "queryByOpenid",
+          openid: this.data.openid,
+          deviceId: this.data.deviceId
+        } 
+      });
+      if (checkRes.result?.success){
+        const orderInfo = checkRes.result.data;
+        if(orderInfo.status == this.data.constants.ORDER_STATUS_PROCESSING){
+          wx.showToast({ title: '已有订单，请先取件', icon: 'none', duration: 2000});
+          setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
+          return;
+        }
       }
 
-      //3.检查是否有进行中的订单
-      checkRes = await this.checkOrder();
-      if (checkRes?.data && checkRes.data.status == this.data.constants.ORDER_STATUS_PROCESSING) {
-        wx.showToast({ title: '已有订单，请先取件', icon: 'none' });
-        setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
-        return;
-      }
+      //3.获取可用柜子并占用
+      const freeRes = await wx.cloud.callFunction({
+        name: 'locker',
+        data: {
+          action: 'listFree',
+          deviceId: this.data.deviceId
+        }
+      });
+      
+      if (!freeRes.result?.success) 
+        throw new Error('查询空闲柜门失败');
+      lockerInfo = freeRes.result.data;
+
+      //4.创建/获取用户账户      
+      const userRes = await wx.cloud.callFunction({
+        name: 'user',
+        data: {
+          action: 'createUser',
+          openid: this.data.openid,
+          phone: this.data.phone,
+        }
+      });
+      if (!userRes.result?.success) throw new Error('获取用户信息失败');
+      const userInfo = userRes.result.data;
+
       // 4. 创建订单
-      orderId = await this.createOrder(lockerInfo);
-      if (!orderId) return;
+      const orderRes = await wx.cloud.callFunction({
+        name: "order",
+        data: {
+          action: "createOrder",
+          password: this.data.password,
+          lockerInfo: lockerInfo,
+          userInfo: userInfo
+        }
+      });
+      if (!orderRes.result?.success) throw new Error('创建订单失败');
+      orderId = orderRes.result.data;
 
-      // 4. 查询订单状态，判断是否需要支付
-      // 4. 查询用户是否有余额
-      const depositRes = await this.getUserDeposit(this.data.openid);
-      if (depositRes.deposit === this.data.constants.DEPOSIT) {
-        wx.showToast({ title: '余额充足，无需额外支付', icon: 'none' });
+      //5.更新柜子当前状态
+      const updateRes = await wx.cloud.callFunction({
+        name: 'locker',
+        data: {
+          action: 'updateLocker',
+          lockerId: lockerInfo._id,
+          currentOrderId: orderId,
+          currentUserPhone: userInfo.phone
+        }
+      });
+      if (!updateRes.result?.success) 
+        throw new Error('更新柜子当前订单失败');
+
+      // 5. 查询用户是否有余额
+      const userDeposit = await this.getUserDeposit(this.data.openid);
+      const deviceDeposit = await this.getDeviceDeposit(this.data.deviceId);
+      let newDeposit = 0;
+      if (userDeposit >= deviceDeposit) {
+        wx.showToast({ title: '余额充足，无需支付', icon: 'none', duration: 2000});
       } else {
         // 押金不足，需要支付
-        const confirmPay = await this.showPaymentConfirmModal();
+        const confirmPay = await this.showPaymentConfirmModal(lockerInfo.deviceDeposit, lockerInfo.lockerNo);
         if (!confirmPay) {
-          await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
-          await this.recoverOrder(orderId);
           wx.navigateBack({ delta: 1 });
-          return;
+          throw new Error('未确认支付');
         }
-
-        // 模拟支付
-        wx.showLoading({ title: '支付押金中...' });
-        const paySuccess = await this.mockPaymentSuccess(orderId);
+        
+        //支付
+        wx.showLoading({ title: '支付预付费用...' });
+        const paySuccess = await this.payment(orderId, lockerInfo.deviceDeposit);
         if (!paySuccess) {
-          wx.showToast({ title: '支付失败', icon: 'none' });
-          await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
-          await this.recoverOrder(orderId);
-          return;
+          throw new Error('支付失败');
         }
+        const confirmed = await this.waitForPayment(orderId);
+        if (!confirmed) throw new Error('支付结果未确认');
+        newDeposit = deviceDeposit;
       }
 
-      // 7. 开柜操作
+      // 6.更新订单状态为进行中并更新付款金额
+      // const updateOrderRes = await wx.cloud.callFunction({
+      //   name: "order",
+      //   data: {
+      //     action: "updateOrder",
+      //     orderId: orderId,
+      //     status: this.data.constants.ORDER_STATUS_PROCESSING,
+      //     deposit: newDeposit
+      //   }
+      // });
+      // if (!updateOrderRes.result?.success) 
+      //   throw new Error('更新订单状态为进行中失败');
+
+      // 7.更新用户余额
+      const userUpdate = await wx.cloud.callFunction({
+        name: 'user',
+        data: {
+          action: 'updateUser',
+          openid: this.data.openid,
+          deposit: newDeposit,
+        }
+      });
+      if (!userUpdate.result?.success) 
+        throw new Error('更新用户余额失败');
+
+      // 8. 开柜操作
       wx.showLoading({ title: '打开柜门中...' });
-      const openSuccess = await this.openCabinet(lockerInfo, orderId);
-      const opennum = (lockerInfo.cabinetNo - 1) * 2 + lockerInfo.doorNo;//每个锁板包含两个锁
+      // const openSuccess = await this.openCabinet(lockerInfo, orderId);
+      const openDoorRes = await wx.cloud.callFunction({
+        name: "locker",
+        data: {
+          action: "openDoor",
+          deviceId: lockerInfo.deviceId,
+          doorNo: lockerInfo.doorNo,
+          orderId: orderId,
+          cabinetNo: lockerInfo.cabinetNo,
+          type: "store"
+        }
+      });
 
-      if (openSuccess) {
+      if (!openDoorRes.result?.success){
         wx.hideLoading();
-        wx.showToast({ 
-          title: `柜门 ${opennum} 已打开`, 
-          icon: 'success',
-          duration: 3000
-        });
-      } else {
+        wx.showToast({ title: '开门失败，请重试', icon: 'none' });
+        throw new Error('开门失败');
+      }else{
+        //缓存手机号和密码
+        await this.saveUserCredentials(this.data.openid, this.data.phone, this.data.password);
+
         wx.hideLoading();
-        wx.showToast({ title: '开门失败', icon: 'none' });
-        await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
-        await this.recoverOrder(orderId);
+        wx.showToast({ title: `柜门 ${lockerInfo.lockerNo} 已打开`, icon: 'none', duration: 2000});
+          setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
       }
+
     } catch (e) {
       console.error("存包流程异常", e);
-      wx.showToast({ title: '操作失败', icon: 'none' });
+      wx.showToast({ title: '开门失败，请重试', icon: 'none' });
       if (lockerInfo) await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
       if (orderId) await this.recoverOrder(orderId);
     } finally {

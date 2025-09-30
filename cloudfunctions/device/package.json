@@ -1,0 +1,10 @@
+{
+  "name": "device",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest",
+    "node-fetch": "^2.7.0",
+    "axios": "^1.6.8" 
+  }
+}

@@ -3,3 +3,33 @@
     <view class="title"></view>
   </view>
 </view>
+
+<view wx:if="{{showPayModal}}" class="modal-mask">
+  <view class="modal-container">
+    <view class="modal-title">确认支付</view>
+    <view class="modal-locker">柜门号：<text class="locker-no">{{lockerNo}}</text></view>
+    <view class="modal-content">
+      需支付预付款 <text class="highlight">{{payDeposit}}</text> 元
+    </view>
+    <view class="modal-actions">
+      <button class="btn cancel" bindtap="cancelPay">取消</button>
+      <button class="btn confirm" bindtap="confirmPay">确认支付</button>
+    </view>
+  </view>
+</view>
+
+<!-- <view wx:if="{{showPayModal}}" class="modal-mask">
+  <view class="modal-container">
+    <view class="modal-header">确认支付</view>
+    <view class="modal-body">
+      <view class="locker-text">柜门号</view>
+      <view class="locker-no">{{lockerNo}}</view>
+      <view class="deposit-text">需支付预付款 <text class="deposit">{{payDeposit}} 元</text></view>
+      <view class="tip">剩余费用可在个人账户中提现</view>
+    </view>
+    <view class="modal-footer">
+      <button class="btn-cancel" bindtap="cancelPay">取消</button>
+      <button class="btn-confirm" bindtap="confirmPay">确认</button>
+    </view>
+  </view>
+</view> -->

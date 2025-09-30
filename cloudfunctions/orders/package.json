@@ -1,9 +1,9 @@
 {
-  "name": "order",
+  "name": "orders",
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
     "wechatpay-node-v3": "^2.2.1",
-    "wx-server-sdk": "^3.0.1"
+    "wx-server-sdk": "latest"
   }
 }

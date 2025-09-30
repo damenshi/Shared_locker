@@ -7,6 +7,11 @@ const db = cloud.database();
 const devicesCollection = db.collection('devices');
 const _ = db.command;
 
+const CONFIG = {
+  appsecret: process.env.APPSECRET,
+  appid: process.env.APPID,
+};
+
 // 云函数主入口
 exports.main = async (event, context) => {
     const body = event.body ? JSON.parse(event.body) : {};
@@ -31,19 +36,6 @@ exports.main = async (event, context) => {
             // 4. 设备离线通知
             case 'device_offline':
                 return handleDeviceOffline(deviceId);
-            // 4. 手机号开门结果反馈
-            // case 'open_by_phone_result':
-            //     return handleOpenByPhoneResult(deviceId, data);
-                
-            // 5. 开门结果反馈
-            // case 'open_door_result':
-            //     return handleOpenDoorResult(deviceId, data);
-                
-            // 6. 柜门状态更新
-            // case 'door_status_result':
-            //     return handleDoorStatusUpdate(deviceId, data);
-                
-            
                 
             // 未知类型处理
             default:
@@ -61,41 +53,41 @@ exports.main = async (event, context) => {
     }
 };
 
-async function startOfflineCheckTask() {
-  const _ = db.command; // 确保引入数据库命令对象
-  const checkInterval = 60 * 1000; // 1分钟检查一次
-  const offlineThreshold = 5 * 60 * 1000; // 5分钟阈值
+// async function startOfflineCheckTask() {
+//   const _ = db.command; // 确保引入数据库命令对象
+//   const checkInterval = 60 * 1000; // 1分钟检查一次
+//   const offlineThreshold = 5 * 60 * 1000; // 5分钟阈值
 
-  setInterval(async () => {
-      try {
-          const fiveMinutesAgo = new Date(Date.now() - offlineThreshold);
+//   setInterval(async () => {
+//       try {
+//           const fiveMinutesAgo = new Date(Date.now() - offlineThreshold);
           
-          // 查询超过5分钟未心跳且在线的设备
-          const offlineDevices = await devicesCollection
-              .where({
-                  isOnline: true,
-                  updatedAt: _.lt(fiveMinutesAgo)
-              })
-              .get();
+//           // 查询超过5分钟未心跳且在线的设备
+//           const offlineDevices = await devicesCollection
+//               .where({
+//                   isOnline: true,
+//                   updatedAt: _.lt(fiveMinutesAgo)
+//               })
+//               .get();
 
-          if (offlineDevices.data.length > 0) {
-              // 批量更新离线状态
-              await devicesCollection
-                  .where({
-                      deviceId: _.in(offlineDevices.data.map(d => d.deviceId))
-                  })
-                  .update({
-                      isOnline: false,
-                      updatedAt: db.serverDate()
-                  });
+//           if (offlineDevices.data.length > 0) {
+//               // 批量更新离线状态
+//               await devicesCollection
+//                   .where({
+//                       deviceId: _.in(offlineDevices.data.map(d => d.deviceId))
+//                   })
+//                   .update({
+//                       isOnline: false,
+//                       updatedAt: db.serverDate()
+//                   });
 
-              console.log(`已标记 ${offlineDevices.data.length} 个设备为离线`);
-          }
-      } catch (error) {
-          console.error('设备离线检查任务失败:', error);
-      }
-  }, checkInterval);
-}
+//               console.log(`已标记 ${offlineDevices.data.length} 个设备为离线`);
+//           }
+//       } catch (error) {
+//           console.error('设备离线检查任务失败:', error);
+//       }
+//   }, checkInterval);
+// }
 
 /**
  * 1. 处理设备登录请求
@@ -115,8 +107,8 @@ async function getAccessToken() {
         return cachedToken;
     }
 
-    const APPID = 'wxc447a8e66f5f8294';
-    const APPSECRET = '5b41ba2cdb527822e2e43c2fbb2a9db9';
+    const APPID = CONFIG.appid;
+    const APPSECRET = CONFIG.appsecret;
 
     try {
         const res = await axios.get('https://api.weixin.qq.com/cgi-bin/token', {
@@ -145,17 +137,27 @@ async function getAccessToken() {
     }
 }
 
-async function ensureCounterDoc() {
-  const docRef = db.collection('counters').doc('deviceCounter');
-  try {
-    const res = await docRef.get();
-    if (!res.data) {
-      // 文档不存在，创建初始文档
-      await docRef.set({ internalNoSeq: 0 });
+async function generateUrlLink(deviceId) {
+  const accessToken = await getAccessToken(); // 获取微信 access_token
+
+  // 生成 URL Link 请求
+  const res = await axios.post(
+    `https://api.weixin.qq.com/wxa/generate_urllink?access_token=${accessToken}`,
+    {
+      // 跳转的小程序页面
+      path: 'pages/index/index',
+      // 携带参数，等价于小程序中 onLoad(options)
+      query: `deviceId=${deviceId}`,
+      // 可选配置：比如有效期、是否生成短链等
+      is_expire: false
     }
-  } catch (err) {
-    // 如果 get 报错（文档不存在），也创建
-    await docRef.set({ internalNoSeq: 0 });
+  );
+
+  if (res.data.url_link) {
+    return res.data.url_link;
+  } else {
+    console.error('生成 URL Link 失败:', res.data);
+    throw new Error(res.data.errmsg || 'generateUrlLink failed');
   }
 }
 
@@ -198,32 +200,6 @@ async function generateInternalNumber() {
     }
   }
 }
-    
-
-
-async function generateUrlLink(deviceId) {
-  const accessToken = await getAccessToken(); // 获取微信 access_token
-
-  // 生成 URL Link 请求
-  const res = await axios.post(
-    `https://api.weixin.qq.com/wxa/generate_urllink?access_token=${accessToken}`,
-    {
-      // 跳转的小程序页面
-      path: 'pages/index/index',
-      // 携带参数，等价于小程序中 onLoad(options)
-      query: `deviceId=${deviceId}`,
-      // 可选配置：比如有效期、是否生成短链等
-      is_expire: false
-    }
-  );
-
-  if (res.data.url_link) {
-    return res.data.url_link;
-  } else {
-    console.error('生成 URL Link 失败:', res.data);
-    throw new Error(res.data.errmsg || 'generateUrlLink failed');
-  }
-}
 
 async function handleDeviceLogin(deviceId) {
     // 查询设备是否已注册
@@ -249,6 +225,7 @@ async function handleDeviceLogin(deviceId) {
               deviceAddress:null,
               isOnline: true,           // 新注册设备默认在线
               isConfigured: false,
+              deviceDeposit: 0,
               urlLink: urlLink,
               lastLoginTime: db.serverDate(), // 记录登录时间
               createdAt: db.serverDate(),  // 创建时间
@@ -305,7 +282,7 @@ async function handleDeviceHeartbeat(deviceId, data, timestamp) {
  * 验证手机号和密码是否匹配有效订单
  */
 async function handleOpenByPhone(deviceId, data) {
-  const { phone, password, time } = data;
+  const {phone, password} = data;
   
   // 1. 验证订单信息
   const orderRes = await db.collection('orders')
@@ -313,7 +290,7 @@ async function handleOpenByPhone(deviceId, data) {
           phone,
           password,
           status: '进行中', // 有效订单
-          deviceId // 订单关联的设备ID
+          deviceId
       })
       .limit(1)
       .get();
@@ -339,7 +316,7 @@ async function handleOpenByPhone(deviceId, data) {
       });
 
       // 3. 处理开柜结果
-      if (openResult.result?.ok) {
+      if (openResult.result?.success) {
           // 生成doorSort返回格式
           const cabinetNoStr = String(order.cabinetNo).padStart(2, '0');
           const doorNoStr = String(order.doorNo).padStart(2, '0');
@@ -364,50 +341,6 @@ async function handleOpenByPhone(deviceId, data) {
           message: 'opendoor unsuccess'
       };
   }
-}
-
-/**
- * 4. 处理手机号开门结果反馈
- */
-async function handleOpenByPhoneResult(deviceId, data) {
-    const { doorSort, status } = data;
-    
-    // 更新订单状态（如果开门成功）
-    if (status === 'success') {
-        await db.collection('orders')
-            .where({ doorSort, deviceId, status: 'valid' })
-            .update({
-                status: 'opened',
-                openedAt: db.serverDate()
-            });
-    }
-  
-    return { code: 200, message: '开门结果已记录' };
-}
-
-/**
- * 5. 处理开门结果反馈
- */
-async function handleOpenDoorResult(deviceId, data) {
-    const { doorSort, time, status } = data;
-    
-    // 更新储物柜状态
-    await lockersCollection
-        .where({ deviceId, doorSort })
-        .update({
-            status: status === 'success' ? 'occupied' : 'fault',
-            lastOpenAt: time,
-            updatedAt: db.serverDate()
-        });
-
-    await logsCollection.add({
-        deviceId,
-        type: 'open_door',
-        data: { doorSort, time, status },
-        createdAt: db.serverDate()
-    });
-
-    return { code: 200, message: '开门结果已处理' };
 }
 
 /**
@@ -450,5 +383,3 @@ async function handleDeviceOffline(deviceId) {
         });
       return { code: 200, message: '设备离线已确认' };
 }
-
-startOfflineCheckTask();

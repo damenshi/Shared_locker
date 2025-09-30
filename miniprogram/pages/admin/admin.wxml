@@ -79,7 +79,17 @@
       />
     </view>
     <view class="input-item">
-      <text>锁板数量：</text>
+      <text>设备收费标准：</text>
+      <input 
+        type="text" 
+        value="{{deviceDeposit}}" 
+        data-field="deviceDeposit"
+        bindinput="onInputChange"
+        placeholder="请输入设备预付款标准"
+      />
+    </view>
+    <view class="input-item">
+      <text>设备锁板数量：</text>
       <input 
         type="number" 
         value="{{cabinetCount}}" 
@@ -89,7 +99,7 @@
       />
     </view>
     <view class="input-item">
-      <text>每个锁板的锁数量：</text>
+      <text>设备锁数量：</text>
       <input 
         type="number" 
         value="{{lockersPerCabinet}}" 
@@ -102,7 +112,7 @@
       bindtap="batchCreateLockersByDevice" 
       type="primary"
     >
-      基于设备生成锁具
+      配置设备
     </button>
   </view>
     

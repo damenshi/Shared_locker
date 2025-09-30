@@ -31,30 +31,7 @@ const validateParams = (params, rules) => {
   return { valid: true }
 }
 
-// 工具函数：恢复柜子状态为空闲
-// const recoverLockerStatus = async (doorNo) => {
-//   try {
-//     const locker = await db.collection('lockers')
-//       .where({ doorNo })
-//       .get()
-      
-//     if (locker.data.length > 0) {
-//       await db.collection('lockers').doc(locker.data[0]._id).update({
-//         data: {
-//           status: 'free',
-//           currentOrderId: null,
-//           updatedAt: Date.now()
-//         }
-//       })
-//       console.log(`柜门 ${doorNo} 已自动恢复为空闲状态`)
-//       return true
-//     }
-//     return false
-//   } catch (err) {
-//     console.error(`恢复柜门 ${doorNo} 状态失败`, err)
-//     return false
-//   }
-// }
+
 
 exports.main = async (event, context) => {
   const { action } = event
@@ -63,34 +40,43 @@ exports.main = async (event, context) => {
   if (action === 'listFree') {
     try {
       const { deviceId } = event;
-
-      const whereCondition = { 
-        status: 'free',
-        currentOrderId: _.eq(null)
-      };
-
-      if (deviceId !== undefined && deviceId !== null && deviceId.trim() !== '') {
-        whereCondition.deviceId = deviceId.trim();
-      }
-
-      const result = await db.collection('lockers')
-        .where(whereCondition)
-        .field({
-          _id: true,
-          doorNo: true,
-          size: true,
-          status: true,
-          currentOrderId: true,
-          cabinetNo: true,
-          deviceId: true
-        })
-        .get()
-
-      return { success: true, data: result.data }
+  
+      return await db.runTransaction(async transaction => {
+        const whereCondition = {
+          status: 'free',
+          currentOrderId: _.eq(null),
+          deviceId: deviceId
+        };
+  
+        // 1. 查询一个空闲柜子
+        const lockerRes = await transaction.collection('lockers')
+          .where(whereCondition)
+          .limit(1)
+          .get();
+  
+        if (lockerRes.data.length === 0) {
+          throw new Error('没有可用柜子');
+        }
+  
+        const locker = lockerRes.data[0];
+  
+        // 2. 更新为占用
+        await transaction.collection('lockers').doc(locker._id).update({
+          data: {
+            status: 'occupied',
+            updatedAt: db.serverDate()
+          }
+        });
+  
+        // 3. 返回占用的柜子信息
+        return { success: true, data: locker };
+      });
+  
     } catch (err) {
-      console.error('查询空闲柜子失败', err)
-      return { success: false, errMsg: `查询空闲柜子失败：${err.message}` }
+      console.error('占用柜子失败', err);
+      return { success: false, errMsg: `占用柜子失败：${err.message}` };
     }
+
   }
 
   // 2. 开门操作
@@ -111,7 +97,6 @@ exports.main = async (event, context) => {
     }
 
     const callHardwareOpen = async (deviceId, cabinetNo, doorNo) => {
-    
       try {
         // 2. 调用socket服务器接口
         const formatNumber = (num) => {
@@ -160,7 +145,7 @@ exports.main = async (event, context) => {
           .get({ readFresh: true })
 
         if (lockerQuery.data.length === 0) {
-          throw new Error(`柜门 ${doorNo} 不存在`)
+          throw new Error(`柜门 ${cabinetNo}${_}${doorNo} 不存在`)
         }
 
         const locker = lockerQuery.data[0]
@@ -172,50 +157,28 @@ exports.main = async (event, context) => {
           // 状态校验
           if (locker.status !== 'occupied' || locker.currentOrderId !== orderId) {
             throw new Error(
-              `存包失败：柜门 ${doorNo} 状态异常（当前：${locker.status}，关联订单：${locker.currentOrderId}）`
+              `存包失败：柜门 ${locker.lockerNo} 状态异常（当前：${locker.status}，关联订单：${locker.currentOrderId}）`
             )
           }
 
           // 订单校验
-          const orderQuery = await transaction.collection('orders').doc(orderId).get()
-          if (!orderQuery.data) {
-            throw new Error(`订单 ${orderId} 不存在`)
-          }
-          if (!['进行中', '已支付'].includes(orderQuery.data.status)) {
-            throw new Error(`订单 ${orderId} 未支付，无法开柜`)
-          }
-          if (orderQuery.data.doorNo !== doorNo) {
-            throw new Error(
-              `订单 ${orderId} 关联柜门不匹配（订单：${orderQuery.data.doorNo}，当前：${doorNo}）`
-            )
-          }
+          // const orderQuery = await transaction.collection('orders').doc(orderId).get()
+          // if (!orderQuery.data) {
+          //   throw new Error(`订单 ${orderId} 不存在`)
+          // }
+          // if (!['进行中', '已支付'].includes(orderQuery.data.status)) {
+          //   throw new Error(`订单 ${orderId} 未支付，无法开柜`)
+          // }
 
-          // 模拟硬件开柜
-          // const openSuccess = true; // 实际项目中替换为硬件接口调用
+          //硬件开柜
           const openSuccess = await callHardwareOpen(deviceId, cabinetNo, doorNo);
           if (!openSuccess) {
             throw new Error(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 硬件开柜失败`)
           }
 
-          // 更新柜子状态
-          await transaction.collection('lockers').doc(lockerId).update({
-            data: {
-              status: 'occupied',
-              currentOrderId: orderId,
-              lastOpenAt: db.serverDate(),
-              updatedAt: db.serverDate()
-            }
-          })
-
-          // 更新订单信息
-          await transaction.collection('orders').doc(orderId).update({
-            data: { deviceId ,doorNo, cabinetNo, updatedAt: db.serverDate() }
-          })
-
           return { 
-            ok: true, 
-            message: `存包成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`, 
-            doorNo 
+            success: true, 
+            message: `存包成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`
           }
         }
 
@@ -239,16 +202,15 @@ exports.main = async (event, context) => {
             data: {
               status: 'free',
               currentOrderId: null,
+              currentUserPhone: null,
               lastOpenAt: db.serverDate(),
               updatedAt: db.serverDate()
             }
           })
 
           return { 
-            ok: true, 
-            message: `取包成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`, 
-            doorNo,
-            cabinetNo
+            success: true, 
+            message: `取包成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`
           }
         }
       })
@@ -262,54 +224,52 @@ exports.main = async (event, context) => {
         stack: err.stack
       })
 
-      // 失败时尝试恢复柜子状态
-      // await recoverLockerStatus(doorNo)
-      return { ok: false, errMsg: err.message }
+      return { success: false, errMsg: err.message }
     }
   }
 
-  // 3. 更新柜子状态
-  // if (action === 'updateStatus') {
-  //   const { lockerId, status, orderId } = event
+  // 3. 更新柜子信息
+  if (action === 'updateLocker') {
+    const { lockerId, currentOrderId, currentUserPhone} = event
 
-  //   // 参数校验
-  //   const validation = validateParams(event, {
-  //     lockerId: { type: 'string' },
-  //     status: { enum: CONSTANTS.LOCKER_STATUSES }
-  //   })
-  //   if (!validation.valid) {
-  //     return { success: false, errMsg: validation.msg }
-  //   }
-  //   if (status === 'occupied' && (!orderId || typeof orderId !== 'string')) {
-  //     return { success: false, errMsg: '标记为占用状态时，orderId不能为空且必须为字符串' }
-  //   }
+    // 参数校验
+    const validation = validateParams(event, {
+      lockerId: { type: 'string' },
+    })
+    if (!validation.valid) {
+      return { ok: false, errMsg: validation.msg }
+    }
 
-  //   try {
-  //     const updateData = {
-  //       status,
-  //       updatedAt: db.serverDate()
-  //     }
-  //     // 占用状态需关联订单，空闲状态需清空订单
-  //     updateData.currentOrderId = status === 'occupied' ? orderId : null
+    try {
+      return await db.runTransaction(async transaction => {
 
-  //     await db.collection('lockers').doc(lockerId).update({ data: updateData })
-  //     return { success: true, message: `柜状态已更新为${status}` }
-  //   } catch (err) {
-  //     console.error('更新柜子状态失败', err)
-  //     // 占用状态更新失败时，自动恢复为空闲
-  //     if (status === 'occupied') {
-  //       try {
-  //         await db.collection('lockers').doc(lockerId).update({
-  //           data: { status: 'free', currentOrderId: null, updatedAt: Date.now() }
-  //         })
-  //         return { success: false, errMsg: `${err.message}，已自动恢复为空闲状态` }
-  //       } catch (recoverErr) {
-  //         console.error('恢复状态失败', recoverErr)
-  //       }
-  //     }
-  //     return { success: false, errMsg: `更新状态失败：${err.message}` }
-  //   }
-  // }
+        const lockerDoc = await transaction.collection('lockers').where({lockerId:lockerId}).get()
+
+        if (!lockerDoc.data) {
+          throw new Error('柜子不存在')
+        }
+  
+        // 更新数据
+        const updateData = { updatedAt: db.serverDate() }
+        if (typeof currentOrderId !== 'undefined') {
+          updateData.currentOrderId = currentOrderId
+        }
+        if (typeof currentUserPhone !== 'undefined') {
+          updateData.currentUserPhone = currentUserPhone
+        }
+  
+        // 更新柜子
+        await transaction.collection('lockers').doc(lockerId).update({
+          data: updateData
+        })
+  
+        return { success: true }
+      })
+    } catch (err) {
+      console.error('更新柜子信息失败', { orderId, error: err.message })
+      return { success: false, errMsg: err.message }
+    }
+  }
 
   // 4. 恢复柜子状态为空闲
   if (action === 'recoverLocker') {
@@ -326,56 +286,28 @@ exports.main = async (event, context) => {
     }
 
     try {
-      const locker = await db.collection('lockers').where({ deviceId, doorNo, cabinetNo}).get()
-      
-      if (locker.data.length === 0) {
-        return { success: false, errMsg: `未找到柜门${doorNo}的记录` }
-      }
-
-      await db.collection('lockers').doc(locker.data[0]._id).update({
-        data: {
-          status: 'free',
-          currentOrderId: null,
-          updatedAt: db.serverDate()
+      return await db.runTransaction(async transaction => {
+        const locker = await transaction.collection('lockers').where({ deviceId, doorNo, cabinetNo}).get()
+        
+        if (locker.data.length === 0) {
+          throw new Error('未找到柜门${doorNo}的记录');
         }
+
+        await transaction.collection('lockers').doc(locker.data[0]._id).update({
+          data: {
+            status: 'free',
+            currentOrderId: null,
+            updatedAt: db.serverDate()
+          }
+        })
+        
+        return { success: true, message: `柜门 ${doorNo} 已恢复为空闲状态` }
       })
-      
-      return { success: true, message: `柜门 ${doorNo} 已恢复为空闲状态` }
     } catch (err) {
       console.error('恢复柜子状态失败', err)
       return { success: false, errMsg: `恢复柜子状态失败：${err.message}` }
     }
   }
-
-  // 5. 根据柜门查询柜号
-  // if (action === 'getByIdByNo') {
-  //   const { doorNo } = event
-
-  //   // 参数校验
-  //   const validation = validateParams(event, {
-  //     doorNo: { type: 'number' }
-  //   })
-  //   if (!validation.valid) {
-  //     return { success: false, errMsg: validation.msg }
-  //   }
-
-  //   try {
-  //     const res = await db.collection('lockers').where({ doorNo }).get()
-      
-  //     if (res.data.length > 0) {
-  //       return { 
-  //         success: true, 
-  //         lockerId: res.data[0]._id, 
-  //         data: res.data[0] 
-  //       }
-  //     } else {
-  //       return { success: false, errMsg: `未找到柜门${doorNo}的记录` }
-  //     }
-  //   } catch (err) {
-  //     console.error('查询柜门失败', err)
-  //     return { success: false, errMsg: `查询柜门失败：${err.message}` }
-  //   }
-  // }
 
   if (action === 'queryDoorStatus') {
     const { deviceId, cabinetNo, doorNo} = event;

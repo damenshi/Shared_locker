@@ -5,7 +5,8 @@
     "pages/store/store",
     "pages/take/take",
     "pages/admin/admin",
-    "pages/mine/mine"
+    "pages/mine/mine",
+    "pages/mine/myorder"
   ],
   "window": {
     "navigationBarTitleText": "优享储物",

@@ -1,7 +1,7 @@
 <view class="page">
   <!-- 头部信息 -->
   <view class="header">
-    <view class="school-name">贵阳XX驾校</view>
+    <view class="school-name">{{deviceAddress}}</view>
     <view class="business-hours">营业时间：00:00~24:00</view>
   </view>
   
@@ -49,16 +49,12 @@
   </view>
   
   <!-- 下一步按钮 -->
-  <view 
+  <!-- <view 
     class="next-btn {{!canProceed ? 'disabled' : ''}}" 
     bindtap="{{canProceed ? 'goToNextPage' : ''}}">
     下一步
+  </view> -->
+  <view class="next-btn {{!canProceed ? 'disabled' : ''}}" bindtap="{{canProceed ? 'goToNextPage' : ''}}">
+    下一步
   </view>
-
-
-  <view class="card">
-    <view class="title">管理入口（管理员）</view>
-    <button class="btn" bindtap="goAdmin">管理看板</button>
-  </view>
-
 </view>

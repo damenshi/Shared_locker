@@ -1,7 +1,8 @@
 App({
   globalData: {
     openid: null, // 存储用户openid
-    deviceId: null // 存储当前设备ID
+    deviceId: null,// 存储当前设备ID
+    deviceAddress: null
   },
   
   onLaunch(options) {
@@ -15,7 +16,7 @@ App({
     this.getOpenid();
 
     // 2. 处理扫码进入的设备ID
-    const temp_deviceid = '6de04f165a9c7e88';
+    const temp_deviceid = 'c924697f-w38aw6yd-0';
     let deviceId = temp_deviceid;
     if (options.query) {
       // 情况1：扫码进入，解析scene参数（微信扫码会将参数放在scene中，且经过编码）
@@ -29,6 +30,8 @@ App({
       console.log('全局获取到的deviceId:', deviceId);
     }
     
+    //3.获取设备地址
+    this.getDevAddress();
   },
 
   // 获取用户openid并缓存到本地和全局
@@ -58,6 +61,24 @@ App({
       }
     } catch (err) {
       console.error('获取openid失败:', err);
+    }
+  },
+
+  async getDevAddress() {
+    try {
+      // 先查本地缓存，避免重复获取
+      const getAddRes = await wx.cloud.callFunction({
+        name: 'device',
+        data: {
+          action: 'getDeviceAddress',
+          deviceId: this.globalData.deviceId
+        }
+      });
+      if(!getAddRes.result?.success)
+        throw new Error('未获取到设备地址');
+      this.globalData.deviceAddress = getAddRes.result.data;
+    } catch (err) {
+      console.error('未获取到设备地址', err);
     }
   }
 })

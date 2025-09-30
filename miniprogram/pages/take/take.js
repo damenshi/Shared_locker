@@ -12,18 +12,23 @@ Page({
   onLoad(options) {
     // 接收首页传递的参数并验证
     this.setData({
-      phone: options.phone || '',
-      password: options.password || '',
       openid: app.globalData.openid || '',
       deviceId: app.globalData.deviceId || '',
     });
-    // this.setData({ phone, password, deviceId});
 
+    const userCache = wx.getStorageSync('userCredentials') || {};
+    const userInfo = userCache[app.globalData.openid] || {};
+    if (userInfo) {
+      this.setData({
+        phone: userInfo.phone,
+        password: userInfo.password
+      });
+    }
     // 自动触发取件流程
     if (this.data.phone && this.data.password) {
       this.handleTakeItem();
     } else {
-      this.showError('请先输入手机号和取件码', () => {
+      this.showError('请先存包', () => {
         wx.navigateBack({ delta: 1 });
       });
     }
@@ -82,108 +87,6 @@ Page({
   },
 
   /**
-   * 查询匹配的订单（手机号+取件码）
-   * @returns {Promise<Object|null>} 订单数据或null
-   */
-  async queryMatchedOrder() {
-    try {
-      const { openid, deviceId} = this.data;
-      if (!deviceId) {
-        wx.showToast({ title: '设备错误', icon: 'none' });
-        return null;
-      }
-      const res = await wx.cloud.callFunction({
-        name: "order",
-        data: {
-          action: "queryByOpenid",
-          openid,
-          deviceId: deviceId
-        }
-      });
-
-      if (!res.result || !res.result.success) {
-        throw new Error(res.result.errMsg || '取包查询订单失败');
-      }
-      return res.result.data || null;
-    } catch (e) {
-      console.error("取包查询订单失败:", e);
-      wx.showToast({ 
-        title: `无有效订单`, 
-        icon: 'none',
-        duration: 3000
-      });
-      return null;
-    }
-  },
-
-  /**
-   * 取包打开柜门
-   * @param {number} doorNo - 柜门
-   * @param {string} orderId - 订单ID
-   * @returns {Promise<boolean>} 开柜是否成功
-   */
-  async openCabinetDoor(deviceId, doorNo, orderId, cabinetNo) {
-    try {
-      const res = await wx.cloud.callFunction({
-        name: "locker",
-        data: {
-          action: "openDoor",
-          deviceId,
-          doorNo,
-          orderId,
-          cabinetNo,
-          type: "take"
-        }
-      });
-
-      console.log("开柜接口返回:", res.result);
-      // 验证开柜结果
-      if (!res.result || res.result.ok !== true) {
-        throw new Error(res.result?.errMsg || '开柜失败');
-      }
-      return true;
-    } catch (e) {
-      console.error("开柜操作失败:", e);
-      wx.showToast({ 
-        title: e.message, 
-        icon: 'none',
-        duration: 3000
-      });
-      return false;
-    }
-  },
-
-  /**
-   * 完成订单并释放柜子
-   * @param {string} orderId - 订单ID
-   * @returns {Promise<boolean>} 订单是否完成
-   */
-  async finishOrder(orderId) {
-    try {
-      const res = await wx.cloud.callFunction({
-        name: "order",
-        data: {
-          action: "finishOrder",
-          orderId
-        }
-      });
-
-      if (!res.result || !res.result.success) {
-        throw new Error(res.result?.errMsg || '完成订单失败');
-      }
-      return true;
-    } catch (e) {
-      console.error("完成订单失败:", e);
-      wx.showToast({ 
-        title: `结束订单失败`, 
-        icon: 'none',
-        duration: 3000
-      });
-      return false;
-    }
-  },
-
-  /**
    * 核心取件逻辑
    */
   async handleTakeItem() {
@@ -192,7 +95,6 @@ Page({
     this.setData({ isLoading: true });
     wx.showLoading({ title: '正在验证取件信息...' });
 
-    console.log("take deviceid:", this.data.deviceId);
     try {
       // 1. 验证输入参数
       if (!this.validateInput()) {
@@ -205,15 +107,17 @@ Page({
       }
 
       // 2. 查询匹配订单
-      const order = await this.queryMatchedOrder();
-      if (!order) {
-        this.setData({ isLoading: false });
-        wx.hideLoading();
-        this.showError('未找到匹配的存包记录', () => {
-          wx.navigateBack({ delta: 1 });
-        });
-        return;
-      }
+      const matchOrder = await wx.cloud.callFunction({
+        name: "order",
+        data: {
+          action: "queryByOpenid",
+          openid: this.data.openid,
+          deviceId: this.data.deviceId
+        }
+      });
+      if (!matchOrder.result?.success) 
+        throw new Error('查询用户订单失败');
+      const order = matchOrder.result.data;
 
       // 3. 验证订单状态
       const validStatus = ['进行中', '已支付'];
@@ -227,42 +131,53 @@ Page({
       }
 
       // 4. 打开柜门
-      const isDoorOpen = await this.openCabinetDoor(order.deviceId, order.doorNo, order._id, order.cabinetNo);
-      if (!isDoorOpen) {
+      const isDoorOpen = await wx.cloud.callFunction({
+        name: "locker",
+        data: {
+          action: "openDoor",
+          deviceId: order.deviceId,
+          doorNo: order.doorNo,
+          orderId: order._id,
+          cabinetNo: order.cabinetNo,
+          type: "take"
+        }
+      });
+      if (!isDoorOpen.result?.success){
         this.setData({ isLoading: false });
         wx.hideLoading();
         this.showError('柜门打开失败，请重试', () => {
           wx.navigateBack({ delta: 1 });
         });
-        return;
+        throw new Error('取件开门失败');
       }
-
-      // 5. 完成订单（即使失败也不影响用户取件）
-      const isOrderFinished = await this.finishOrder(order._id);
+        
+      // 5. 完成订单
+      const orderFinishRes = await wx.cloud.callFunction({
+        name: "order",
+        data: {
+          action: "finishOrder",
+          orderId: order._id
+        }
+      });
+      const isOrderFinished = orderFinishRes.result.success
       
-      // 6. 处理最终结果
+      // 6. 无论订单是否结束都提示柜门打开
       wx.hideLoading();
       this.setData({ isLoading: false });
-
-      if (isOrderFinished) {
-        this.showSuccess(
-          `取件成功，柜门 ${order.doorNo} 已打开`,
-          () => { wx.navigateBack({ delta: 1 }); }
-        );
-      } else {
-        // 订单状态更新失败但取件成功，仍提示成功
-        this.showSuccess(
-          `取件成功，柜门 ${order.doorNo} 已打开`,
-          () => { wx.navigateBack({ delta: 1 }); }
-        );
-      }
+      this.showSuccess(
+        `取件成功，柜门 ${order.lockerNo} 已打开`,
+        () => { wx.navigateBack({ delta: 1 }); }
+      );
+      if (!isOrderFinished) {
+        throw new Error('取件后订单更新失败');
+      } 
 
     } catch (e) {
       console.error("取件流程异常:", e);
       this.setData({ isLoading: false });
       wx.hideLoading();
-      this.showError(`系统错误: ${e.message}`, () => {
-        wx.navigateBack({ delta: 1 });
+      this.showError(`取件错误: ${e.message}`, () => {
+        wx.navigateBack({ delta: 1});
       });
     }
   }

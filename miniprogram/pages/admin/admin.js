@@ -14,10 +14,6 @@ Page({
     cabinetCount: 2, //每个设备的锁板数量
     lockersPerCabinet: 5, // 每个锁板的锁数量
     
-    // 生成二维码相关
-    // selectedDeviceId: null,
-    // qrcodeList: [],
-    
     queryDeviceId: '',      // 要查询的设备ID
     queryCabinetNo: '',     // 要查询的锁板号
     queryDoorNo: '',        // 要查询的柜门号
@@ -143,53 +139,10 @@ Page({
       wx.showToast({ title: '操作失败，请重试', icon: 'none' });
     }
   },
-
-  //批量生成设备
-  // async batchCreateDevices() {
-  //   const { deviceCount } = this.data;
-    
-  //   if (deviceCount <= 0) {
-  //     return wx.showToast({ 
-  //       title: '请输入有效的设备数量（需大于0）', 
-  //       icon: 'none' 
-  //     });
-  //   }
-
-  //   this.showLoading('生成设备中...');
-    
-  //   try {
-  //     const result = await wx.cloud.callFunction({
-  //       name: 'admin',
-  //       data: {
-  //         action: 'batchCreateDevices',
-  //         deviceCount: parseInt(deviceCount)
-  //       }
-  //     });
-
-  //     this.hideLoading();
-      
-  //     if (result.result.success) {
-  //       wx.showToast({
-  //         title: `成功生成 ${result.result.count} 个设备`,
-  //         icon: 'success',
-  //         duration: 2000
-  //       });
-  //     } else {
-  //       wx.showToast({
-  //         title: result.result.errMsg || '生成失败',
-  //         icon: 'none'
-  //       });
-  //     }
-  //   } catch (err) {
-  //     this.hideLoading();
-  //     console.error('批量生成设备失败：', err);
-  //     wx.showToast({ title: '网络错误，请重试', icon: 'none' });
-  //   }
-  // },
   
-  //基于设备生成锁
+  //配置设备
   async batchCreateLockersByDevice() {
-    const { internalNo, deviceAddress, cabinetCount, lockersPerCabinet } = this.data;
+    const { internalNo, deviceAddress, deviceDeposit, cabinetCount, lockersPerCabinet } = this.data;
     
     if (!deviceAddress || !internalNo || cabinetCount <= 0 || lockersPerCabinet <= 0) {
       return wx.showToast({ 
@@ -207,6 +160,7 @@ Page({
           action: 'batchCreateLockers',
           internalNo: internalNo, // 指定设备ID
           deviceAddress: deviceAddress,
+          deviceDeposit: parseInt(deviceDeposit),
           cabinetCount: parseInt(cabinetCount),
           lockersPerCabinet: parseInt(lockersPerCabinet)
         }
@@ -280,43 +234,6 @@ Page({
       wx.showToast({ title: '操作失败，请重试', icon: 'none' });
     }
   },
-  // 5. 生成储物柜二维码
-  // async generateLockerQrcodes() {
-  //   const { selectedDeviceId } = this.data;
-
-  //   this.showLoading('生成二维码中...');
-    
-  //   try {
-  //     const result = await wx.cloud.callFunction({
-  //       name: 'admin',
-  //       data: {
-  //         action: 'generateLockerQrcodes',
-  //         deviceId: selectedDeviceId ? parseInt(selectedDeviceId) : null
-  //       }
-  //     });
-
-  //     this.hideLoading();
-      
-  //     if (result.result.success) {
-  //       wx.showToast({
-  //         title: `成功生成 ${result.result.count} 个二维码`,
-  //         icon: 'success',
-  //         duration: 2000
-  //       });
-  //       // 显示生成的二维码列表
-  //       this.setData({ qrcodeList: result.result.data });
-  //     } else {
-  //       wx.showToast({
-  //         title: result.result.errMsg || '生成失败',
-  //         icon: 'none'
-  //       });
-  //     }
-  //   } catch (err) {
-  //     this.hideLoading();
-  //     console.error('生成二维码函数失败：', err);
-  //     wx.showToast({ title: '网络错误，请重试', icon: 'none' });
-  //   }
-  // },
 
   // 页面加载时验证管理员权限
   async onLoad() {

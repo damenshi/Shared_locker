@@ -4,7 +4,30 @@ Page({
   data: {
     phone: '',
     password: '',
+    deviceAddress: '',
     canProceed: false
+  },
+
+  onLoad(options) {
+    const globalAddress = app.globalData.deviceAddress || '';
+    this.setData({
+      deviceAddress: globalAddress
+    });
+
+    //处理异步延迟：若 app 中地址还没获取完，监听更新
+    if (!app.globalData.deviceAddress) {
+      this.addressWatcher = setInterval(() => {
+        const newAddress = app.globalData.deviceAddress;
+        if (newAddress) {
+          this.setData({ deviceAddress: newAddress });
+          clearInterval(this.addressWatcher); // 获取到后停止监听
+        }
+      }, 10); // 每 100ms 检查一次
+    }
+  },
+
+  onUnload() {
+    if (this.addressWatcher) clearInterval(this.addressWatcher);
   },
 
   // 监听手机号输入
@@ -41,9 +64,10 @@ Page({
     wx.setStorageSync('phone', this.data.phone);
     wx.setStorageSync('password', this.data.password);
     
-    // 跳转到支付页面
+    // 跳转到存包页面
     wx.navigateTo({
       url: `/pages/store/store?phone=${this.data.phone}&password=${this.data.password}`
     });
   },
+
 });
