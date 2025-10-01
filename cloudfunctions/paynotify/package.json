@@ -1,9 +1,8 @@
 {
-  "name": "orders",
+  "name": "paynotify",
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "wechatpay-node-v3": "^2.2.1",
     "wx-server-sdk": "latest"
   }
 }

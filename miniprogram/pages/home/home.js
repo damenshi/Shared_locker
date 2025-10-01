@@ -12,7 +12,7 @@ Page({
     })
   },
 
-  goMine() {
+  goHome() {
     wx.navigateTo({
       url: '/pages/home/home'
     })

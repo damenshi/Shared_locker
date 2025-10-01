@@ -45,7 +45,7 @@ const validateParams = (params, rules) => {
 const CONFIG = {
   mchid: process.env.MCHID,
   appid: process.env.APPID,
-  notify_url: 'https://cloudbase-3gnr17whd71a5b45-1379469522.ap-shanghai.app.tcloudbase.com/server',
+  notify_url: 'https://cloudbase-3gnr17whd71a5b45-1379469522.ap-shanghai.app.tcloudbase.com/paynotify',
   privateKeyPath: './private/apiclient_key.pem',
   wechatPayPublicKeyPath: './private/pub_key.pem',
   publicKeyPath: './private/apiclient_cert.pem',
@@ -190,60 +190,60 @@ exports.main = async (event, context) => {
   }
 
   // 处理微信支付异步回调
-  if (event.body) {
-    let body
-    try {
-      body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body
-    } catch (err) {
-      console.error('解析回调body失败', err)
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ code: 'FAIL', message: 'body非JSON格式' })
-      }
-    }
+  // if (!action && event.body && event.headers && event.headers['Wechatpay-Signature']) {
+  //   let body
+  //   try {
+  //     body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body
+  //   } catch (err) {
+  //     console.error('解析回调body失败', err)
+  //     return {
+  //       statusCode: 400,
+  //       body: JSON.stringify({ code: 'FAIL', message: 'body非JSON格式' })
+  //     }
+  //   }
   
-    if (!body.resource) {
-      console.error('回调中缺少resource字段')
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ code: 'FAIL', message: '缺少resource字段' })
-      }
-    }
+  //   if (!body.resource) {
+  //     console.error('回调中缺少resource字段')
+  //     return {
+  //       statusCode: 400,
+  //       body: JSON.stringify({ code: 'FAIL', message: '缺少resource字段' })
+  //     }
+  //   }
   
-    try {
-      const notifyData = decryptNotify(body.resource)
-      console.log('支付结果通知:', notifyData)
+  //   try {
+  //     const notifyData = decryptNotify(body.resource)
+  //     console.log('支付结果通知:', notifyData)
   
-      const orderId = notifyData.out_trade_no
-      const amountFen = notifyData.amount?.total || 0
-      const amountYuan = amountFen / 100
+  //     const orderId = notifyData.out_trade_no
+  //     const amountFen = notifyData.amount?.total || 0
+  //     const amountYuan = amountFen / 100
   
-      await db.collection('orders').doc(orderId).update({
-        data: {
-          status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
-          deposit: amountYuan,
-          updatedAt: db.serverDate()
-        }
-      })
+  //     await db.collection('orders').doc(orderId).update({
+  //       data: {
+  //         status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
+  //         deposit: amountYuan,
+  //         updatedAt: db.serverDate()
+  //       }
+  //     })
   
-      // 微信支付要求返回 SUCCESS
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ code: 'SUCCESS', message: '成功' })
-      }
-    } catch (err) {
-      console.error('支付回调处理失败', err)
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ code: 'FAIL', message: err.message })
-      }
-    }
-  } else {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ code: 'FAIL', message: 'body为空' })
-    }
-  }
+  //     // 微信支付要求返回 SUCCESS
+  //     return {
+  //       statusCode: 200,
+  //       body: JSON.stringify({ code: 'SUCCESS', message: '成功' })
+  //     }
+  //   } catch (err) {
+  //     console.error('支付回调处理失败', err)
+  //     return {
+  //       statusCode: 500,
+  //       body: JSON.stringify({ code: 'FAIL', message: err.message })
+  //     }
+  //   }
+  // } else {
+  //   return {
+  //     statusCode: 400,
+  //     body: JSON.stringify({ code: 'FAIL', message: 'body为空' })
+  //   }
+  // }
   
   // if (action === 'notify') {
   //   try {

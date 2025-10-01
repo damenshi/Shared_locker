@@ -245,7 +245,7 @@ Page({
   },
 
   async waitForPayment(orderId) {
-    let retries = 5; // 最多查询 5次
+    let retries = 10; // 最多查询 5次
     while (retries-- > 0) {
       const res = await wx.cloud.callFunction({
         name: 'order',
@@ -352,6 +352,19 @@ Page({
       let newDeposit = 0;
       if (userDeposit >= deviceDeposit) {
         wx.showToast({ title: '余额充足，无需支付', icon: 'none', duration: 2000});
+        //更新订单状态为进行中并更新付款金额
+        const updateOrderRes = await wx.cloud.callFunction({
+          name: "order",
+          data: {
+            action: "updateOrder",
+            orderId: orderId,
+            status: this.data.constants.ORDER_STATUS_PROCESSING,
+            deposit: newDeposit
+          }
+        });
+        if (!updateOrderRes.result?.success) 
+          throw new Error('更新订单状态为进行中失败');
+        
       } else {
         // 押金不足，需要支付
         const confirmPay = await this.showPaymentConfirmModal(lockerInfo.deviceDeposit, lockerInfo.lockerNo);
@@ -367,22 +380,10 @@ Page({
           throw new Error('支付失败');
         }
         const confirmed = await this.waitForPayment(orderId);
-        if (!confirmed) throw new Error('支付结果未确认');
+        if (!confirmed) 
+          throw new Error('支付结果未确认');
         newDeposit = deviceDeposit;
       }
-
-      // 6.更新订单状态为进行中并更新付款金额
-      // const updateOrderRes = await wx.cloud.callFunction({
-      //   name: "order",
-      //   data: {
-      //     action: "updateOrder",
-      //     orderId: orderId,
-      //     status: this.data.constants.ORDER_STATUS_PROCESSING,
-      //     deposit: newDeposit
-      //   }
-      // });
-      // if (!updateOrderRes.result?.success) 
-      //   throw new Error('更新订单状态为进行中失败');
 
       // 7.更新用户余额
       const userUpdate = await wx.cloud.callFunction({
