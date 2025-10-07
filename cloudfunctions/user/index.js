@@ -60,10 +60,8 @@ exports.main = async (event, context) => {
   }
 
   if (action === 'createUser') {
-
     try {
       return await db.runTransaction(async transaction => {
-
           // 先查询用户是否已存在
           const existingUser = await transaction.collection('users')
             .where({ openid: openid})
@@ -132,7 +130,7 @@ exports.main = async (event, context) => {
 
   if(action === 'updateUser'){
     const {openid, deposit} = event
-    
+
     // 参数校验
     const validation = validateParams(event, {
       openid: { type: 'string' },
@@ -148,7 +146,7 @@ exports.main = async (event, context) => {
         if (!userDoc.data) {
           throw new Error('用户不存在')
         }
-  
+
         // 更新数据
         const updateData = { updatedAt: db.serverDate() }
         // if (typeof phone !== 'undefined') {
@@ -157,12 +155,12 @@ exports.main = async (event, context) => {
         if (typeof deposit !== 'undefined') {
           updateData.deposit = deposit + userDoc.data[0].deposit
         }
-  
+
         // 更新订单
         await transaction.collection('users').where({openid:openid}).update({
           data: updateData
         })
-  
+
         return { success: true }
       })
     } catch (err) {
@@ -189,7 +187,7 @@ exports.main = async (event, context) => {
 
         // 2. 验证余额是否充足
         if (currentDeposit <= 0) {
-          throw new Error('用户余额为0，无需退款');
+          throw new Error('余额不足');
         }
 
         let actualRefundAmount = currentDeposit; // 默认全额退款

@@ -123,7 +123,7 @@ Page({
       const res = await wx.cloud.callFunction({
         name: 'order',
         data: {
-          action: 'createPrepay',  
+          action: 'createPrepay',
           orderId: orderId,
           amount: Math.round(deviceDeposit * 100),
           openid: this.data.openid
@@ -372,7 +372,7 @@ Page({
           wx.navigateBack({ delta: 1 });
           throw new Error('未确认支付');
         }
-        
+
         //支付
         wx.showLoading({ title: '支付预付费用...' });
         const paySuccess = await this.payment(orderId, lockerInfo.deviceDeposit);

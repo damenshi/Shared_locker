@@ -82,6 +82,7 @@ exports.main = async (event) => {
     console.log('支付结果通知解密后数据:', notifyData)
 
     const orderId = notifyData.out_trade_no
+    const transactionId = notifyData.transaction_id
     const amountFen = notifyData.amount?.total || 0
     const amountYuan = amountFen / 100
 
@@ -89,6 +90,7 @@ exports.main = async (event) => {
     await db.collection('orders').doc(orderId).update({
       data: {
         status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
+        transactionId: transactionId,
         deposit: amountYuan,
         updatedAt: db.serverDate()
       }

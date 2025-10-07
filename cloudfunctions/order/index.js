@@ -126,28 +126,6 @@ exports.main = async (event, context) => {
   const { action } = event
   const now = Date.now()
 
-  // 1. 模拟支付成功
-  if (action === 'mockPaySuccess') {
-    const { orderId, deviceDeposit } = event
-
-    // 参数校验 
-    const validation = validateParams(event, {
-      orderId: { type: 'string' },
-    })
-    if (!validation.valid) {
-      return { success: false, errMsg: validation.msg }
-    }
-
-    try {
-      return await db.runTransaction(async transaction => {
-        return { success: true }
-      })
-    } catch (err) {
-      console.error('模拟支付失败', { orderId, error: err.message })
-      return { success: false, errMsg: err.message }
-    }
-  }
-
   if (action === 'createPrepay') {
     const { orderId, amount, openid } = event
 
@@ -189,96 +167,6 @@ exports.main = async (event, context) => {
     }
   }
 
-  // 处理微信支付异步回调
-  // if (!action && event.body && event.headers && event.headers['Wechatpay-Signature']) {
-  //   let body
-  //   try {
-  //     body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body
-  //   } catch (err) {
-  //     console.error('解析回调body失败', err)
-  //     return {
-  //       statusCode: 400,
-  //       body: JSON.stringify({ code: 'FAIL', message: 'body非JSON格式' })
-  //     }
-  //   }
-  
-  //   if (!body.resource) {
-  //     console.error('回调中缺少resource字段')
-  //     return {
-  //       statusCode: 400,
-  //       body: JSON.stringify({ code: 'FAIL', message: '缺少resource字段' })
-  //     }
-  //   }
-  
-  //   try {
-  //     const notifyData = decryptNotify(body.resource)
-  //     console.log('支付结果通知:', notifyData)
-  
-  //     const orderId = notifyData.out_trade_no
-  //     const amountFen = notifyData.amount?.total || 0
-  //     const amountYuan = amountFen / 100
-  
-  //     await db.collection('orders').doc(orderId).update({
-  //       data: {
-  //         status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
-  //         deposit: amountYuan,
-  //         updatedAt: db.serverDate()
-  //       }
-  //     })
-  
-  //     // 微信支付要求返回 SUCCESS
-  //     return {
-  //       statusCode: 200,
-  //       body: JSON.stringify({ code: 'SUCCESS', message: '成功' })
-  //     }
-  //   } catch (err) {
-  //     console.error('支付回调处理失败', err)
-  //     return {
-  //       statusCode: 500,
-  //       body: JSON.stringify({ code: 'FAIL', message: err.message })
-  //     }
-  //   }
-  // } else {
-  //   return {
-  //     statusCode: 400,
-  //     body: JSON.stringify({ code: 'FAIL', message: 'body为空' })
-  //   }
-  // }
-  
-  // if (action === 'notify') {
-  //   try {
-  //     const bodyStr = typeof event.body === 'string' ? event.body : JSON.stringify(event.body);
-  //     const body = JSON.parse(bodyStr);
-
-  //     const notifyData = decryptNotify(body.resource);
-  //     console.log('支付结果通知:', notifyData);
-
-  //     // 更新订单状态
-  //     const orderId = notifyData.out_trade_no;
-  //     const amountFen = notifyData.amount?.total || 0; // 单位：分
-  //     const amountYuan = amountFen / 100;
-
-  //     await db.collection('orders').doc(orderId).update({
-  //       data: {
-  //         status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
-  //         deposit: amountYuan,
-  //         updatedAt: db.serverDate()
-  //       }
-  //     });
-
-  //     return {
-  //       statusCode: 200,
-  //       body: JSON.stringify({ code: 'SUCCESS', message: '成功' })
-  //     };
-  //   } catch (err) {
-  //     console.error('notify 处理失败', err);
-  //     return {
-  //       statusCode: 500,
-  //       body: JSON.stringify({ code: 'FAIL', message: err.message })
-  //     };
-  //   }
-  // }
-
   // 2. 创建订单
   if (action === 'createOrder') {
     const { password, lockerInfo, userInfo } = event
@@ -308,6 +196,7 @@ exports.main = async (event, context) => {
           phone: userInfo.phone,
           status: CONSTANTS.ORDER_STATUSES.PENDING_PAY,
           deposit: 0,
+          transactionId: '',
           createdAt: db.serverDate(),
           updatedAt: db.serverDate()
         }

@@ -84,7 +84,7 @@ Page({
       return wx.showToast({ title: '请先登录', icon: 'none' });
     }
     if (deposit <= 0) {
-      return wx.showToast({ title: '余额为0，无需退款', icon: 'none' });
+      return wx.showToast({ title: '余额不足', icon: 'none' });
     }
 
     // 显示确认弹窗
