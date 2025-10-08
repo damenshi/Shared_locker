@@ -563,6 +563,16 @@ exports.main = async (event, context) => {
       };
 
       const refundRes = await client.refunds(refundParams);
+      console.log('退款结果：', refundRes)
+
+      await db.collection('orders').doc(orderId).update({
+        data: {
+          status: CONSTANTS.ORDER_STATUSES.REFUNDED,
+          refundTime: new Date(), // 记录退款时间
+          refundTransactionId: refundRes.id // 保存退款交易ID
+        }
+      });
+
       return { success: true, data: refundRes };
     } catch (err) {
       return { success: false, errMsg: err.message }
