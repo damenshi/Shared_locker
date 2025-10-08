@@ -540,7 +540,7 @@ exports.main = async (event, context) => {
   }
 
   if (action === 'refundOrder') {
-    const { orderId } = event
+    const { openid, orderId } = event
     const orderDoc = await db.collection('orders').doc(orderId).get()
     const order = orderDoc.data
 
@@ -565,16 +565,29 @@ exports.main = async (event, context) => {
       const refundRes = await client.refunds(refundParams);
       console.log('退款结果：', refundRes)
 
-      await db.collection('orders').doc(orderId).update({
-        data: {
-          status: CONSTANTS.ORDER_STATUSES.REFUNDED,
-          refundTime: new Date(), // 记录退款时间
-          refundTransactionId: refundRes.id // 保存退款交易ID
-        }
+      await db.runTransaction(async (transaction) => {
+        await transaction.collection('users')
+          .where({ openid })
+          .update({
+            data: {
+              deposit: _.inc(-order.deposit),
+              updatedAt: db.serverDate()
+            }
+          });
+
+        await transaction.collection('orders').doc(orderId)
+          .update({
+            data: {
+              status: CONSTANTS.ORDER_STATUSES.REFUNDED,
+              refundTime: new Date(),
+              refundTransactionId: refundRes.id
+            }
+          });
       });
 
       return { success: true, data: refundRes };
     } catch (err) {
+      console.log('退款失败：', err)
       return { success: false, errMsg: err.message }
     }
   }

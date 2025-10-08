@@ -67,9 +67,6 @@ async function handlePayNotify(notifyData) {
 async function handleRefundNotify(notifyData) {
   const outRefundNo = notifyData.out_refund_no;
   const refundId = notifyData.refund_id;
-  const refundStatus = notifyData.refund_status;
-  const successTime = notifyData.success_time;
-  const failReason = notifyData.fail_reason || '';
   const refundAmountFen = notifyData.amount?.refund || 0;
   const refundAmountYuan = refundAmountFen / 100;
 
@@ -96,7 +93,7 @@ async function handleRefundNotify(notifyData) {
 
 // 云函数入口
 exports.main = async (event) => {
-  console.log('收到支付回调:', event)
+  console.log('收到支付/退款回调:', event)
 
   if (!event.headers || !event.body) {
     return {
@@ -128,7 +125,7 @@ exports.main = async (event) => {
     // Step2: 解密通知数据
     const notifyData = decryptNotify(body.resource)
     console.log('通知解密后数据:', notifyData)
-    const eventType = notifyData.event_type;
+    const eventType = body.event_type;
 
     if (eventType === "REFUND.SUCCESS" || eventType === "REFUND.FAIL") {
       console.log('处理退款回调，退款单号:', notifyData.out_refund_no);
@@ -137,7 +134,7 @@ exports.main = async (event) => {
       console.log('处理支付回调，订单号:', notifyData.out_trade_no);
       await handlePayNotify(notifyData);
     } else {
-      throw new Error('无法识别的通知类型（缺少refund_id或transaction_id）');
+      throw new Error('无法识别的通知类型');
     }
 
     return {

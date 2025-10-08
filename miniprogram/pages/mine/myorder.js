@@ -44,7 +44,7 @@ Page({
           openid: this.data.openid
         }
       });
-      console.log("res.result.data:", res.result.data);
+      console.log("获取用户订单结果：", res.result.data);
       if (res.result.success) {
         const orders = (res.result.data || []).map(order => {
           if (order.createdAt) {
@@ -70,7 +70,8 @@ Page({
   },
 
   async refund(event) {
-    // 显示确认弹窗
+    console.log('退款事件：', event)
+
     wx.showModal({
       title: '确认退款',
       content: `确认退款？`,
@@ -83,26 +84,58 @@ Page({
 
         if (res.confirm) {
           wx.showLoading({ title: '处理中...', mask: true });
-          const orderId = event.currentTarget.dataset.id;
-          console.log('点击退款的订单ID:', orderId);
 
-          const res = await wx.cloud.callFunction({
-            name: 'order',
-            data: {
-              action: 'refundOrder',
-              orderId: orderId
-            }
-          });
+          try {
+            const orderId = event.currentTarget.dataset.id;
+            const openid = event.currentTarget.dataset.openid;
 
-          console.log('---', res)
-
-          if (res.result.success) {
-            wx.showToast({ title: '退款成功', icon: 'success', duration: 2000 });
-          } else {
-            wx.showToast({
-              title: res.result.errMsg || '退款失败', 
-              icon: 'none' 
+            const res = await wx.cloud.callFunction({
+              name: 'order',
+              data: {
+                action: 'refundOrder',
+                openid: openid,
+                orderId: orderId
+              }
             });
+            console.log('退款结果：', res)
+
+            if (res.result.success) {
+              if (!res.result.data.error) {
+                wx.showToast({
+                  title: '退款成功',
+                  icon: 'success',
+                  duration: 2000
+                });
+              } else {
+                const errText = res.result?.data?.error || res.result?.data?.errRaw?.response?.text || '';
+
+                let errMsg = '请稍后重试';
+                try {
+                  if (errText) {
+                    const parsed = JSON.parse(errText);
+                    errMsg = parsed.message || errMsg;
+                  }
+                } catch (e) {}
+
+                wx.showToast({
+                  title: errMsg,
+                  icon: 'error',
+                  duration: 2000
+                });
+              }
+
+              this.onLoad();
+            } else {
+              wx.showToast({
+                title: res.result.errMsg || '退款失败', 
+                icon: 'none' 
+              });
+            }
+          } catch (err) {
+            wx.showToast({ title: '系统错误', icon: 'none' });
+            console.log('系统错误：', err)
+          } finally {
+            wx.hideLoading();
           }
         }
       }
