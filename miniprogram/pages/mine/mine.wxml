@@ -9,7 +9,7 @@
     </view>
     <view class="user-detail">
       <view class="phone">{{phone}}</view>
-      <view class="deposit">账户余额：¥{{deposit}}</view>
+      <view class="deposit" wx:if="{{false}}">账户余额：¥{{deposit}}</view>
     </view>
   </view>
 
