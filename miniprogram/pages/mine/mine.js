@@ -113,7 +113,6 @@ Page({
                 throw new Error(`订单 ${order._id} 未完成，无法退款`);
               }
             }
-            //此处待添加微信支付退款步骤
 
             const res = await wx.cloud.callFunction({
               name: 'user',

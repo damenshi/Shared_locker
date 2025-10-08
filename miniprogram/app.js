@@ -16,7 +16,7 @@ App({
     this.getOpenid();
 
     // 2. 处理扫码进入的设备ID
-    const temp_deviceid = 'c924697f-w38aw6yd-0';
+    const temp_deviceid = 'fa23d3e1fc60a45b';
     let deviceId = temp_deviceid;
     if (options.query) {
       // 情况1：扫码进入，解析scene参数（微信扫码会将参数放在scene中，且经过编码）

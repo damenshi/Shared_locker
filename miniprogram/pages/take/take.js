@@ -3,7 +3,7 @@ const app = getApp();
 Page({
   data: {
     phone: '', 
-    password: '',        
+    password: '',
     openid: '',
     deviceId: null,
     isLoading: false // 加载状态
@@ -17,6 +17,7 @@ Page({
     });
 
     const userCache = wx.getStorageSync('userCredentials') || {};
+    console.log("userCache:", userCache);
     const userInfo = userCache[app.globalData.openid] || {};
     if (userInfo) {
       this.setData({
@@ -150,7 +151,7 @@ Page({
         });
         throw new Error('取件开门失败');
       }
-        
+
       // 5. 完成订单
       const orderFinishRes = await wx.cloud.callFunction({
         name: "order",
@@ -160,7 +161,7 @@ Page({
         }
       });
       const isOrderFinished = orderFinishRes.result.success
-      
+
       // 6. 无论订单是否结束都提示柜门打开
       wx.hideLoading();
       this.setData({ isLoading: false });
@@ -170,7 +171,7 @@ Page({
       );
       if (!isOrderFinished) {
         throw new Error('取件后订单更新失败');
-      } 
+      }
 
     } catch (e) {
       console.error("取件流程异常:", e);

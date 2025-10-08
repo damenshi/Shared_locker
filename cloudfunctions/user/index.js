@@ -190,29 +190,61 @@ exports.main = async (event, context) => {
           throw new Error('余额不足');
         }
 
-        let actualRefundAmount = currentDeposit; // 默认全额退款
-        // 4. 执行退款（更新余额）
+        const order = orderRes.data;
+        const client = getClient();
+        const refundParams = {
+          out_trade_no: order.outTradeNo || order._id, // 原商户订单号
+          out_refund_no: `refund_${Date.now()}`, // 退款单号
+          amount: {
+            refund: refundAmount, // 退款金额(分)
+            total: order.amount || refundAmount, // 原订单总金额
+            currency: 'CNY'
+          },
+          notify_url: CONFIG.notify_url // 退款结果通知地址
+        };
+
+        const refundResult = await client.refunds(refundParams);
+        if (refundResult.data.status !== 'SUCCESS') {
+          throw new Error(`支付平台退款失败: ${refundResult.data.status}`);
+        }
+
         await transaction.collection('users')
           .where({ openid: openid })
           .update({
             data: {
-              deposit: _.inc(-actualRefundAmount), // 减少余额
-              updatedAt: db.serverDate(),
+              deposit: _.inc(-refundAmount),
+              updatedAt: db.serverDate()
             }
           });
 
+        await transaction.collection('orders').doc(orderId).update({
+          data: {
+            refundStatus: '已退款',
+            refundAmount,
+            refundTime: db.serverDate(),
+            refundId: refundResult.data.out_refund_no,
+            updatedAt: db.serverDate()
+          }
+        });
+
         return {
           success: true,
-          message: '退款成功'
+          message: '退款成功',
+          data: {
+            refundAmount,
+            refundNo: refundResult.data.out_refund_no
+          }
         };
       })
     } catch (error) {
+      console.error('退款处理失败:', error);
       return {
         success: false,
-        message: '退款失败：' + error.message
+        message: `退款失败：${error.message}`
       };
     }
   }
+
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 };

@@ -14,7 +14,8 @@ const CONSTANTS = {
     IN_PROGRESS: '进行中',
     COMPLETED: '已完成',
     FORCE_FINISHED: '已强制结束',
-    CANCELLED: '已取消'
+    CANCELLED: '已取消',
+    REFUNDED: '已退款'
   },
   VALID_STATUSES_FOR_QUERY: ['进行中']
 }
@@ -519,7 +520,8 @@ exports.main = async (event, context) => {
           deviceAddress: true,
           status: true,
           openid: true,
-          createdAt: true
+          createdAt: true,
+          deposit: true
         })
         .get()
 
@@ -533,6 +535,38 @@ exports.main = async (event, context) => {
 
     } catch (err) {
       console.error('查询用户所有订单失败', { error: err.message })
+      return { success: false, errMsg: err.message }
+    }
+  }
+
+  if (action === 'refundOrder') {
+    const { orderId } = event
+
+    const orderDoc = await db.collection('orders').doc(orderId).get()
+    const order = orderDoc.data
+
+    if (order.status !== CONSTANTS.ORDER_STATUSES.COMPLETED) {
+      throw new Error(`仅【已完成】的订单可退款，当前状态：${order.status}`);
+    }
+
+    try {
+      const client = await getClient();
+      const refundParams = {
+        out_trade_no: order.outTradeNo || order._id,
+        transaction_id: order.transactionId,
+        out_refund_no: `refund_${Date.now()}`,
+        amount: {
+          refund: order.deposit * 100,
+          total: order.deposit * 100,
+          currency: 'CNY'
+        },
+        notify_url: CONFIG.notify_url
+      };
+
+      const refundRes = await client.refunds(refundParams);
+      return { success: true, data: refundRes };
+    } catch (err) {
+      console.error('退款失败', { error: err.message })
       return { success: false, errMsg: err.message }
     }
   }

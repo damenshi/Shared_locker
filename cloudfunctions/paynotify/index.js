@@ -9,7 +9,8 @@ const CONSTANTS = {
     IN_PROGRESS: '进行中',
     COMPLETED: '已完成',
     FORCE_FINISHED: '已强制结束',
-    CANCELLED: '已取消'
+    CANCELLED: '已取消',
+    REFUNDED: '已退款'
   },
   VALID_STATUSES_FOR_QUERY: ['进行中']
 }
@@ -46,6 +47,53 @@ function decryptNotify(resource) {
   return JSON.parse(decrypted.toString('utf8'))
 }
 
+async function handlePayNotify(notifyData) {
+  const orderId = notifyData.out_trade_no;
+  const transactionId = notifyData.transaction_id;
+  const amountFen = notifyData.amount?.total || 0;
+  const amountYuan = amountFen / 100;
+
+  await db.collection('orders').doc(orderId).update({
+    data: {
+      status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
+      transactionId: transactionId,
+      deposit: amountYuan,
+      payTime: db.serverDate(),
+      updatedAt: db.serverDate()
+    }
+  });
+}
+
+async function handleRefundNotify(notifyData) {
+  const outRefundNo = notifyData.out_refund_no;
+  const refundId = notifyData.refund_id;
+  const refundStatus = notifyData.refund_status;
+  const successTime = notifyData.success_time;
+  const failReason = notifyData.fail_reason || '';
+  const refundAmountFen = notifyData.amount?.refund || 0;
+  const refundAmountYuan = refundAmountFen / 100;
+
+  const orderRes = await db.collection('orders')
+    .where({ refundNo: outRefundNo })
+    .limit(1)
+    .get();
+
+  if (orderRes.data.length === 0) {
+    throw new Error(`未找到退款单号为 ${outRefundNo} 的订单`);
+  }
+  const order = orderRes.data[0];
+  const orderId = order._id;
+
+  const updateData = {
+    status: CONSTANTS.ORDER_STATUSES.REFUNDED,
+    refundId: refundId,
+    refundAmount: refundAmountYuan,
+    updatedAt: db.serverDate()
+  };
+
+  await db.collection('orders').doc(orderId).update({ data: updateData });
+}
+
 // 云函数入口
 exports.main = async (event) => {
   console.log('收到支付回调:', event)
@@ -79,30 +127,25 @@ exports.main = async (event) => {
   try {
     // Step2: 解密通知数据
     const notifyData = decryptNotify(body.resource)
-    console.log('支付结果通知解密后数据:', notifyData)
+    console.log('通知解密后数据:', notifyData)
+    const eventType = notifyData.event_type;
 
-    const orderId = notifyData.out_trade_no
-    const transactionId = notifyData.transaction_id
-    const amountFen = notifyData.amount?.total || 0
-    const amountYuan = amountFen / 100
+    if (eventType === "REFUND.SUCCESS" || eventType === "REFUND.FAIL") {
+      console.log('处理退款回调，退款单号:', notifyData.out_refund_no);
+      await handleRefundNotify(notifyData);
+    } else if (eventType === 'TRANSACTION.SUCCESS') {
+      console.log('处理支付回调，订单号:', notifyData.out_trade_no);
+      await handlePayNotify(notifyData);
+    } else {
+      throw new Error('无法识别的通知类型（缺少refund_id或transaction_id）');
+    }
 
-    // Step3: 更新订单状态
-    await db.collection('orders').doc(orderId).update({
-      data: {
-        status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
-        transactionId: transactionId,
-        deposit: amountYuan,
-        updatedAt: db.serverDate()
-      }
-    })
-
-    // Step4: 返回成功
     return {
       statusCode: 200,
       body: JSON.stringify({ code: 'SUCCESS', message: '成功' })
     }
   } catch (err) {
-    console.error('支付回调处理失败:', err)
+    console.error('回调处理失败:', err)
     return {
       statusCode: 500,
       body: JSON.stringify({ code: 'FAIL', message: err.message })

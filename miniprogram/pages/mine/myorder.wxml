@@ -46,7 +46,12 @@
               <text class="label">创建时间</text>
               <text class="value">{{item.createdAtFormatted}}</text>
             </view>
+            <view class="row">
+              <text class="label">付款金额</text>
+              <text class="value">{{item.deposit}}</text>
+            </view>
           </view>
+          <button class="btn refund" bindtap="refund" data-id="{{item._id}}">退款</button>
         </view>
       </block>
     </view>

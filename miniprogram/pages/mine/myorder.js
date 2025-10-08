@@ -68,4 +68,17 @@ Page({
       this.setData({ loading: false });
     }
   },
+
+  async refund(e) {
+    const orderId = e.currentTarget.dataset.id;
+    console.log('点击退款的订单ID:', orderId);
+
+    const res = await wx.cloud.callFunction({
+      name: 'order',
+      data: {
+        action: 'refundOrder',
+        orderId: orderId
+      }
+    });
+  }
 });
