@@ -541,15 +541,14 @@ exports.main = async (event, context) => {
 
   if (action === 'refundOrder') {
     const { orderId } = event
-
     const orderDoc = await db.collection('orders').doc(orderId).get()
     const order = orderDoc.data
 
-    if (order.status !== CONSTANTS.ORDER_STATUSES.COMPLETED) {
-      throw new Error(`仅【已完成】的订单可退款，当前状态：${order.status}`);
-    }
-
     try {
+      if (order.status !== CONSTANTS.ORDER_STATUSES.COMPLETED) {
+        throw new Error(`仅【已完成】订单可退款\n当前状态：【${order.status}】`);
+      }
+
       const client = await getClient();
       const refundParams = {
         out_trade_no: order.outTradeNo || order._id,
@@ -566,7 +565,6 @@ exports.main = async (event, context) => {
       const refundRes = await client.refunds(refundParams);
       return { success: true, data: refundRes };
     } catch (err) {
-      console.error('退款失败', { error: err.message })
       return { success: false, errMsg: err.message }
     }
   }

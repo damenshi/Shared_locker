@@ -2,7 +2,7 @@ const app = getApp();
 
 Page({
   data: {
-    phone: '', 
+    phone: '',
     password: '',
     openid: '',
     deviceId: null,
@@ -71,19 +71,19 @@ Page({
    */
   validateInput() {
     const { phone, password } = this.data;
-    
+
     // 手机号验证（11位数字）
     if (!/^\d{11}$/.test(phone)) {
       wx.showToast({ title: '请输入正确的11位手机号', icon: 'none' });
       return false;
     }
-    
+
     // 取件码验证（4位数字）
     if (!/^\d{4}$/.test(password)) {
       wx.showToast({ title: '请输入4位取件码', icon: 'none' });
       return false;
     }
-    
+
     return true;
   },
 

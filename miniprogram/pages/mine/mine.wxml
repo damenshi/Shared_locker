@@ -21,9 +21,9 @@
     </view>
 
     <!-- 申请退款 -->
-    <view class="menu-item" bindtap="handleRefund">
+    <!-- <view class="menu-item" bindtap="handleRefund">
       <view class="menu-text">申请退款</view>
-    </view>
+    </view> -->
 
     <!-- 客服电话 -->
     <view class="menu-item" bindtap="customerService">

@@ -78,67 +78,66 @@ Page({
   /**
    * 全额退款按钮点击事件
    */
-  async handleRefund() {
-    const { deposit, openid } = this.data;
-    if (!openid) {
-      return wx.showToast({ title: '请先登录', icon: 'none' });
-    }
-    if (deposit <= 0) {
-      return wx.showToast({ title: '余额不足', icon: 'none' });
-    }
+  // async handleRefund() {
+  //   const { deposit, openid } = this.data;
+  //   if (!openid) {
+  //     return wx.showToast({ title: '请先登录', icon: 'none' });
+  //   }
+  //   if (deposit <= 0) {
+  //     return wx.showToast({ title: '余额不足', icon: 'none' });
+  //   }
 
-    // 显示确认弹窗
-    wx.showModal({
-      title: '确认退款',
-      content: `确认全部退款？`,
-      confirmText: '确认退款',
-      cancelText: '取消',
-      success: async (res) => {
-        if (res.confirm) {
-          wx.showLoading({ title: '处理中...', mask: true });
-          try {
-            //需要先确定用户订单是否已完成或者已取消，才能退款
-            const orderRes = await wx.cloud.callFunction({
-              name: 'order',
-              data: {
-                action: 'getUserOrders',
-                openid,
-              }
-            });
+  //   // 显示确认弹窗
+  //   wx.showModal({
+  //     title: '确认退款',
+  //     content: `确认全部退款？`,
+  //     confirmText: '确认退款',
+  //     cancelText: '取消',
+  //     success: async (res) => {
+  //       if (res.confirm) {
+  //         wx.showLoading({ title: '处理中...', mask: true });
+  //         try {
+  //           //需要先确定用户订单是否已完成或者已取消，才能退款
+  //           const orderRes = await wx.cloud.callFunction({
+  //             name: 'order',
+  //             data: {
+  //               action: 'getUserOrders',
+  //               openid,
+  //             }
+  //           });
 
-            const orders = orderRes.result?.data || [];
-            // 遍历检查
-            for (const order of orders) {
-              if (order.status === '进行中') {
-                throw new Error(`订单 ${order._id} 未完成，无法退款`);
-              }
-            }
+  //           const orders = orderRes.result?.data || [];
+  //           // 遍历检查
+  //           for (const order of orders) {
+  //             if (order.status === '进行中') {
+  //               throw new Error(`订单 ${order._id} 未完成，无法退款`);
+  //             }
+  //           }
 
-            const res = await wx.cloud.callFunction({
-              name: 'user',
-              data: {
-                action: 'refundDeposit',
-                openid,
-              }
-            });
+  //           const res = await wx.cloud.callFunction({
+  //             name: 'user',
+  //             data: {
+  //               action: 'refundDeposit',
+  //               openid,
+  //             }
+  //           });
 
-            if (res.result.success) {
-              wx.showToast({ title: '退款成功', icon: 'success', duration: 2000 });
-              this.getUserInfo(); // 刷新余额
-            } else {
-              throw new Error(`退款失败`)
-            }
-          } catch (err) {
-            console.error('退款失败：', err);
-            wx.showToast({ title: err.message || '系统错误，请重试', icon: 'none' });
-          } finally {
-            wx.hideLoading();
-          }
-        }
-      }
-    });
-  },
-
+  //           if (res.result.success) {
+  //             wx.showToast({ title: '退款成功', icon: 'success', duration: 2000 });
+  //             this.getUserInfo(); // 刷新余额
+  //           } else {
+  //             throw new Error(`退款失败`)
+  //           }
+  //         } catch (err) {
+  //           console.error('退款失败：', err);
+  //           wx.showToast({ title: err.message || '系统错误，请重试', icon: 'none' });
+  //         } finally {
+  //           wx.hideLoading();
+  //         }
+  //       }
+  //     }
+  //   });
+  // },
 
   // 页面跳转方法
   goMyOrders() { wx.navigateTo({ url: '/pages/mine/myorder' }); },

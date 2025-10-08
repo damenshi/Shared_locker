@@ -69,15 +69,42 @@ Page({
     }
   },
 
-  async refund(e) {
-    const orderId = e.currentTarget.dataset.id;
-    console.log('点击退款的订单ID:', orderId);
+  async refund(event) {
+    // 显示确认弹窗
+    wx.showModal({
+      title: '确认退款',
+      content: `确认退款？`,
+      confirmText: '确认',
+      cancelText: '取消',
+      success: async (res) => {
+        if (res.cancel) {
+          return;
+        }
 
-    const res = await wx.cloud.callFunction({
-      name: 'order',
-      data: {
-        action: 'refundOrder',
-        orderId: orderId
+        if (res.confirm) {
+          wx.showLoading({ title: '处理中...', mask: true });
+          const orderId = event.currentTarget.dataset.id;
+          console.log('点击退款的订单ID:', orderId);
+
+          const res = await wx.cloud.callFunction({
+            name: 'order',
+            data: {
+              action: 'refundOrder',
+              orderId: orderId
+            }
+          });
+
+          console.log('---', res)
+
+          if (res.result.success) {
+            wx.showToast({ title: '退款成功', icon: 'success', duration: 2000 });
+          } else {
+            wx.showToast({
+              title: res.result.errMsg || '退款失败', 
+              icon: 'none' 
+            });
+          }
+        }
       }
     });
   }
