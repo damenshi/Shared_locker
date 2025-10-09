@@ -36,7 +36,10 @@ exports.main = async (event, context) => {
             // 4. 设备离线通知
             case 'device_offline':
                 return handleDeviceOffline(deviceId);
-                
+            //5.中途手机号密码开门
+            case 'mid_way_open_door':
+                  return handleMidwayOpen(deviceId, data);
+
             // 未知类型处理
             default:
                 return {
@@ -53,41 +56,6 @@ exports.main = async (event, context) => {
     }
 };
 
-// async function startOfflineCheckTask() {
-//   const _ = db.command; // 确保引入数据库命令对象
-//   const checkInterval = 60 * 1000; // 1分钟检查一次
-//   const offlineThreshold = 5 * 60 * 1000; // 5分钟阈值
-
-//   setInterval(async () => {
-//       try {
-//           const fiveMinutesAgo = new Date(Date.now() - offlineThreshold);
-          
-//           // 查询超过5分钟未心跳且在线的设备
-//           const offlineDevices = await devicesCollection
-//               .where({
-//                   isOnline: true,
-//                   updatedAt: _.lt(fiveMinutesAgo)
-//               })
-//               .get();
-
-//           if (offlineDevices.data.length > 0) {
-//               // 批量更新离线状态
-//               await devicesCollection
-//                   .where({
-//                       deviceId: _.in(offlineDevices.data.map(d => d.deviceId))
-//                   })
-//                   .update({
-//                       isOnline: false,
-//                       updatedAt: db.serverDate()
-//                   });
-
-//               console.log(`已标记 ${offlineDevices.data.length} 个设备为离线`);
-//           }
-//       } catch (error) {
-//           console.error('设备离线检查任务失败:', error);
-//       }
-//   }, checkInterval);
-// }
 
 /**
  * 1. 处理设备登录请求
@@ -353,6 +321,73 @@ async function handleOpenByPhone(deviceId, data) {
       return {
           code: 500,
           message: '开柜失败'
+      };
+  }
+}
+
+/**
+ * 3. 处理手机号密码中途开门请求
+ * 验证手机号和密码是否匹配有效订单
+ */
+async function handleMidwayOpen(deviceId, data) {
+  const {phone, password} = data;
+  
+  // 1. 验证订单信息
+  const orderRes = await db.collection('orders')
+      .where({
+          phone,
+          password,
+          status: '进行中', // 有效订单
+          deviceId
+      })
+      .limit(1)
+      .get();
+
+  if (orderRes.data.length === 0) {
+      return { code: 500, message: '手机号或密码错误' };
+  }
+
+  const order = orderRes.data[0];
+  
+  // 2. 调用locker云函数的openDoor方法开柜
+  try {
+      const openResult = await cloud.callFunction({
+          name: 'locker',
+          data: {
+              action: 'openDoor',
+              deviceId: deviceId,
+              doorNo: order.doorNo,
+              orderId: order._id,
+              cabinetNo: order.cabinetNo,
+              type: 'store' // 存件操作类型
+          }
+      });
+
+      // 3. 处理开柜结果
+      if (openResult.result?.success) {
+          // 生成doorSort返回格式
+          const cabinetNoStr = String(order.cabinetNo).padStart(2, '0');
+          const doorNoStr = String(order.doorNo).padStart(2, '0');
+          const doorSort = cabinetNoStr + doorNoStr;
+
+          return {
+              code: 200,
+              data: {
+                  doorSort: doorSort,
+              }
+          };
+      } else {
+          return {
+              code: 500,
+              message: '中途开柜失败', 
+          };
+      };
+
+  } catch (error) {
+      console.error('调用中途开柜函数失败:', error);
+      return {
+          code: 500,
+          message: '中途开柜失败'
       };
   }
 }
