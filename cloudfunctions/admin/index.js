@@ -3,19 +3,17 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
 
-// 管理员openid列表
-const ADMIN_OPENIDS = [
-  'oFThN1yR0zzomK0r1LRwvx4GSqoU'
-]
+const ADMIN_OPENIDS = (process.env.ADMIN_OPENIDS || '').split(',').filter(Boolean);
+
 
 const batchCreateLockers = async (event) => {
-  const { internalNo, deviceAddress, deviceDeposit, cabinetCount, lockersPerCabinet } = event
+  const { internalNo, deviceAddress, deviceDeposit, screenNo,cabinetCount, lockersPerCabinet } = event
   
   // 验证参数
-  if (!internalNo || !deviceAddress || !deviceDeposit || !cabinetCount || !lockersPerCabinet) {
+  if (!internalNo || !deviceAddress || !deviceDeposit || !screenNo || !cabinetCount || !lockersPerCabinet) {
     return { 
       success: false, 
-      errMsg: '请指定设备ID、设备地址、设备收费标准、锁板数量和每个锁板的锁数量' 
+      errMsg: '请指定设备ID、设备地址、设备收费标准、屏幕编号、锁板数量和每个锁板的锁数量' 
     }
   }
 
@@ -38,6 +36,7 @@ const batchCreateLockers = async (event) => {
           isConfigured: true,                    // 标记为已配置
           deviceAddress: deviceAddress,          // 设备地址
           deviceDeposit: deviceDeposit,
+          screenNo: screenNo,
           updatedAt: db.serverDate()             // 更新时间
         }
       });
@@ -68,10 +67,24 @@ const batchCreateLockers = async (event) => {
       }
     }
 
+    //先清除记录再添加lockers
+    await db.collection('lockers').where({
+      deviceId: deviceId // 匹配要清除的deviceId
+    }).remove();
+
     // 批量插入lockers集合
     const result = await db.collection('lockers').add({
       data: lockers
     })
+
+    //将屏幕柜门设为不可打开
+    await db.collection('lockers')
+    .where({ deviceId: deviceId, lockerNo: screenNo })
+    .update({
+      data: {
+        status: 'occupied',
+      }
+    });
 
     const createdCount = result._ids.length;
     return {

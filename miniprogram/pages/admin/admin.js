@@ -4,16 +4,13 @@ Page({
     orderId: '',
     
     // 柜门控制相关
-    lockerId: '',
-    
-    // 批量生成设备相关
-    deviceCount: 1, 
+    internalNo_ctl: '',
+    lockerNo: '',
   
     // 批量生成储物柜相关
-    selectedDeviceId: null, // 选择要生成锁的设备
-    cabinetCount: 2, //每个设备的锁板数量
-    lockersPerCabinet: 5, // 每个锁板的锁数量
-    
+    internalNo: '',
+    cabinetCount: '', //每个设备的锁板数量
+    lockersPerCabinet: '', // 每个锁板的锁数量
     queryDeviceId: '',      // 要查询的设备ID
     queryCabinetNo: '',     // 要查询的锁板号
     queryDoorNo: '',        // 要查询的柜门号
@@ -109,40 +106,40 @@ Page({
 
   // 3. 远程打开柜门
   async openAnyDoor() {
-    const { lockerId } = this.data;
+    const {internalNo_ctl, lockerNo} = this.data;
     
-    if (!lockerId) {
-      return wx.showToast({ title: '请输入柜子ID', icon: 'none' });
+    if (!internalNo_ctl || !lockerNo) {
+      return wx.showToast({ title: '请输入设备编号和柜门编号', icon: 'none' });
     }
 
     this.showLoading('正在开门...');
     
     try {
       const result = await wx.cloud.callFunction({
-        name: 'admin',
+        name: 'locker',
         data: {
-          action: 'openDoor',
-          lockerId: lockerId
+          action: 'openDoorByAdmin',
+          internalNo: internalNo_ctl,
+          lockerNo: parseInt(lockerNo)
         }
       });
 
       this.hideLoading();
       
-      if (result.result.success) {
-        wx.showToast({ title: '柜门已打开', icon: 'success' });
-      } else {
-        wx.showToast({ title: result.result.errMsg || '开门失败', icon: 'none' });
-      }
+      if (!result.result.success)
+        throw new Error('开门失败，设备不在线');
+      wx.showToast({ title: '柜门已打开', icon: 'success' });
+      
     } catch (err) {
       this.hideLoading();
       console.error('开门失败：', err);
-      wx.showToast({ title: '操作失败，请重试', icon: 'none' });
+      wx.showToast({ title: '开门失败，设备不在线', icon: 'none' });
     }
   },
   
   //配置设备
   async batchCreateLockersByDevice() {
-    const { internalNo, deviceAddress, deviceDeposit, cabinetCount, lockersPerCabinet } = this.data;
+    const { internalNo, deviceAddress, deviceDeposit, screenNo, cabinetCount, lockersPerCabinet } = this.data;
     
     if (!deviceAddress || !internalNo || cabinetCount <= 0 || lockersPerCabinet <= 0) {
       return wx.showToast({ 
@@ -161,6 +158,7 @@ Page({
           internalNo: internalNo, // 指定设备ID
           deviceAddress: deviceAddress,
           deviceDeposit: parseInt(deviceDeposit),
+          screenNo: parseInt(screenNo),
           cabinetCount: parseInt(cabinetCount),
           lockersPerCabinet: parseInt(lockersPerCabinet)
         }
@@ -256,5 +254,8 @@ Page({
         wx.navigateBack();
       }, 1500);
     }
-  }
+  },
+
+   // 页面跳转方法
+   goMyDeviceList() { wx.navigateTo({ url: '/pages/admin/mydevice' }); },
 })

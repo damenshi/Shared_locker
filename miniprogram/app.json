@@ -5,11 +5,12 @@
     "pages/store/store",
     "pages/take/take",
     "pages/admin/admin",
+    "pages/admin/mydevice",
     "pages/mine/mine",
     "pages/mine/myorder"
   ],
   "window": {
-    "navigationBarTitleText": "优享储物",
+    "navigationBarTitleText": "珊星储物",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black"
   },

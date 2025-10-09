@@ -1,4 +1,4 @@
-// pages/mine/orders.js
+// pages/mine/myorder.js
 const app = getApp();
 
 function formatDate(dateStr) {
@@ -104,7 +104,7 @@ Page({
                 wx.showToast({
                   title: '退款成功',
                   icon: 'success',
-                  duration: 2000
+                  duration: 3000
                 });
               } else {
                 const errText = res.result?.data?.error || res.result?.data?.errRaw?.response?.text || '';
@@ -120,7 +120,7 @@ Page({
                 wx.showToast({
                   title: errMsg,
                   icon: 'error',
-                  duration: 2000
+                  duration: 3000
                 });
               }
 

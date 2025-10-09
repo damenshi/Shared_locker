@@ -34,28 +34,18 @@
     </view>
   </view>
 
-  <!-- 柜门控制区域 -->
-  <view class="card">
-    <view class="card-title">柜门控制</view>
-    <view class="input-item">
-      <text>柜子ID：</text>
-      <input 
-        type="text" 
-        value="{{lockerId}}" 
-        data-field="lockerId"
-        bindinput="onInputChange"
-        placeholder="请输入要操作的柜子ID"
-      />
-    </view>
+   <!-- 设备列表 -->
+   <view class="card">
+    <view class="card-title">设备列表</view>
     <button 
-      bindtap="openAnyDoor" 
+      bindtap="goMyDeviceList" 
       type="primary"
     >
-      远程打开柜门
+      获取设备列表
     </button>
   </view>
 
-  <!-- 基于设备生成锁具区域 -->
+  <!-- 设备配置 -->
   <view class="card">
     <view class="card-title">设备配置</view>
     <view class="input-item">
@@ -65,7 +55,7 @@
         value="{{internalNo}}" 
         data-field="internalNo"
         bindinput="onInputChange"
-        placeholder="请输入设备ID（如L0001）"
+        placeholder="请输入设备编号（如L0001）"
       />
     </view>
       <view class="input-item">
@@ -86,6 +76,16 @@
         data-field="deviceDeposit"
         bindinput="onInputChange"
         placeholder="请输入设备预付款标准"
+      />
+    </view>
+    <view class="input-item">
+      <text>屏幕编号：</text>
+      <input 
+        type="text" 
+        value="{{screenNo}}" 
+        data-field="screenNo"
+        bindinput="onInputChange"
+        placeholder="请输入设备屏幕编号"
       />
     </view>
     <view class="input-item">
@@ -116,6 +116,37 @@
     </button>
   </view>
     
+  <!-- 柜门控制区域 -->
+  <view class="card">
+    <view class="card-title">柜门控制</view>
+    <view class="input-item">
+      <text>设备编号：</text>
+      <input 
+        type="text" 
+        value="{{internalNo_ctl}}" 
+        data-field="internalNo_ctl"
+        bindinput="onInputChange"
+        placeholder="请输入设备编号（如L0001）"
+      />
+    </view>
+    <view class="input-item">
+      <text>柜门编号：</text>
+      <input 
+        type="number" 
+        value="{{lockerNo}}" 
+        data-field="lockerNo"
+        bindinput="onInputChange"
+        placeholder="请输入柜门编号"
+      />
+    </view>
+    <button 
+      bindtap="openAnyDoor" 
+      type="primary"
+    >
+      远程打开柜门
+    </button>
+  </view>
+
 <!-- 柜门状态查询区域（新增） -->
 <view class="card">
   <view class="card-title">柜门状态查询</view>

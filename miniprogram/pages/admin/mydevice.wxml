@@ -1,0 +1,66 @@
+<view class="container">
+  <!-- 如果没有设备 -->
+  <block wx:if="{{!loading && devices.length === 0}}">
+    <view class="empty">暂无设备</view>
+  </block>
+
+  <!-- 有订单时 -->
+  <block wx:if="{{devices.length > 0}}">
+    <view class="devices-list">
+      <block wx:for="{{devices}}" wx:key="_id">
+        <view class="devices-card">
+          <view class="devices-header">
+            <text class="devices-id">设备ID：{{item.deviceId}}</text>
+          </view>
+
+          <view class="devices-body">
+            <view class="row">
+              <text class="label">设备是否配置</text>
+              <text class="isConfigured">{{item.isConfigured}}</text>
+            </view>
+            <view class="row">
+              <text class="label">设备编号</text>
+              <text class="value">{{item.internalNo}}</text>
+            </view>
+            <view class="row">
+              <text class="label">屏幕编号</text>
+              <text class="value">{{item.screenNo}}</text>
+            </view>
+            <view class="row">
+              <text class="label">设备锁板数量</text>
+              <text class="value">{{item.cabinetCount}}</text>
+            </view>
+            <view class="row">
+              <text class="label">每锁板锁数量</text>
+              <text class="value">{{item.doorCount}}</text>
+            </view>
+            <view class="row">
+              <text class="label">设备收费标准</text>
+              <text class="value">{{item.deviceDeposit}}</text>
+            </view>
+            <view class="row">
+              <text class="label">设备是否在线</text>
+              <text class="value">{{item.isOnline}}</text>
+            </view>
+            <view class="row">
+              <text class="label">设备地址</text>
+              <text class="value">{{item.deviceAddress}}</text>
+            </view>
+            <view class="row">
+              <text class="label">创建时间</text>
+              <text class="value">{{item.createdAtFormatted}}</text>
+            </view>
+            <view class="row">
+              <text class="label">更新时间</text>
+              <text class="value">{{item.updatedAtFormatted}}</text>
+            </view>
+            <view class="row">
+              <text class="label">最后登录时间</text>
+              <text class="value">{{item.lastLoginFormatted}}</text>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </block>
+</view>

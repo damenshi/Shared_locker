@@ -89,6 +89,23 @@ exports.main = async (event, context) => {
     }
   }
 
+  if (action === 'getDevices') {
+
+    try {
+      const deviceInfo = await db.collection('devices').get()
+
+      if (deviceInfo.data.length === 0) {
+        throw new Error('暂无设备');
+      }
+
+      const devices = deviceInfo.data;
+      return { success: true, data: devices }
+
+    } catch (err) {
+      console.error('查询设备列表失败', { error: err.message })
+      return { success: false, errMsg: err.message }
+    }
+  }
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 }

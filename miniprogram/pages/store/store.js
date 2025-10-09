@@ -23,7 +23,6 @@ Page({
       password: options.password || '',
       openid: app.globalData.openid || '',
       deviceId: app.globalData.deviceId || '',
-      // deviceId: '6de04f165a9c7e88'
     });
     this.handleStoreItem();
   },
@@ -295,19 +294,6 @@ Page({
         }
       }
 
-      //3.获取可用柜子并占用
-      const freeRes = await wx.cloud.callFunction({
-        name: 'locker',
-        data: {
-          action: 'listFree',
-          deviceId: this.data.deviceId
-        }
-      });
-      
-      if (!freeRes.result?.success) 
-        throw new Error('查询空闲柜门失败');
-      lockerInfo = freeRes.result.data;
-
       //4.创建/获取用户账户      
       const userRes = await wx.cloud.callFunction({
         name: 'user',
@@ -319,6 +305,19 @@ Page({
       });
       if (!userRes.result?.success) throw new Error('获取用户信息失败');
       const userInfo = userRes.result.data;
+
+      //3.获取可用柜子并占用
+      const freeRes = await wx.cloud.callFunction({
+        name: 'locker',
+        data: {
+          action: 'listFree',
+          deviceId: this.data.deviceId
+        }
+      });
+  
+      if (!freeRes.result?.success) 
+        throw new Error('查询空闲柜门失败');
+      lockerInfo = freeRes.result.data;
 
       // 4. 创建订单
       const orderRes = await wx.cloud.callFunction({
@@ -333,7 +332,7 @@ Page({
       if (!orderRes.result?.success) throw new Error('创建订单失败');
       orderId = orderRes.result.data;
 
-      //5.更新柜子当前状态
+      //5.更新柜子相关信息
       const updateRes = await wx.cloud.callFunction({
         name: 'locker',
         data: {
@@ -421,7 +420,7 @@ Page({
         await this.saveUserCredentials(this.data.openid, this.data.phone, this.data.password);
 
         wx.hideLoading();
-        wx.showToast({ title: `柜门 ${lockerInfo.lockerNo} 已打开`, icon: 'none', duration: 2000});
+        wx.showToast({ title: `柜门 ${lockerInfo.lockerNo} 已打开`, icon: 'none', duration: 5000});
           setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
       }
 

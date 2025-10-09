@@ -7,7 +7,7 @@ const fs = require('fs');
 const Pay = require('wechatpay-node-v3');
 const crypto = require('crypto');
 
-// 常量定义：订单状态和固定费用配置
+// 常量定义：订单状态
 const CONSTANTS = {
   ORDER_STATUSES: {
     PENDING_PAY: '待支付',
@@ -545,8 +545,11 @@ exports.main = async (event, context) => {
     const order = orderDoc.data
 
     try {
-      if (order.status !== CONSTANTS.ORDER_STATUSES.COMPLETED) {
-        throw new Error(`仅【已完成】订单可退款\n当前状态：【${order.status}】`);
+      if (![
+        CONSTANTS.ORDER_STATUSES.COMPLETED, 
+        CONSTANTS.ORDER_STATUSES.CANCELLED
+      ].includes(order.status)) {
+        throw new Error(`仅【已完成】或【已取消】订单可退款\n当前状态：【${order.status}】`);
       }
 
       const client = await getClient();

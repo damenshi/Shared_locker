@@ -56,7 +56,7 @@ Page({
    * @param {Function} callback - 回调函数
    * @param {number} duration - 提示时长
    */
-  showSuccess(message, callback, duration = 2000) {
+  showSuccess(message, callback, duration = 3000) {
     wx.showToast({
       title: message,
       icon: 'success',

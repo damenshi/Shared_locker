@@ -51,15 +51,16 @@ exports.main = async (event, context) => {
         // 1. 查询一个空闲柜子
         const lockerRes = await transaction.collection('lockers')
           .where(whereCondition)
-          .limit(1)
           .get();
   
         if (lockerRes.data.length === 0) {
           throw new Error('没有可用柜子');
         }
   
-        const locker = lockerRes.data[0];
-  
+        // const locker = lockerRes.data[0];
+        const randomIndex = Math.floor(Math.random() * lockerRes.data.length);
+        const locker = lockerRes.data[randomIndex];
+
         // 2. 更新为占用
         await transaction.collection('lockers').doc(locker._id).update({
           data: {
@@ -359,6 +360,96 @@ exports.main = async (event, context) => {
     }
   }
 
+  if (action === 'openDoorByAdmin') {
+    console.log('=== 执行管理员开柜操作 ===', event)
+    const { internalNo, lockerNo} = event
+
+    // 参数校验
+    const validation = validateParams(event, {
+      internalNo: {type: 'string'},
+      lockerNo: { type: 'number' }
+    })
+    if (!validation.valid) {
+      return { ok: false, errMsg: validation.msg }
+    }
+
+    const callHardwareOpen = async (deviceId, cabinetNo, doorNo) => {
+      try {
+        // 2. 调用socket服务器接口
+        const formatNumber = (num) => {
+          return num.toString().padStart(2, '0');
+        };
+        const formattedCabinetNo = formatNumber(cabinetNo); // 2 → "02"
+        const formattedDoorNo = formatNumber(doorNo);       // 1 → "01"
+        const combinedCode = formattedCabinetNo + formattedDoorNo; // "0201"
+
+        const axios = require('axios');
+        const response = await axios.post(
+          'http://1.116.109.239:3000/send-command', 
+          {
+            direct: 'openDoor',
+            deviceId: deviceId,
+            data: {
+              doorSort: combinedCode,
+            }
+          },
+          { timeout: 8000 }  // 8秒超时设置
+        );
+
+        // 3. 验证服务器返回结果
+        if (response.data.code !== 200 || response.data.doorSort != combinedCode) {
+          throw new Error(`服务器响应异常: ${response.data.message || '未知错误'}`);
+        }
+        return true;
+      } catch (err) {
+        if (err.code === 'ECONNABORTED') {
+          throw new Error(`连接超时，请检查服务器是否在线`);
+        }
+        if (err.response) {
+          const errorMsg = err.response.data?.message || err.response.statusText;
+          console.error(`服务器返回错误: 设备${deviceId}，状态码${err.response.status}，message: ${errorMsg}`);
+          throw new Error(`服务器返回错误: ${err.response.status} ${errorMsg}`);
+        }
+        throw new Error(`开柜接口调用失败: ${err.message}`);
+      }
+    };
+
+    try {
+      return await db.runTransaction(async transaction => {
+        // 查询柜子信息
+        const lockerQuery = await transaction.collection('lockers')
+          .where({ internalNo, lockerNo})
+          .get({ readFresh: true })
+
+        if (lockerQuery.data.length === 0) {
+          throw new Error(`设备${internalNo} 柜门${lockerNo}不存在`)
+        }
+
+        const locker = lockerQuery.data[0]
+        // const lockerId = locker._id
+        const deviceId = locker.deviceId
+        const cabinetNo = locker.cabinetNo
+        const doorNo = locker.doorNo
+
+        //硬件开柜
+        const openSuccess = await callHardwareOpen(deviceId, cabinetNo, doorNo);
+        if (!openSuccess) {
+          throw new Error(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 硬件开柜失败`)
+        }
+
+        return { 
+          success: true, 
+          message: `开柜成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`
+        }
+      })
+    } catch (err) {
+      console.error('开柜操作失败', {
+        message: err.message,
+        stack: err.stack
+      })
+      return { success: false, errMsg: err.message }
+    }
+  }
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 }

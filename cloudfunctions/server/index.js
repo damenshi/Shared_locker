@@ -214,8 +214,8 @@ async function handleDeviceLogin(deviceId) {
     if (deviceRes.data.length === 0) {
         // 设备未注册
         internalNo = await generateInternalNumber();
-        // urlLink = await generateUrlLink(deviceId);//上线版可用
-        urlLink = '体验版暂无';
+        urlLink = await generateUrlLink(deviceId);//上线版可用
+        // urlLink = '体验版暂无';
         await devicesCollection.add({
           data: {
               deviceId: deviceId,       // 终端提供的设备ID
@@ -227,6 +227,7 @@ async function handleDeviceLogin(deviceId) {
               isConfigured: false,
               deviceDeposit: 0,
               urlLink: urlLink,
+              screenNo: 0,
               lastLoginTime: db.serverDate(), // 记录登录时间
               createdAt: db.serverDate(),  // 创建时间
               updatedAt: db.serverDate()
@@ -317,6 +318,18 @@ async function handleOpenByPhone(deviceId, data) {
 
       // 3. 处理开柜结果
       if (openResult.result?.success) {
+
+          const orderFinishRes = await cloud.callFunction({
+            name: "order",
+            data: {
+              action: "finishOrder",
+              orderId: order._id
+            }
+          });
+          const isOrderFinished = orderFinishRes.result.success
+          if(!isOrderFinished)
+            throw new Error('OpenByPhone 订单结束失败');
+
           // 生成doorSort返回格式
           const cabinetNoStr = String(order.cabinetNo).padStart(2, '0');
           const doorNoStr = String(order.doorNo).padStart(2, '0');
@@ -331,14 +344,15 @@ async function handleOpenByPhone(deviceId, data) {
       } else {
           return {
               code: 500,
-              message: '手机号或密码错误', 
+              message: '开柜失败', 
           };
-      }
+      };
+
   } catch (error) {
       console.error('调用开柜函数失败:', error);
       return {
           code: 500,
-          message: 'opendoor unsuccess'
+          message: '开柜失败'
       };
   }
 }
