@@ -450,6 +450,35 @@ exports.main = async (event, context) => {
       return { success: false, errMsg: err.message }
     }
   }
+
+  if (action === 'getDevFreeDoor') {
+    try {
+      const { deviceId } = event;
+  
+      return await db.runTransaction(async transaction => {
+        const whereCondition = {
+          status: 'free',
+          currentOrderId: _.eq(null),
+          deviceId: deviceId
+        };
+  
+        // 1. 查询一个空闲柜子
+        const lockerRes = await transaction.collection('lockers')
+          .where(whereCondition)
+          .get();
+  
+        const freeCnt = lockerRes.data.length;
+  
+        // 3. 返回占用的柜子信息
+        return { success: true, data: freeCnt };
+      });
+  
+    } catch (err) {
+      console.error('查询设备空闲柜门个数失败', err);
+      return { success: false, errMsg: `查询设备空闲柜门个数失败${err.message}` };
+    }
+
+  }
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 }

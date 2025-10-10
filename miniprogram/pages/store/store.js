@@ -419,6 +419,12 @@ Page({
         //缓存手机号和密码
         await this.saveUserCredentials(this.data.openid, this.data.phone, this.data.password);
 
+        const pages = getCurrentPages();
+        const indexPage = pages.find(p => p.route === 'pages/index/index');
+        if (indexPage) {
+          indexPage.showOpenedLocker(lockerInfo.lockerNo);
+        }
+  
         wx.hideLoading();
         wx.showToast({ title: `柜门 ${lockerInfo.lockerNo} 已打开`, icon: 'none', duration: 5000});
           setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);

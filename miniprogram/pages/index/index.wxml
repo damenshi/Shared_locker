@@ -3,6 +3,12 @@
   <view class="header">
     <view class="school-name">{{deviceAddress}}</view>
     <view class="business-hours">营业时间：00:00~24:00</view>
+
+    <!-- ✅ 新增：右上角显示空闲柜 -->
+    <view class="free-lockers">
+      <text>空闲柜门：</text>
+      <text class="free-count">{{freeDoorCnt}}</text>
+    </view>
   </view>
   
   <!-- 帮助提示 -->
@@ -57,4 +63,10 @@
   <view class="next-btn {{!canProceed ? 'disabled' : ''}}" bindtap="{{canProceed ? 'goToNextPage' : ''}}">
     下一步
   </view>
+
+<view wx:if="{{showLockerBox}}" class="locker-box-large">
+  <text class="locker-box-text">柜门 {{openedLockerNo}} 使用中</text>
+  <button class="reopen-btn" bindtap="midopenLocker">中途开柜</button>
+</view>
+
 </view>
