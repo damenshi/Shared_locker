@@ -19,23 +19,36 @@ App({
     this.getOpenid();
 
     // 2. 处理扫码进入的设备ID
-    const temp_deviceid = 'fa23d3e1fc60a45b';
-    let deviceId = temp_deviceid;
-    if (options.query) {
-      // 情况1：扫码进入，解析scene参数（微信扫码会将参数放在scene中，且经过编码）
-      if (options.query.scene) {
-        deviceId = decodeURIComponent(options.query.scene);
-      } 
-    }
-    // 保存deviceId到全局
-    if (deviceId) {
+    // const temp_deviceid = 'fa23d3e1fc60a45b';
+    // let deviceId = temp_deviceid;
+    let deviceId = null;
+    if (options && options.query && options.query.deviceId) {
+      deviceId = options.query.deviceId;
       this.globalData.deviceId = deviceId;
-      console.log('全局获取到的deviceId:', deviceId);
+      console.log('[onLaunch]从URL Link获取到deviceId:', deviceId);
+    } else {
+      console.log('[onLaunch]未获取到 deviceId');
     }
     
     //3.获取设备地址
     this.getDevAddress();
 
+    this.getFreeDoorCnt();
+  },
+
+  onShow(options) {
+    console.log('onShow options:', options);
+
+    let deviceId = null;
+    if (options && options.query && options.query.deviceId) {
+      deviceId = options.query.deviceId;
+      this.globalData.deviceId = deviceId;
+      console.log('[onshow]从URL Link获取到 deviceId:', deviceId);
+    } else {
+      console.log('[onshow]未获取到 deviceId');
+    }
+    // 其他逻辑
+    this.getDevAddress();
     this.getFreeDoorCnt();
   },
 
