@@ -17,23 +17,6 @@ App({
 
     // 1. 获取用户openid并缓存
     this.getOpenid();
-
-    // 2. 处理扫码进入的设备ID
-    // const temp_deviceid = 'fa23d3e1fc60a45b';
-    // let deviceId = temp_deviceid;
-    let deviceId = null;
-    if (options && options.query && options.query.deviceId) {
-      deviceId = options.query.deviceId;
-      this.globalData.deviceId = deviceId;
-      console.log('[onLaunch]从URL Link获取到deviceId:', deviceId);
-    } else {
-      console.log('[onLaunch]未获取到 deviceId');
-    }
-    
-    //3.获取设备地址
-    this.getDevAddress();
-
-    this.getFreeDoorCnt();
   },
 
   onShow(options) {

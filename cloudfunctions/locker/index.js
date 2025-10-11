@@ -250,20 +250,18 @@ exports.main = async (event, context) => {
         if (typeof currentUserPhone !== 'undefined') {
           updateData.currentUserPhone = currentUserPhone
         }
+        // 更新柜子
+        await db.collection('lockers').doc(lockerId).update({
+          data: updateData
+        })
   
-        const res = await db.collection('lockers')
-          .where({ lockerId })
-          .update({ data: updateData });
-
-        if (res.stats.updated === 0) {
-          return { success: false, errMsg: '柜子不存在或未更新' };
-        }
-        return { success: true };
+        return { success: true }
     } catch (err) {
-      console.error('更新柜子信息失败', err);
-      return { success: false, errMsg: err.message };
+      console.error('更新柜子信息失败', { orderId, error: err.message })
+      return { success: false, errMsg: err.message }
     }
   }
+
 
   // 4. 恢复柜子状态为空闲
   if (action === 'recoverLocker') {
