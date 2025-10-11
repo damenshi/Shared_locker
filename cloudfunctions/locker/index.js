@@ -242,14 +242,6 @@ exports.main = async (event, context) => {
     }
 
     try {
-      return await db.runTransaction(async transaction => {
-
-        const lockerDoc = await transaction.collection('lockers').where({lockerId:lockerId}).get()
-
-        if (!lockerDoc.data) {
-          throw new Error('柜子不存在')
-        }
-  
         // 更新数据
         const updateData = { updatedAt: db.serverDate() }
         if (typeof currentOrderId !== 'undefined') {
@@ -259,16 +251,17 @@ exports.main = async (event, context) => {
           updateData.currentUserPhone = currentUserPhone
         }
   
-        // 更新柜子
-        await transaction.collection('lockers').doc(lockerId).update({
-          data: updateData
-        })
-  
-        return { success: true }
-      })
+        const res = await db.collection('lockers')
+          .where({ lockerId })
+          .update({ data: updateData });
+
+        if (res.stats.updated === 0) {
+          return { success: false, errMsg: '柜子不存在或未更新' };
+        }
+        return { success: true };
     } catch (err) {
-      console.error('更新柜子信息失败', { orderId, error: err.message })
-      return { success: false, errMsg: err.message }
+      console.error('更新柜子信息失败', err);
+      return { success: false, errMsg: err.message };
     }
   }
 

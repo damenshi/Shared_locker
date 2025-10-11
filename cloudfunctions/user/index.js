@@ -61,45 +61,16 @@ exports.main = async (event, context) => {
 
   if (action === 'createUser') {
     try {
-      return await db.runTransaction(async transaction => {
-          // 先查询用户是否已存在
-          const existingUser = await transaction.collection('users')
-            .where({ openid: openid})
-            .get();
-
-          if (existingUser.data.length > 0) {
-            const user = await transaction.collection('users')
-            .where({ openid: openid})
-            .update({
-              data: {
-                phone,
-                updatedAt: db.serverDate()
-              }
-            });
-          }else{
-            const user = await transaction.collection('users').add({
-              data: {
-                phone,
-                openid: openid,
-                deposit: 0,
-                isAdmin: false,
-                createdAt: db.serverDate(),
-                updatedAt: db.serverDate()
-              }
-            });
-          }
-
-          const updatedUser = await transaction.collection('users')
-          .where({ openid: openid })
-          .get();
-
-          if (updatedUser.data.length === 0) {
-            throw new Error('无有效用户');
-          }
-
-          const user = updatedUser.data[0];
+        const existingUser = await db.collection('users').where({openid}).get();
+        if (existingUser.data.length > 0) {
+          const user = existingUser.data[0];
+          await db.collection('users').doc(user._id).update({ data: { phone, updatedAt: db.serverDate() } });
+          user.phone = phone;
           return { success: true, data: user };
-        })
+        } else {
+          const addRes = await db.collection('users').add({ data: { phone, openid, deposit: 0, isAdmin: false, createdAt: db.serverDate(), updatedAt: db.serverDate() } });
+          return { success: true, data: { _id: addRes._id, phone, openid, deposit: 0, isAdmin: false } };
+        }
       } catch (error) {
         return {
           success: false, errMsg: '创建用户失败：' + error.message
@@ -140,29 +111,20 @@ exports.main = async (event, context) => {
     }
 
     try {
-      return await db.runTransaction(async transaction => {
-        // 获取订单
-        const userDoc = await transaction.collection('users').where({openid:openid}).get()
-        if (!userDoc.data) {
-          throw new Error('用户不存在')
-        }
+      const updateData = { updatedAt: db.serverDate() };
+      if (typeof deposit !== 'undefined') {
+        updateData.deposit = db.command.inc(deposit); // 累加 deposit
+      }
 
-        // 更新数据
-        const updateData = { updatedAt: db.serverDate() }
-        // if (typeof phone !== 'undefined') {
-        //   updateData.phone = phone
-        // }
-        if (typeof deposit !== 'undefined') {
-          updateData.deposit = deposit + userDoc.data[0].deposit
-        }
+      const res = await db.collection('users')
+        .where({ openid })
+        .update({ data: updateData });
 
-        // 更新订单
-        await transaction.collection('users').where({openid:openid}).update({
-          data: updateData
-        })
+      if (res.stats.updated === 0) {
+        return { success: false, errMsg: '用户不存在或未更新' };
+      }
 
-        return { success: true }
-      })
+      return { success: true };
     } catch (err) {
       console.error('更新用户信息失败', {error: err.message })
       return { success: false, errMsg: err.message }

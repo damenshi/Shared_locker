@@ -180,8 +180,6 @@ exports.main = async (event, context) => {
     }
 
     try {
-      return await db.runTransaction(async transaction => {
-
         // 构建订单数据
         const order = {
           password: password,
@@ -202,10 +200,9 @@ exports.main = async (event, context) => {
           updatedAt: db.serverDate()
         }
         // 创建订单
-        const addRes = await transaction.collection('orders').add({ data: order })
+        const addRes = await db.collection('orders').add({ data: order })
 
         return { success: true, data: addRes._id }
-      })
     } catch (err) {
       console.error('创建订单失败', { error: err.message })
       return { success: false, errMsg: err.message }
@@ -249,29 +246,19 @@ exports.main = async (event, context) => {
     }
 
     try {
-      return await db.runTransaction(async transaction => {
-        // 获取订单
-        const orderDoc = await transaction.collection('orders').doc(orderId).get()
-        if (!orderDoc.data) {
-          throw new Error('订单不存在')
-        }
+      const updateData = { updatedAt: db.serverDate() };
+      if (typeof status !== 'undefined') updateData.status = status;
+      if (typeof deposit !== 'undefined') updateData.deposit = deposit;
 
-        // 更新数据
-        const updateData = { updatedAt: db.serverDate() }
-        if (typeof status !== 'undefined') {
-          updateData.status = status
-        }
-        if (typeof deposit !== 'undefined') {
-          updateData.deposit = deposit
-        }
+      const res = await db.collection('orders')
+        .doc(orderId)
+        .update({ data: updateData });
 
-        // 更新订单
-        await transaction.collection('orders').doc(orderId).update({
-          data: updateData
-        })
+      if (res.stats.updated === 0) {
+        return { success: false, errMsg: '订单不存在或未更新' };
+      }
 
-        return { success: true, message: '更新订单信息成功' }
-      })
+      return { success: true, message: '更新订单信息成功' };
     } catch (err) {
       console.error('更新订单信息失败', { orderId, error: err.message })
       return { success: false, errMsg: err.message }
@@ -390,15 +377,12 @@ exports.main = async (event, context) => {
           deviceId,
           status: _.in(CONSTANTS.VALID_STATUSES_FOR_QUERY)
         })
-        .field({
-          _id: true,
-          deviceId: true,
-          cabinetNo: true,
-          doorNo: true,
-          lockerNo: true,
+        .field({        
           status: true,
-          lockerId: true,
-          createdAt: true
+          deviceId: true,
+          doorNo: true,
+          orderId: true,
+          cabinetNo: true,
         })
         .orderBy('createdAt', 'desc')
         .limit(1)
