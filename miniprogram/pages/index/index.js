@@ -11,24 +11,10 @@ Page({
     canProceed: false,
     showLockerBox: false, 
     openedLockerNo: '',       // 显示开柜号
+    showConfirmModal: false
   },
 
   onLoad(options) {
-    // const globalAddress = app.globalData.deviceAddress || '';
-    // this.setData({
-    //   deviceAddress: globalAddress
-    // });
-
-    // //处理异步延迟：若 app 中地址还没获取完，监听更新
-    // if (!app.globalData.deviceAddress) {
-    //   this.addressWatcher = setInterval(() => {
-    //     const newAddress = app.globalData.deviceAddress;
-    //     if (newAddress) {
-    //       this.setData({ deviceAddress: newAddress });
-    //       clearInterval(this.addressWatcher); // 获取到后停止监听
-    //     }
-    //   }, 10); // 每 100ms 检查一次
-    // }
     if (app.globalData.deviceAddress) {
       this.setData({
         deviceAddress: app.globalData.deviceAddress
@@ -172,15 +158,45 @@ Page({
   },
 
   // 前往下一步（支付页面）
-  goToNextPage() {
-    // 保存用户输入的手机号和密码
-    wx.setStorageSync('phone', this.data.phone);
-    wx.setStorageSync('password', this.data.password);
+  // goToNextPage() {
+  //   // 保存用户输入的手机号和密码
+  //   wx.setStorageSync('phone', this.data.phone);
+  //   wx.setStorageSync('password', this.data.password);
     
-    // 跳转到存包页面
-    wx.navigateTo({
-      url: `/pages/store/store?phone=${this.data.phone}&password=${this.data.password}`
-    });
+  //   // 跳转到存包页面
+  //   wx.navigateTo({
+  //     url: `/pages/store/store?phone=${this.data.phone}&password=${this.data.password}`
+  //   });
+  // },
+  // 前往下一步（支付页面）
+  goToNextPage() {
+    const { phone, password } = this.data;
+    if (!phone || !password) {
+      wx.showToast({ title: '请填写手机号和取件码', icon: 'none' });
+      return;
+    }
+  
+    // 显示自定义确认弹窗
+    this.setData({ showConfirmModal: true });
   },
-
+  
+  // 点击确认按钮
+  handleConfirmNext() {
+    const { phone, password } = this.data;
+    wx.setStorageSync('phone', phone);
+    wx.setStorageSync('password', password);
+  
+    wx.navigateTo({
+      url: `/pages/store/store?phone=${phone}&password=${password}`
+    });
+  
+    this.setData({ showConfirmModal: false });
+  },
+  
+  // 点击取消按钮
+  handleCancelConfirm() {
+    wx.showToast({ title: '请检查信息后再操作', icon: 'none', duration: 1500 });
+    this.setData({ showConfirmModal: false });
+  }
+  
 });

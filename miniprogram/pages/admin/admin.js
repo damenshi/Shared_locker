@@ -1,7 +1,7 @@
 Page({
   data: {
     // 订单管理相关
-    orderId: '',
+    userPhone: '',
     
     // 柜门控制相关
     internalNo_ctl: '',
@@ -256,6 +256,18 @@ Page({
     }
   },
 
-   // 页面跳转方法
-   goMyDeviceList() { wx.navigateTo({ url: '/pages/admin/mydevice' }); },
+  goUserOrders() {
+    const userPhone = this.data.userPhone;
+    if (!userPhone) {
+      wx.showToast({ title: '请输入手机号', icon: 'none' });
+      return;
+    }
+  
+    wx.navigateTo({
+      url: `/pages/admin/userorder?userPhone=${userPhone}`
+    });
+  },
+
+  goMyDeviceList() { wx.navigateTo({ url: '/pages/admin/mydevice' }); },
+
 })

@@ -1,83 +1,74 @@
 <view class="container">
+  <!-- 顶部标题 -->
   <view class="header">
     <text class="title">储物柜系统管理</text>
   </view>
 
-  <!-- 订单管理区域 -->
+  <!-- 订单管理 -->
   <view class="card">
-    <view class="card-title">订单管理</view>
+    <view class="card-title">📦 订单管理</view>
     <view class="input-item">
-      <text>订单ID：</text>
+      <text>手机号：</text>
       <input 
         type="text" 
-        value="{{orderId}}" 
-        data-field="orderId"
+        value="{{userPhone}}" 
+        data-field="userPhone"
         bindinput="onInputChange"
-        placeholder="请输入要操作的订单ID"
+        placeholder="请输入用户手机号"
       />
     </view>
-    <view class="button-group">
-      <button 
-        bindtap="forceFinishOrder" 
-        type="warn"
-        size="mini"
-      >
-        强制结束订单
-      </button>
-      <button 
-        bindtap="refundOrder" 
-        type="primary"
-        size="mini"
-      >
-        订单退款
-      </button>
-    </view>
+    <button 
+      bindtap="goUserOrders" 
+      class="primary-btn"
+    >获取订单</button>
   </view>
 
-   <!-- 设备列表 -->
-   <view class="card">
-    <view class="card-title">设备列表</view>
+  <!-- 设备列表 -->
+  <view class="card">
+    <view class="card-title">🧭 设备列表</view>
     <button 
       bindtap="goMyDeviceList" 
-      type="primary"
-    >
-      获取设备列表
-    </button>
+      class="primary-btn"
+    >获取设备列表</button>
   </view>
 
   <!-- 设备配置 -->
   <view class="card">
-    <view class="card-title">设备配置</view>
+    <view class="card-title">⚙️ 设备配置</view>
+
     <view class="input-item">
-      <text>设备ID：</text>
+      <text>设备编号：</text>
       <input 
         type="text" 
         value="{{internalNo}}" 
         data-field="internalNo"
         bindinput="onInputChange"
-        placeholder="请输入设备编号（如L0001）"
+        placeholder="如 L0001"
       />
     </view>
-      <view class="input-item">
-      <text>设备地址：</text>
+
+    <view class="input-item">
+      <text>安装地址：</text>
       <input 
         type="text" 
         value="{{deviceAddress}}" 
         data-field="deviceAddress"
         bindinput="onInputChange"
-        placeholder="请输入设备安装地址"
+        placeholder="请输入设备地址"
       />
     </view>
+
     <view class="input-item">
-      <text>设备收费标准：</text>
+      <text>收费标准：</text>
       <input 
         type="text" 
         value="{{deviceDeposit}}" 
         data-field="deviceDeposit"
         bindinput="onInputChange"
-        placeholder="请输入设备预付款标准"
+        placeholder="请输入押金金额"
       />
     </view>
+
     <view class="input-item">
       <text>屏幕编号：</text>
       <input 
@@ -85,40 +76,41 @@
         value="{{screenNo}}" 
         data-field="screenNo"
         bindinput="onInputChange"
-        placeholder="请输入设备屏幕编号"
+        placeholder="请输入屏幕编号"
       />
     </view>
+
     <view class="input-item">
-      <text>设备锁板数量：</text>
+      <text>锁板数量：</text>
       <input 
         type="number" 
         value="{{cabinetCount}}" 
         data-field="cabinetCount"
         bindinput="onInputChange"
-        placeholder="每个设备的锁板数量"
+        placeholder="请输入锁板数量"
       />
     </view>
+
     <view class="input-item">
-      <text>设备锁数量：</text>
+      <text>每板锁数：</text>
       <input 
         type="number" 
         value="{{lockersPerCabinet}}" 
         data-field="lockersPerCabinet"
         bindinput="onInputChange"
-        placeholder="每个锁板的锁数量"
+        placeholder="请输入每块锁板的锁数量"
       />
     </view>
+
     <button 
       bindtap="batchCreateLockersByDevice" 
-      type="primary"
-    >
-      配置设备
-    </button>
+      class="primary-btn"
+    >配置设备</button>
   </view>
-    
-  <!-- 柜门控制区域 -->
+
+  <!-- 柜门控制 -->
   <view class="card">
-    <view class="card-title">柜门控制</view>
+    <view class="card-title">🔓 柜门控制</view>
     <view class="input-item">
       <text>设备编号：</text>
       <input 
@@ -126,7 +118,7 @@
         value="{{internalNo_ctl}}" 
         data-field="internalNo_ctl"
         bindinput="onInputChange"
-        placeholder="请输入设备编号（如L0001）"
+        placeholder="如 L0001"
       />
     </view>
     <view class="input-item">
@@ -136,59 +128,12 @@
         value="{{lockerNo}}" 
         data-field="lockerNo"
         bindinput="onInputChange"
-        placeholder="请输入柜门编号"
+        placeholder="请输入柜门号"
       />
     </view>
     <button 
       bindtap="openAnyDoor" 
-      type="primary"
-    >
-      远程打开柜门
-    </button>
+      class="primary-btn"
+    >远程开门</button>
   </view>
-
-<!-- 柜门状态查询区域（新增） -->
-<view class="card">
-  <view class="card-title">柜门状态查询</view>
-  <view class="input-item">
-    <text>设备ID：</text>
-    <input 
-      type="text" 
-      value="{{queryDeviceId}}" 
-      data-field="queryDeviceId"
-      bindinput="onInputChange"
-      placeholder="如L0001"
-    />
-  </view>
-  <view class="input-item">
-    <text>锁板号：</text>
-    <input 
-      type="number" 
-      value="{{queryCabinetNo}}" 
-      data-field="queryCabinetNo"
-      bindinput="onInputChange"
-      placeholder="如1、2"
-    />
-  </view>
-  <view class="input-item">
-    <text>柜门号：</text>
-    <input 
-      type="number" 
-      value="{{queryDoorNo}}" 
-      data-field="queryDoorNo"
-      bindinput="onInputChange"
-      placeholder="如1、2"
-    />
-  </view>
-  <button 
-    bindtap="queryDoorStatus" 
-    type="primary"
-  >
-    查询柜门状态
-  </button>
-  <!-- 展示查询结果 -->
-  <view class="status-result" wx:if="{{doorStatusResult}}">
-    {{doorStatusResult}}
-  </view>
-</view>
 </view>

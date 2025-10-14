@@ -6,6 +6,7 @@
     "pages/take/take",
     "pages/admin/admin",
     "pages/admin/mydevice",
+    "pages/admin/userorder",
     "pages/mine/mine",
     "pages/mine/myorder"
   ],

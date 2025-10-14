@@ -28,7 +28,7 @@
     <!-- 客服电话 -->
     <view class="menu-item" bindtap="customerService">
       <view class="menu-text">客服电话</view>
-      <view class="customerphone">{{'400' + '-' + '123' + '-' + '456'}}</view>
+      <view class="customerphone">{{'19942291657'}}</view>
     </view>
 
     <!-- 管理员界面 -->

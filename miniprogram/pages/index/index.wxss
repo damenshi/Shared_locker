@@ -255,3 +255,109 @@
   transform: scale(0.97);
   box-shadow: 0 2rpx 6rpx rgba(22,119,255,0.2);
 }
+
+/* 遮罩层 */
+.custom-modal-mask {
+  position: fixed;
+  top:0; left:0; right:0; bottom:0;
+  background-color: rgba(0,0,0,0.35);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 弹窗盒子 */
+.custom-modal-box {
+  width: 75%;
+  background-color: #fff;
+  border-radius: 28rpx;
+  padding: 40rpx 24rpx;
+  box-shadow: 0 12rpx 28rpx rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: scaleIn 0.25s ease;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 标题 */
+.custom-modal-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 32rpx;
+  color: #111;
+}
+
+/* 内容 */
+.custom-modal-content {
+  font-size: 30rpx;
+  line-height: 46rpx;
+  text-align: center;
+  margin-bottom: 36rpx;
+}
+
+/* 高亮手机号和密码 */
+.highlight-text {
+  color: #ff3b30; /* iOS 红色 */
+  font-weight: 700;
+  font-size: 36rpx;
+  text-align: center;
+  display: block;
+  margin: 12rpx 0;
+}
+
+/* 按钮容器 */
+.custom-modal-buttons {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx; /* 按钮间距 */
+  margin-top: 24rpx;
+}
+
+/* 按钮 */
+.confirm-btn, .cancel-btn {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 40rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  text-align: center;
+  line-height: 80rpx; /* 保证垂直居中 */
+  display: flex;
+  justify-content: center; /* 水平居中 */
+  align-items: center;     /* 垂直居中 */
+  transition: all 0.2s ease;
+}
+
+.confirm-btn {
+  background-color: #007aff;
+  color: #fff;
+  box-shadow: 0 4rpx 10rpx rgba(0,122,255,0.25);
+}
+
+.confirm-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 2rpx 6rpx rgba(0,122,255,0.25);
+}
+
+.cancel-btn {
+  background-color: #f2f2f7;
+  color: #333;
+}
+
+.cancel-btn:active {
+  transform: scale(0.97);
+}

@@ -69,4 +69,23 @@
   <button class="reopen-btn" bindtap="midopenLocker">中途开柜</button>
 </view>
 
+<!-- 自定义确认弹窗 -->
+<view wx:if="{{showConfirmModal}}" class="custom-modal-mask">
+  <view class="custom-modal-box">
+    <view class="custom-modal-title">请确认信息</view>
+    <view class="custom-modal-content">
+      <text class="highlight-text">手机号：{{phone}}</text>
+      <text class="highlight-text">取件码：{{password}}</text>
+      <text style="font-size:28rpx; color:#555; display:block; margin-top:12rpx; text-align:center;">
+        请确认信息，否则可能无法取件!!!
+      </text>
+    </view>
+    <view class="custom-modal-buttons">
+      <button class="cancel-btn" bindtap="handleCancelConfirm">返回修改</button>
+      <button class="confirm-btn" bindtap="handleConfirmNext">确认无误</button>
+    </view>
+  </view>
+</view>
+
+
 </view>
