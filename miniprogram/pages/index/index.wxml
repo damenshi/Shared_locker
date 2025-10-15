@@ -26,34 +26,49 @@
   <!-- 输入区域 -->
   <view class="input-container">
     <view class="input-title">设置取包 手机号及密码</view>
-    
-    <view class="input-item">
+
+    <!-- 手机号输入框 + 自动获取按钮 -->
+    <view class="input-item phone-input-item">
       <text class="input-label">手机号</text>
-      <input 
-        class="input-field" 
-        type="number" 
-        placeholder="请输入手机号" 
-        maxlength="11"
-        bindinput="onPhoneInput"
-      ></input>
+      <view class="phone-input-box">
+        <input
+          class="input-field"
+          type="number"
+          placeholder="请输入手机号"
+          maxlength="11"
+          value="{{phone}}"
+          bindinput="onPhoneInput"
+        />
+        <button
+          class="auto-btn"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="getPhoneNumber"
+        >
+          自动获取
+        </button>
+      </view>
     </view>
-    
-    <view class="input-item">
+
+    <!-- 密码输入框 -->
+    <view class="input-item phone-input-item">
       <text class="input-label">取包密码</text>
-      <input 
-        class="input-field" 
-        type="number" 
-        placeholder="4位数字，建议使用出生日期" 
-        maxlength="4"
-        bindinput="onPasswordInput"
-      ></input>
+      <view class="phone-input-box">
+        <input
+          class="input-field"
+          type="number"
+          placeholder="4位数字，建议使用出生日期"
+          maxlength="4"
+          bindinput="onPasswordInput"
+        />
+      </view>
     </view>
-    
+
     <view class="password-hint">
       建议生日日期，例：0109（01月09日）
     </view>
   </view>
   
+    
   <!-- 下一步按钮 -->
   <!-- <view 
     class="next-btn {{!canProceed ? 'disabled' : ''}}" 

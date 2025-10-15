@@ -58,6 +58,47 @@ Page({
 
   },
 
+  getPhoneNumber(e) {
+    console.log("手机号授权回调：", e);
+  
+    //用户拒绝授权
+    if (e.detail.errMsg !== "getPhoneNumber:ok") {
+      wx.showToast({ title: "获取手机号失败", icon: "none" });
+      return;
+    }
+  
+    wx.showLoading({ title: "获取中...", mask: true });
+  
+    //调用统一云函数 user
+    wx.cloud.callFunction({
+      name: "user",
+      data: {
+        action: 'getPhone',
+        code: e.detail.code  // 前端提供的手机号 code
+      },
+      success: (res) => {
+        console.log("云函数返回：", res);
+  
+        // 3️⃣ 微信官方返回格式在 res.result 中
+        const phone = res.result?.phoneInfo?.phoneNumber || res.result?.phoneNumber;
+  
+        if (phone) {
+          this.setData({ phone });
+          this.checkCanProceed?.();
+          wx.showToast({ title: "手机号已获取", icon: "success" });
+        } else {
+          wx.showToast({ title: "获取手机号失败", icon: "none" });
+        }
+      },
+      fail: (err) => {
+        console.error("获取手机号出错：", err);
+        wx.showToast({ title: "获取失败，请重试", icon: "none" });
+      },
+      complete: () => wx.hideLoading()
+    });
+  },
+  
+
   //显示打开柜号
   showOpenedLocker(lockerNo) {
     this.setData({
@@ -157,17 +198,6 @@ Page({
     });
   },
 
-  // 前往下一步（支付页面）
-  // goToNextPage() {
-  //   // 保存用户输入的手机号和密码
-  //   wx.setStorageSync('phone', this.data.phone);
-  //   wx.setStorageSync('password', this.data.password);
-    
-  //   // 跳转到存包页面
-  //   wx.navigateTo({
-  //     url: `/pages/store/store?phone=${this.data.phone}&password=${this.data.password}`
-  //   });
-  // },
   // 前往下一步（支付页面）
   goToNextPage() {
     const { phone, password } = this.data;

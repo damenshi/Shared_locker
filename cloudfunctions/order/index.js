@@ -383,6 +383,7 @@ exports.main = async (event, context) => {
           doorNo: true,
           orderId: true,
           cabinetNo: true,
+          lockerNo: true
         })
         .orderBy('createdAt', 'desc')
         .limit(1)

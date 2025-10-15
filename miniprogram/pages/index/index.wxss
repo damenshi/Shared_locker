@@ -137,6 +137,7 @@
   font-weight: 600;
 }
 
+/* 输入框通用样式 */
 .input-item {
   display: flex;
   align-items: center;
@@ -171,6 +172,51 @@
 
 .input-field::placeholder {
   color: #bbb;
+}
+
+/* 手机号输入框（内嵌按钮） */
+.phone-input-box {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  background-color: #fafafa;
+  border-radius: 12rpx;
+  overflow: hidden;
+  border: 1rpx solid #e6e6e6;
+  height: 64rpx;       /* 调小输入框高度 */
+}
+
+.phone-input-box .input-field {
+  flex: 1;
+  padding-left: 20rpx;
+  font-size: 28rpx;
+  height: 100%;
+  border: none;
+  outline: none;
+  background-color: transparent;
+}
+
+.phone-input-box .auto-btn {
+  font-size: 24rpx;         /* 字体稍小 */
+  padding: 0 12rpx;         /* 左右内边距小一点 */
+  width: auto;               /* 宽度根据内容自适应 */
+  min-width: 80rpx;          /* 设置最小宽度，保证点击区域够用 */
+  height: 48rpx;             /* 调整高度，让按钮更小巧 */
+  margin: 0;
+  border: none;
+  border-left: 1rpx solid #e6e6e6;
+  border-radius: 8rpx;       /* 小圆角 */
+  background-color: #1677ff;
+  color: #fff;
+  line-height: 48rpx;
+  font-weight: 500;
+  box-shadow: none;          /* 内嵌按钮不要阴影 */
+  transition: all 0.2s ease;
+}
+
+.phone-input-box .auto-btn:active {
+  transform: scale(0.97);
+  background-color: #105ecf;
 }
 
 /* 密码提示文字 */
@@ -209,10 +255,8 @@
 }
 
 /* 固定开柜框 */
-/* 固定开柜框（大容器） */
-/* 固定开柜框（大容器） */
 .locker-box-large {
-  margin-top: 48rpx;       /* 调大和上一元素的间距 */
+  margin-top: 48rpx;
   padding: 40rpx 24rpx;
   border-radius: 28rpx;
   background-color: #f0f7ff;
@@ -224,16 +268,14 @@
   box-shadow: 0 6rpx 16rpx rgba(22,119,255,0.15);
 }
 
-/* 大字体提示 */
 .locker-box-text {
-  font-size: 48rpx;          
+  font-size: 48rpx;
   font-weight: 700;
   color: #1677ff;
-  margin-bottom: 24rpx;      
+  margin-bottom: 24rpx;
   text-align: center;
 }
 
-/* 小按钮 */
 .reopen-btn {
   background-color: #ffffff;
   color: #1677ff;
@@ -241,12 +283,12 @@
   border-radius: 36rpx;
   font-size: 28rpx;
   height: 70rpx;
-  width: 200rpx;            
+  width: 200rpx;
   line-height: 70rpx;
   text-align: center;
-  display: flex;             /* ✅ 使用 flex 确保文字垂直水平居中 */
-  justify-content: center;   /* 水平居中 */
-  align-items: center;       /* 垂直居中 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
   box-shadow: 0 4rpx 10rpx rgba(22,119,255,0.15);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -310,7 +352,7 @@
 
 /* 高亮手机号和密码 */
 .highlight-text {
-  color: #ff3b30; /* iOS 红色 */
+  color: #ff3b30;
   font-weight: 700;
   font-size: 36rpx;
   text-align: center;
@@ -323,11 +365,11 @@
   width: 100%;
   display: flex;
   justify-content: space-between;
-  gap: 16rpx; /* 按钮间距 */
+  gap: 16rpx;
   margin-top: 24rpx;
 }
 
-/* 按钮 */
+/* 弹窗按钮 */
 .confirm-btn, .cancel-btn {
   flex: 1;
   height: 80rpx;
@@ -335,10 +377,10 @@
   font-size: 30rpx;
   font-weight: 500;
   text-align: center;
-  line-height: 80rpx; /* 保证垂直居中 */
+  line-height: 80rpx;
   display: flex;
-  justify-content: center; /* 水平居中 */
-  align-items: center;     /* 垂直居中 */
+  justify-content: center;
+  align-items: center;
   transition: all 0.2s ease;
 }
 

@@ -207,6 +207,20 @@ exports.main = async (event, context) => {
     }
   }
 
+  if(action === 'getPhone'){
+    const {code} = event
+    if (!code) return { error: '缺少 code' };
+
+    try {
+      const res = await cloud.openapi.user.getPhoneNumber({ code });
+      // res.phoneInfo 里直接包含 phoneNumber
+      return res;
+    } catch (err) {
+      console.error(err);
+      return { error: err.message };
+    }
+  }
+
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 };
