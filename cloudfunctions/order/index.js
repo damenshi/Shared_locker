@@ -622,7 +622,137 @@ exports.main = async (event, context) => {
       return { success: false, errMsg: err.message }
     }
   }
+  
+  if (action === 'getDeviceOrderStats') {
+    const { deviceIds } = event;
+    const orders = db.collection('orders');
+    const _ = db.command;
+  
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return { success: false, errMsg: 'deviceIds 参数无效，应为非空数组' };
+    }
+  
+    try {
+      const now = new Date();
+  
+      // 时间边界计算
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  
+      // 使用聚合 pipeline 按 deviceId 统计
+      const $ = db.command.aggregate;
 
+      const aggRes = await orders.aggregate()
+        .match({
+          deviceId: _.in(deviceIds),
+          createdAt: _.gte(startOfLastMonth).and(_.lt(endOfMonth))
+        })
+        .group({
+          _id: '$deviceId',
+          todayPaid: $.sum($.cond({
+            if: $.and([
+              $.gt(['$deposit', 0]),
+              $.gte(['$createdAt', startOfToday]),
+              $.lt(['$createdAt', endOfToday])
+            ]),
+            then: 1,
+            else: 0
+          })),
+          todayRefunded: $.sum($.cond({
+            if: $.and([
+              $.gt(['$deposit', 0]),
+              $.eq(['$status', '已退款']),
+              $.gte(['$createdAt', startOfToday]),
+              $.lt(['$createdAt', endOfToday])
+            ]),
+            then: 1,
+            else: 0
+          })),
+          thisMonthPaid: $.sum($.cond({
+            if: $.and([
+              $.gt(['$deposit', 0]),
+              $.gte(['$createdAt', startOfMonth]),
+              $.lt(['$createdAt', endOfMonth])
+            ]),
+            then: 1,
+            else: 0
+          })),
+          thisMonthRefunded: $.sum($.cond({
+            if: $.and([
+              $.gt(['$deposit', 0]),
+              $.eq(['$status', '已退款']),
+              $.gte(['$createdAt', startOfMonth]),
+              $.lt(['$createdAt', endOfMonth])
+            ]),
+            then: 1,
+            else: 0
+          })),
+          lastMonthPaid: $.sum($.cond({
+            if: $.and([
+              $.gt(['$deposit', 0]),
+              $.gte(['$createdAt', startOfLastMonth]),
+              $.lt(['$createdAt', endOfLastMonth])
+            ]),
+            then: 1,
+            else: 0
+          })),
+          lastMonthRefunded: $.sum($.cond({
+            if: $.and([
+              $.gt(['$deposit', 0]),
+              $.eq(['$status', '已退款']),
+              $.gte(['$createdAt', startOfLastMonth]),
+              $.lt(['$createdAt', endOfLastMonth])
+            ]),
+            then: 1,
+            else: 0
+          })),
+        })
+        .end();
+
+  
+      // 格式化输出为 { deviceId: {...统计数据} }
+      const statsMap = {};
+      for (const item of aggRes.list) {
+        statsMap[item._id] = {
+          todayPaid: item.todayPaid || 0,
+          todayRefunded: item.todayRefunded || 0,
+          thisMonthPaid: item.thisMonthPaid || 0,
+          thisMonthRefunded: item.thisMonthRefunded || 0,
+          lastMonthPaid: item.lastMonthPaid || 0,
+          lastMonthRefunded: item.lastMonthRefunded || 0,
+        };
+      }
+  
+      // 对于没有订单的设备补 0
+      deviceIds.forEach(id => {
+        if (!statsMap[id]) {
+          statsMap[id] = {
+            todayPaid: 0,
+            todayRefunded: 0,
+            thisMonthPaid: 0,
+            thisMonthRefunded: 0,
+            lastMonthPaid: 0,
+            lastMonthRefunded: 0,
+          };
+        }
+      });
+  
+      return {
+        success: true,
+        data: statsMap,
+      };
+    } catch (err) {
+      console.error('批量获取设备订单统计失败：', err);
+      return { success: false, errMsg: err.message };
+    }
+  }
+    
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 }

@@ -39,70 +39,70 @@ Page({
   },
 
   // 1. 强制结束订单
-  async forceFinishOrder() {
-    const { orderId } = this.data;
+  // async forceFinishOrder() {
+  //   const { orderId } = this.data;
     
-    if (!orderId) {
-      return wx.showToast({ title: '请输入订单ID', icon: 'none' });
-    }
+  //   if (!orderId) {
+  //     return wx.showToast({ title: '请输入订单ID', icon: 'none' });
+  //   }
 
-    this.showLoading('正在强制结束订单...');
+  //   this.showLoading('正在强制结束订单...');
     
-    try {
-      const result = await wx.cloud.callFunction({
-        name: 'admin',
-        data: {
-          action: 'forceFinish',
-          orderId: orderId
-        }
-      });
+  //   try {
+  //     const result = await wx.cloud.callFunction({
+  //       name: 'admin',
+  //       data: {
+  //         action: 'forceFinish',
+  //         orderId: orderId
+  //       }
+  //     });
 
-      this.hideLoading();
+  //     this.hideLoading();
       
-      if (result.result.success) {
-        wx.showToast({ title: '订单已强制结束', icon: 'success' });
-      } else {
-        wx.showToast({ title: result.result.errMsg || '操作失败', icon: 'none' });
-      }
-    } catch (err) {
-      this.hideLoading();
-      console.error('强制结束订单失败：', err);
-      wx.showToast({ title: '操作失败，请重试', icon: 'none' });
-    }
-  },
+  //     if (result.result.success) {
+  //       wx.showToast({ title: '订单已强制结束', icon: 'success' });
+  //     } else {
+  //       wx.showToast({ title: result.result.errMsg || '操作失败', icon: 'none' });
+  //     }
+  //   } catch (err) {
+  //     this.hideLoading();
+  //     console.error('强制结束订单失败：', err);
+  //     wx.showToast({ title: '操作失败，请重试', icon: 'none' });
+  //   }
+  // },
 
   // 2. 订单退款
-  async refundOrder() {
-    const { orderId } = this.data;
+  // async refundOrder() {
+  //   const { orderId } = this.data;
     
-    if (!orderId) {
-      return wx.showToast({ title: '请输入订单ID', icon: 'none' });
-    }
+  //   if (!orderId) {
+  //     return wx.showToast({ title: '请输入订单ID', icon: 'none' });
+  //   }
 
-    this.showLoading('正在处理退款...');
+  //   this.showLoading('正在处理退款...');
     
-    try {
-      const result = await wx.cloud.callFunction({
-        name: 'main',
-        data: {
-          action: 'refund',
-          id: orderId
-        }
-      });
+  //   try {
+  //     const result = await wx.cloud.callFunction({
+  //       name: 'main',
+  //       data: {
+  //         action: 'refund',
+  //         id: orderId
+  //       }
+  //     });
 
-      this.hideLoading();
+  //     this.hideLoading();
       
-      if (result.result.ok) {
-        wx.showToast({ title: '退款成功', icon: 'success' });
-      } else {
-        wx.showToast({ title: result.result.errMsg || '退款失败', icon: 'none' });
-      }
-    } catch (err) {
-      this.hideLoading();
-      console.error('退款失败：', err);
-      wx.showToast({ title: '操作失败，请重试', icon: 'none' });
-    }
-  },
+  //     if (result.result.ok) {
+  //       wx.showToast({ title: '退款成功', icon: 'success' });
+  //     } else {
+  //       wx.showToast({ title: result.result.errMsg || '退款失败', icon: 'none' });
+  //     }
+  //   } catch (err) {
+  //     this.hideLoading();
+  //     console.error('退款失败：', err);
+  //     wx.showToast({ title: '操作失败，请重试', icon: 'none' });
+  //   }
+  // },
 
   // 3. 远程打开柜门
   async openAnyDoor() {

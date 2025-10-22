@@ -66,11 +66,6 @@
           <view wx:if="{{expandedDeviceId === item.deviceId}}">
             <view class="extra-info">
               <view class="row">
-                <text class="label">设备ID</text>
-                <text class="value">{{item.deviceId}}</text>
-              </view>
-
-              <view class="row">
                 <text class="label">屏幕编号</text>
                 <text class="value">{{item.screenNo}}</text>
               </view>
@@ -85,10 +80,10 @@
                 <text class="value">{{item.doorCount}}</text>
               </view>
 
-              <view class="row">
+              <!-- <view class="row">
                 <text class="label">收费标准</text>
                 <text class="value">{{item.deviceDeposit}}</text>
-              </view>
+              </view> -->
 
               <view class="row">
                 <text class="label">创建时间</text>
@@ -112,7 +107,7 @@
               data-deviceId="{{item.deviceId}}"
               data-internalNo="{{item.internalNo}}"  
               bindtap="showOpenLockerModal">开柜</button>
-              <button class="ios-btn orange" data-deviceId="{{item.deviceId}}" bindtap="confirmClearLockers">清柜</button>
+              <!-- <button class="ios-btn orange" data-deviceid="{{item.deviceId}}" bindtap="confirmClearLockers">清柜</button> -->
               <button class="ios-btn red" 
               data-internalNo="{{item.internalNo}}"
               data-cabinetCount="{{item.cabinetCount}}"

@@ -468,8 +468,36 @@ exports.main = async (event, context) => {
       console.error('查询设备空闲柜门个数失败', err);
       return { success: false, errMsg: `查询设备空闲柜门个数失败${err.message}` };
     }
-
   }
+
+  if (action === 'freeDoorByDev') {
+    const { deviceId } = event
+
+    // 参数校验
+    const validation = validateParams(event, {
+      deviceId: { type: 'string' },
+    })
+    if (!validation.valid) {
+      return { ok: false, errMsg: validation.msg }
+    }
+
+    try {
+        // 释放该设备的所有柜门
+        await db.collection('lockers').where({deviceId}).update({
+          data: {
+            status: 'free',
+            currentOrderId: null,
+            updatedAt: db.serverDate()
+          }
+        })
+  
+        return { success: true }
+    } catch (err) {
+      console.error('清空柜门失败', { error: err.message })
+      return { success: false, errMsg: err.message }
+    }
+  }
+
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 }

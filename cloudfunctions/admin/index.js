@@ -119,5 +119,18 @@ exports.main = async (event, context) => {
     return await batchCreateLockers(event)
   }
 
+  if (action === 'adminPermission'){
+    const res = await db.collection('admin_permission').where({ openid: OPENID }).get();
+      if (!res.data.length) {
+        return { isAdmin: false };
+      }
+
+      const info = res.data[0];
+      return {
+        isAdmin: true,
+        role: info.type,
+        allowedDevices: info.allowedDevices || []
+      };
+  }
   return { error: 'unknown action' }
 }

@@ -106,6 +106,26 @@ exports.main = async (event, context) => {
       return { success: false, errMsg: err.message }
     }
   }
+
+  if (action === 'getDevicesByInternalNo') {
+    const {internalNos} = event;
+    try {
+      const deviceInfo = await db.collection('devices').where({
+        internalNo: db.command.in(internalNos)
+      }).get()
+
+      if (deviceInfo.data.length === 0) {
+        throw new Error('暂无设备');
+      }
+
+      const devices = deviceInfo.data;
+      return { success: true, data: devices }
+
+    } catch (err) {
+      console.error('通过内部编号查询设备列表失败', { error: err.message })
+      return { success: false, errMsg: err.message }
+    }
+  }
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 }

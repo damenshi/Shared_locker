@@ -5,6 +5,7 @@
     "pages/store/store",
     "pages/take/take",
     "pages/admin/admin",
+    "pages/admin/deviceAdmin",
     "pages/admin/mydevice",
     "pages/admin/userorder",
     "pages/mine/mine",

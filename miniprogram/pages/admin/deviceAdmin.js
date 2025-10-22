@@ -1,4 +1,4 @@
-// pages/admin/mydevice.js
+// pages/admin/deviceAdmin.js
 const app = getApp();
 
 function formatDate(dateStr) {
@@ -23,17 +23,18 @@ Page({
     lockerNo: ''
   },
 
-  onLoad() {
-    this.getDevices();
+  onLoad(options) {
+    const allowedInternalNo = options.allowed ? JSON.parse(decodeURIComponent(options.allowed)) : [];
+    this.getDevices(allowedInternalNo);
   },
 
-  async getDevices() {
+  async getDevices(allowedInternalNo) {
     try {
       this.setData({ loading: true });
   
       const res = await wx.cloud.callFunction({
         name: 'device',
-        data: { action: 'getDevices' }
+        data: { action: 'getDevicesByInternalNo', internalNos: allowedInternalNo}
       });
   
       if (!res.result.success) {
@@ -112,7 +113,6 @@ Page({
       return { success: false, errMsg: err.message };
     }
   },
-
   toggleDetail(e) {
     const id = e.currentTarget.dataset.deviceid;
     this.setData({
@@ -218,8 +218,8 @@ Page({
     const internalNo = e.currentTarget.dataset.internalno;
     const cabinetCount = e.currentTarget.dataset.cabinetcount;
     const doorCount = e.currentTarget.dataset.doorcount;
-
     const totalDoors = cabinetCount * doorCount;
+
     wx.showModal({
       title: '确认全开',
       content: `确定打开本设备的所有${totalDoors} 个柜门？`,
