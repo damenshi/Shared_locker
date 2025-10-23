@@ -6,6 +6,13 @@ cloud.init({
 const db = cloud.database();
 const _ = db.command;
 
+const CONFIG = {
+  appsecret: process.env.APPSECRET,
+  appid: process.env.APPID,
+};
+const axios = require('axios')
+const crypto = require('crypto');
+
 const validateParams = (params, rules) => {
   for (const [key, rule] of Object.entries(rules)) {
     if (params[key] === undefined || params[key] === null) {
@@ -208,16 +215,45 @@ exports.main = async (event, context) => {
   }
 
   if(action === 'getPhone'){
-    const {code} = event
-    if (!code) return { error: '缺少 code' };
-
+    const { code, encryptedData, iv } = event
+    if (!code || !encryptedData || !iv) {
+      return { error: '缺少参数' }
+    }
+  
+    // 1. 调用 jscode2session 获取 session_key
+    const appid = CONFIG.appid
+    const secret = CONFIG.appsecret
+  
+    const resp = await axios.get('https://api.weixin.qq.com/sns/jscode2session', {
+      params: {
+        appid,
+        secret,
+        js_code: code,
+        grant_type: 'authorization_code'
+      }
+    })
+  
+    if (!resp.data.session_key) {
+      console.error('获取 session_key 失败：', resp.data)
+      return { error: '获取 session_key 失败', detail: resp.data }
+    }
+  
+    const sessionKey = Buffer.from(resp.data.session_key, 'base64')
+    const encryptedDataBuffer = Buffer.from(encryptedData, 'base64')
+    const ivBuffer = Buffer.from(iv, 'base64')
+  
     try {
-      const res = await cloud.openapi.user.getPhoneNumber({ code });
-      // res.phoneInfo 里直接包含 phoneNumber
-      return res;
+      // 2. AES 解密
+      const decipher = crypto.createDecipheriv('aes-128-cbc', sessionKey, ivBuffer)
+      decipher.setAutoPadding(true)
+      let decoded = decipher.update(encryptedDataBuffer, 'binary', 'utf8')
+      decoded += decipher.final('utf8')
+      const phoneInfo = JSON.parse(decoded)
+  
+      return phoneInfo
     } catch (err) {
-      console.error(err);
-      return { error: err.message };
+      console.error('解密失败：', err)
+      return { error: '解密失败', detail: err.message }
     }
   }
 

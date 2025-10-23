@@ -20,7 +20,7 @@ App({
   },
 
   onShow(options) {
-    console.log('onShow options:', options);
+    // console.log('onShow options:', options);
 
     let deviceId = null;
     if (options && options.query && options.query.deviceId) {
@@ -35,6 +35,7 @@ App({
     this.getFreeDoorCnt();
   },
 
+  
   // 获取用户openid并缓存到本地和全局
   async getOpenid() {
     try {

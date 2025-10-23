@@ -13,8 +13,18 @@ Page({
     openedLockerNo: '',       // 显示开柜号
     showConfirmModal: false
   },
-
+  
   onLoad(options) {
+
+    if (options && options.query && options.query.deviceId) {
+      app.globalData.deviceId = options.query.deviceId;
+      console.log('[index] 从扫码参数更新 deviceId:', options.query.deviceId);
+    }
+
+    // 每次重新获取设备信息
+    app.getDevAddress();
+    app.getFreeDoorCnt();
+
     if (app.globalData.deviceAddress) {
       this.setData({
         deviceAddress: app.globalData.deviceAddress
@@ -38,7 +48,8 @@ Page({
   },
 
   onUnload() {
-    // if (this.addressWatcher) clearInterval(this.addressWatcher);
+    app.globalData.addressReadyCallback = null;
+    app.globalData.freedoorReadyCallback = null;
   },
 
   onShow() {
@@ -55,49 +66,43 @@ Page({
         openedLockerNo
       });
     }
-
   },
 
-  getPhoneNumber(e) {
-    console.log("手机号授权回调：", e);
-  
-    //用户拒绝授权
+  async getPhoneNumber(e) {
     if (e.detail.errMsg !== "getPhoneNumber:ok") {
-      wx.showToast({ title: "获取手机号失败", icon: "none" });
-      return;
+      wx.showToast({ title: '用户拒绝授权', icon: 'none' })
+      return
     }
-  
-    wx.showLoading({ title: "获取中...", mask: true });
-  
-    //调用统一云函数 user
-    wx.cloud.callFunction({
-      name: "user",
-      data: {
-        action: 'getPhone',
-        code: e.detail.code  // 前端提供的手机号 code
-      },
-      success: (res) => {
-        console.log("云函数返回：", res);
-  
-        // 3️⃣ 微信官方返回格式在 res.result 中
-        const phone = res.result?.phoneInfo?.phoneNumber || res.result?.phoneNumber;
-  
-        if (phone) {
-          this.setData({ phone });
-          this.checkCanProceed?.();
-          wx.showToast({ title: "手机号已获取", icon: "success" });
-        } else {
-          wx.showToast({ title: "获取手机号失败", icon: "none" });
+
+    try {
+      // 第一步：登录获取 code
+      const loginRes = await wx.login()
+      const code = loginRes.code
+
+      // 第二步：传 encryptedData、iv、code 给云函数
+      const res = await wx.cloud.callFunction({
+        name: 'user',
+        data: {
+          action: 'getPhone',
+          code,
+          encryptedData: e.detail.encryptedData,
+          iv: e.detail.iv
         }
-      },
-      fail: (err) => {
-        console.error("获取手机号出错：", err);
-        wx.showToast({ title: "获取失败，请重试", icon: "none" });
-      },
-      complete: () => wx.hideLoading()
-    });
+      })
+
+      const phone = res.result?.phoneNumber;
+
+      if (phone) {
+        this.setData({ phone });
+        this.checkCanProceed?.();
+      } else {
+        wx.showToast({ title: "获取手机号失败", icon: "none" });
+      }
+    } catch (err) {
+      console.error(err)
+      wx.showToast({ title: '获取失败', icon: 'none' })
+    }
   },
-  
 
   //显示打开柜号
   showOpenedLocker(lockerNo) {
