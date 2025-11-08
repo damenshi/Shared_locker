@@ -113,7 +113,7 @@ async function generateUrlLink(deviceId) {
     `https://api.weixin.qq.com/wxa/generate_urllink?access_token=${accessToken}`,
     {
       // 跳转的小程序页面
-      path: 'pages/index/index',
+      path: `pages/index/index`,
       // 携带参数，等价于小程序中 onLoad(options)
       query: `deviceId=${deviceId}`,
       // 可选配置：比如有效期、是否生成短链等
@@ -175,15 +175,17 @@ async function handleDeviceLogin(deviceId) {
         .where({ deviceId })
         .limit(1)
         .get();
-    
-    let urlLink;
-    let internalNo;
+
     console.log('deviceRes:',deviceRes);
+
+    let internalNo;
+    //每次登录重新生成urllink，防止30天过期
+    let urlLink = await generateUrlLink(deviceId);
+    console.log('urlLink:', urlLink);
+
     if (deviceRes.data.length === 0) {
         // 设备未注册
         internalNo = await generateInternalNumber();
-        urlLink = await generateUrlLink(deviceId);//上线版可用
-        // urlLink = '体验版暂无';
         await devicesCollection.add({
           data: {
               deviceId: deviceId,       // 终端提供的设备ID
@@ -204,20 +206,19 @@ async function handleDeviceLogin(deviceId) {
       console.log(`设备 ${deviceId}已自动完成注册`);
     }else{
       // 更新设备在线状态
-      urlLink = deviceRes.data[0].urlLink;
       internalNo = deviceRes.data[0].internalNo;
       await devicesCollection
       .where({ deviceId })
       .update({
         data: {
           isOnline: true,
+          urlLink: urlLink,
           lastLoginTime: db.serverDate(),
           updatedAt: db.serverDate()
         }
       });
     }
     console.log('internalNo:', internalNo);
-    console.log('urlLink:', urlLink);
     // 返回设备二维码
     return {
         code: 200,

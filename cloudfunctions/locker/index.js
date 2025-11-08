@@ -289,6 +289,7 @@ exports.main = async (event, context) => {
           data: {
             status: 'free',
             currentOrderId: null,
+            currentUserPhone: null,
             updatedAt: db.serverDate()
           }
         })
@@ -482,14 +483,26 @@ exports.main = async (event, context) => {
     }
 
     try {
+        const deviceRes = await db.collection('devices').where({ deviceId }).get();
+        const screenNo = deviceRes.data[0]?.screenNo || null;
+        if (!screenNo) {
+          throw new Error(`未找到设备的 screenNo，无法执行释放操作`)
+        }
+
         // 释放该设备的所有柜门
-        await db.collection('lockers').where({deviceId}).update({
-          data: {
-            status: 'free',
-            currentOrderId: null,
-            updatedAt: db.serverDate()
-          }
-        })
+        await db.collection('lockers')
+          .where({
+            deviceId,
+            lockerNo: _.neq(screenNo)
+          })
+          .update({
+            data: {
+              status: 'free',
+              currentOrderId: null,
+              currentUserPhone: null,
+              updatedAt: db.serverDate()
+            }
+          });
   
         return { success: true }
     } catch (err) {
