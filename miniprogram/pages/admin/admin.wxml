@@ -4,9 +4,9 @@
     <text class="title">储物柜系统管理</text>
   </view> -->
 
-  <!-- 订单管理 -->
+  <!-- 用户订单管理 -->
   <view class="card">
-    <view class="card-title">📦 订单管理</view>
+    <view class="card-title">📦 用户订单管理</view>
     <view class="input-item">
       <text>手机号：</text>
       <input 
@@ -19,6 +19,35 @@
     </view>
     <button 
       bindtap="goUserOrders" 
+      class="primary-btn"
+    >获取订单</button>
+  </view>
+
+   <!-- 设备订单管理 -->
+   <view class="card">
+    <view class="card-title">🗄️ 设备订单管理（显示最近20单）</view>
+    <view class="input-item">
+      <text>设备编号：</text>
+      <input 
+        type="text" 
+        value="{{internalNo_ord}}" 
+        data-field="internalNo_ord"
+        bindinput="onInputChange"
+        placeholder="如L0001"
+      />
+    </view>
+    <view class="input-item">
+      <text>柜门编号：</text>
+      <input 
+        type="number" 
+        value="{{lockerNo_ord}}" 
+        data-field="lockerNo_ord"
+        bindinput="onInputChange"
+        placeholder="如1"
+      />
+    </view>
+    <button 
+      bindtap="goDevOrders" 
       class="primary-btn"
     >获取订单</button>
   </view>

@@ -1,8 +1,12 @@
 Page({
   data: {
-    // 订单管理相关
+    // 用户订单管理相关
     userPhone: '',
     
+    // 设备订单管理相关
+    internalNo_ord: '',
+    lockerNo_ord: '',
+
     // 柜门控制相关
     internalNo_ctl: '',
     lockerNo: '',
@@ -11,10 +15,10 @@ Page({
     internalNo: '',
     cabinetCount: '', //每个设备的锁板数量
     lockersPerCabinet: '', // 每个锁板的锁数量
-    queryDeviceId: '',      // 要查询的设备ID
-    queryCabinetNo: '',     // 要查询的锁板号
-    queryDoorNo: '',        // 要查询的柜门号
-    doorStatusResult: null,  // 查询结果（存储柜门状态）
+    // queryDeviceId: '',      // 要查询的设备ID
+    // queryCabinetNo: '',     // 要查询的锁板号
+    // queryDoorNo: '',        // 要查询的柜门号
+    // doorStatusResult: null,  // 查询结果（存储柜门状态）
 
     // 加载状态
     loading: false
@@ -37,72 +41,6 @@ Page({
     this.setData({ loading: false });
     wx.hideLoading();
   },
-
-  // 1. 强制结束订单
-  // async forceFinishOrder() {
-  //   const { orderId } = this.data;
-    
-  //   if (!orderId) {
-  //     return wx.showToast({ title: '请输入订单ID', icon: 'none' });
-  //   }
-
-  //   this.showLoading('正在强制结束订单...');
-    
-  //   try {
-  //     const result = await wx.cloud.callFunction({
-  //       name: 'admin',
-  //       data: {
-  //         action: 'forceFinish',
-  //         orderId: orderId
-  //       }
-  //     });
-
-  //     this.hideLoading();
-      
-  //     if (result.result.success) {
-  //       wx.showToast({ title: '订单已强制结束', icon: 'success' });
-  //     } else {
-  //       wx.showToast({ title: result.result.errMsg || '操作失败', icon: 'none' });
-  //     }
-  //   } catch (err) {
-  //     this.hideLoading();
-  //     console.error('强制结束订单失败：', err);
-  //     wx.showToast({ title: '操作失败，请重试', icon: 'none' });
-  //   }
-  // },
-
-  // 2. 订单退款
-  // async refundOrder() {
-  //   const { orderId } = this.data;
-    
-  //   if (!orderId) {
-  //     return wx.showToast({ title: '请输入订单ID', icon: 'none' });
-  //   }
-
-  //   this.showLoading('正在处理退款...');
-    
-  //   try {
-  //     const result = await wx.cloud.callFunction({
-  //       name: 'main',
-  //       data: {
-  //         action: 'refund',
-  //         id: orderId
-  //       }
-  //     });
-
-  //     this.hideLoading();
-      
-  //     if (result.result.ok) {
-  //       wx.showToast({ title: '退款成功', icon: 'success' });
-  //     } else {
-  //       wx.showToast({ title: result.result.errMsg || '退款失败', icon: 'none' });
-  //     }
-  //   } catch (err) {
-  //     this.hideLoading();
-  //     console.error('退款失败：', err);
-  //     wx.showToast({ title: '操作失败，请重试', icon: 'none' });
-  //   }
-  // },
 
   // 3. 远程打开柜门
   async openAnyDoor() {
@@ -186,52 +124,52 @@ Page({
   },
 
   // 4. 查询柜门状态（新增方法）
-  async queryDoorStatus() {
-    const { queryDeviceId, queryCabinetNo, queryDoorNo } = this.data;
+  // async queryDoorStatus() {
+  //   const { queryDeviceId, queryCabinetNo, queryDoorNo } = this.data;
     
-    // 参数校验
-    if (!queryDeviceId || !queryCabinetNo || !queryDoorNo) {
-      return wx.showToast({ title: '请输入设备ID、锁板号和柜门号', icon: 'none' });
-    }
-    if (!/^L\d+$/.test(queryDeviceId)) { // 验证设备ID格式（如L0001）
-      return wx.showToast({ title: '设备ID格式错误（如L0001）', icon: 'none' });
-    }
-    if (isNaN(queryCabinetNo) || isNaN(queryDoorNo)) { // 验证数字格式
-      return wx.showToast({ title: '锁板号和柜门号必须为数字', icon: 'none' });
-    }
+  //   // 参数校验
+  //   if (!queryDeviceId || !queryCabinetNo || !queryDoorNo) {
+  //     return wx.showToast({ title: '请输入设备ID、锁板号和柜门号', icon: 'none' });
+  //   }
+  //   if (!/^L\d+$/.test(queryDeviceId)) { // 验证设备ID格式（如L0001）
+  //     return wx.showToast({ title: '设备ID格式错误（如L0001）', icon: 'none' });
+  //   }
+  //   if (isNaN(queryCabinetNo) || isNaN(queryDoorNo)) { // 验证数字格式
+  //     return wx.showToast({ title: '锁板号和柜门号必须为数字', icon: 'none' });
+  //   }
 
-    this.showLoading('查询柜门状态中...');
+  //   this.showLoading('查询柜门状态中...');
     
-    try {
-      const result = await wx.cloud.callFunction({
-        name: 'locker', // 调用locker云函数的queryDoorStatus接口
-        data: {
-          action: 'queryDoorStatus',
-          deviceId: queryDeviceId,
-          cabinetNo: parseInt(queryCabinetNo), // 转换为数字
-          doorNo: parseInt(queryDoorNo)       // 转换为数字
-        }
-      });
+  //   try {
+  //     const result = await wx.cloud.callFunction({
+  //       name: 'locker', // 调用locker云函数的queryDoorStatus接口
+  //       data: {
+  //         action: 'queryDoorStatus',
+  //         deviceId: queryDeviceId,
+  //         cabinetNo: parseInt(queryCabinetNo), // 转换为数字
+  //         doorNo: parseInt(queryDoorNo)       // 转换为数字
+  //       }
+  //     });
 
-      this.hideLoading();
+  //     this.hideLoading();
       
-      if (result.result.success) {
-        // 存储查询结果，用于页面展示
-        this.setData({
-          doorStatusResult: `柜门状态：${result.result.data.status}（最后更新：${new Date().toLocaleString()}）`
-        });
-        wx.showToast({ title: '查询成功', icon: 'success' });
-      } else {
-        this.setData({ doorStatusResult: null });
-        wx.showToast({ title: result.result.errMsg || '查询失败', icon: 'none' });
-      }
-    } catch (err) {
-      this.hideLoading();
-      this.setData({ doorStatusResult: null });
-      console.error('查询柜门状态失败：', err);
-      wx.showToast({ title: '操作失败，请重试', icon: 'none' });
-    }
-  },
+  //     if (result.result.success) {
+  //       // 存储查询结果，用于页面展示
+  //       this.setData({
+  //         doorStatusResult: `柜门状态：${result.result.data.status}（最后更新：${new Date().toLocaleString()}）`
+  //       });
+  //       wx.showToast({ title: '查询成功', icon: 'success' });
+  //     } else {
+  //       this.setData({ doorStatusResult: null });
+  //       wx.showToast({ title: result.result.errMsg || '查询失败', icon: 'none' });
+  //     }
+  //   } catch (err) {
+  //     this.hideLoading();
+  //     this.setData({ doorStatusResult: null });
+  //     console.error('查询柜门状态失败：', err);
+  //     wx.showToast({ title: '操作失败，请重试', icon: 'none' });
+  //   }
+  // },
 
   // 页面加载时验证管理员权限
   async onLoad() {
@@ -265,6 +203,19 @@ Page({
   
     wx.navigateTo({
       url: `/pages/admin/userorder?userPhone=${userPhone}`
+    });
+  },
+
+  goDevOrders() {
+    const internalNo = this.data.internalNo_ord;
+    const lockerNo = this.data.lockerNo_ord;
+    if (!internalNo || !lockerNo) {
+      wx.showToast({ title: '请输入柜门编号和柜号', icon: 'none' });
+      return;
+    }
+  
+    wx.navigateTo({
+      url: `/pages/admin/devorder?internalNo=${internalNo}&lockerNo=${lockerNo}`
     });
   },
 

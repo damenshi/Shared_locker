@@ -8,6 +8,7 @@
     "pages/admin/deviceAdmin",
     "pages/admin/mydevice",
     "pages/admin/userorder",
+    "pages/admin/devorder",
     "pages/mine/mine",
     "pages/mine/myorder"
   ],

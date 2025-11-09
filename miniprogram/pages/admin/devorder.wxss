@@ -1,0 +1,102 @@
+.container {
+  padding: 20rpx;
+  background: #f5f5f7;
+  min-height: 100vh;
+}
+
+.empty {
+  margin-top: 200rpx;
+  text-align: center;
+  color: #999;
+  font-size: 30rpx;
+}
+
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 30rpx;
+}
+
+.order-card {
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.05);
+  padding: 30rpx;
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+  font-weight: 600;
+}
+
+.order-id {
+  color: #333;
+  font-size: 28rpx;
+}
+
+.status {
+  color: #007aff; /* iOS 蓝色 */
+  font-size: 26rpx;
+}
+
+.order-body .row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12rpx 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.order-body .row:last-child {
+  border-bottom: none;
+}
+
+.label {
+  color: #666;
+  font-size: 26rpx;
+}
+
+.value {
+  color: #333;
+  font-size: 26rpx;
+}
+
+/* ✅ 按钮区域：左右布局 */
+.order-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30rpx;
+  gap: 20rpx; /* 保证按钮间距 */
+}
+
+/* 左右按钮通用样式 */
+.btn {
+  flex: 1;
+  height: 70rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;    /* 垂直居中 */
+  justify-content: center; /* 水平居中 */
+}
+
+/* 左边按钮 - 退款 */
+.btn.refund {
+  background-color: #ff3b30; /* iOS 红色 */
+}
+
+/* 右边按钮 - 结束订单 */
+.btn.finish {
+  background-color: #007aff; /* iOS 蓝色 */
+}
+
+/* 按钮点击态 */
+.btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
+  transition: all 0.1s;
+}

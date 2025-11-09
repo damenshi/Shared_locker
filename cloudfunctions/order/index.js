@@ -567,6 +567,53 @@ exports.main = async (event, context) => {
     }
   }
 
+  if (action === 'getDevOrders') {
+    const { internalNo, lockerNo } = event;
+    // 参数校验
+    const validation = validateParams(event, {
+      internalNo: { type: 'string' },
+      lockerNo: { type: 'number' },
+    })
+    if (!validation.valid) {
+      return { success: false, errMsg: validation.msg }
+    }
+
+    try {
+      const orderInfo = await db.collection('orders')
+        .where({
+          internalNo,
+          lockerNo
+        })
+        .orderBy('createdAt', 'desc') //按时间由近到远排序
+        .limit(20)                    //只取最近 20 条
+        .field({
+          _id: true,
+          phone: true,
+          password: true,
+          internalNo: true,
+          lockerNo: true,
+          deviceAddress: true,
+          status: true,
+          openid: true,
+          createdAt: true,
+          deposit: true
+        })
+        .get()
+
+      if (orderInfo.data.length === 0) {
+        throw new Error('无设备相关订单');
+      }
+
+      const order = orderInfo.data;
+      console.log(`匹配到订单：ID=${order._id}`)
+      return { success: true, data: order }
+
+    } catch (err) {
+      console.error('查询设备订单失败', { error: err.message })
+      return { success: false, errMsg: err.message }
+    }
+  }
+
   if (action === 'refundOrder') {
     const { openid, orderId } = event
     const orderDoc = await db.collection('orders').doc(orderId).get()
