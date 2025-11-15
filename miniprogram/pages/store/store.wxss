@@ -1,11 +1,7 @@
-/* inherit */
 /* 遮罩层 */
 .modal-mask {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0,0,0,0.45);
   display: flex;
   justify-content: center;
@@ -13,67 +9,88 @@
   z-index: 999;
 }
 
-/* 弹窗主体 */
-.modal-container {
-  width: 80%;
+/* 弹窗容器调整得更简洁 */
+.modal-container.big {
+  width: 90%;
   background: #fff;
-  border-radius: 20rpx;
+  border-radius: 26rpx;
   padding: 40rpx 30rpx;
-  box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.15);
+  box-shadow: 0 20rpx 40rpx rgba(0,0,0,0.15);
   text-align: center;
-  animation: fadeIn 0.25s ease-out;
+  animation: fadeIn 0.20s ease-out;
 }
 
 .modal-title {
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 20rpx;
-}
-
-.modal-locker {
-  font-size: 30rpx;
-  margin-bottom: 20rpx;
-}
-
-.locker-no {
   font-size: 40rpx;
-  font-weight: bold;
-  color: #007aff; /* iOS蓝 */
+  font-weight: 600;
+  margin-bottom: 45rpx;
+  color: #222;
 }
 
+/* ⚡ 超强聚焦柜门号 */
+.locker-box.strong-focus {
+  border-radius: 26rpx;
+  padding: 60rpx 0;
+  margin-bottom: 55rpx;
+  border: 2rpx solid #d3e3ff;  /* subtle iOS style border */
+  background: #f9fbff;
+  box-shadow: 0 8rpx 26rpx rgba(0,122,255,0.08);
+}
+
+/* 柜门号标签 —— 加大、加粗 */
+.locker-label.strong {
+  display: block;
+  width: 100%;
+  text-align: center;      /* 🎯 强制水平居中 */
+  font-size: 42rpx;        /* 稍微放大一点，让层级更自然 */
+  font-weight: 600;
+  color: #007aff;
+  margin-bottom: 26rpx;    /* 与大号数字间距更协调 */
+  letter-spacing: 2rpx;    /* 更偏 iOS 风格 */
+}
+
+/* 数字 —— 主角诞生 */
+.locker-big.strong {
+  font-size: 140rpx;  /* 巨大醒目 */
+  font-weight: 700;
+  line-height: 1;
+  color: #007aff;
+  letter-spacing: 4rpx;
+}
+
+/* 内容文字 */
 .modal-content {
-  font-size: 28rpx;
-  color: #666;
-  margin-bottom: 30rpx;
-  line-height: 1.5;
+  font-size: 32rpx;
+  color: #555;
+  margin-bottom: 45rpx;
 }
 
+/* 按钮 */
 .modal-actions {
   display: flex;
-  justify-content: space-around;
 }
 
 .btn {
   flex: 1;
   margin: 0 10rpx;
-  padding: 16rpx 0;
-  border-radius: 12rpx;
-  font-size: 30rpx;
+  padding: 22rpx 0;
+  border-radius: 16rpx;
+  font-size: 32rpx;
 }
 
 .cancel {
-  background: #f5f5f5;
-  color: #333;
+  background: #f7f7f7;
+  color: #666;
 }
 
 .confirm {
   background: #007aff;
   color: #fff;
+  box-shadow: 0 8rpx 16rpx rgba(0,122,255,0.25);
 }
 
 /* 动画 */
 @keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+  from {opacity:0; transform:scale(0.95);}
+  to {opacity:1; transform:scale(1);}
 }

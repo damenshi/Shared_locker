@@ -71,24 +71,22 @@ Page({
 
   async refund(event) {
     console.log('退款事件：', event)
-
+  
     wx.showModal({
       title: '确认退款',
       content: `确认退款？`,
       confirmText: '确认',
       cancelText: '取消',
       success: async (res) => {
-        if (res.cancel) {
-          return;
-        }
-
+        if (res.cancel) return;
+  
         if (res.confirm) {
           wx.showLoading({ title: '处理中...', mask: true });
-
+  
           try {
             const orderId = event.currentTarget.dataset.id;
             const openid = event.currentTarget.dataset.openid;
-
+  
             const res = await wx.cloud.callFunction({
               name: 'order',
               data: {
@@ -97,48 +95,61 @@ Page({
                 orderId: orderId
               }
             });
-            console.log('退款结果：', res)
-
+  
+            console.log('退款结果：', res);
+            wx.hideLoading();
+  
+            // 统一弹窗通知结果
             if (res.result.success) {
-              if (!res.result.data.error) {
-                wx.showToast({
-                  title: '退款成功',
-                  icon: 'success',
-                  duration: 3000
+              const errorMsg = res.result.data?.error;
+              const raw = res.result.data?.errRaw?.response?.text;
+              let finalMsg = '';
+  
+              if (!errorMsg) {
+                finalMsg = '退款成功！';
+                wx.showModal({
+                  title: '退款结果:',
+                  content: finalMsg,
+                  showCancel: false,
+                  success: () => {
+                    this.onLoad(); // 刷新订单列表
+                  }
                 });
               } else {
-                const errText = res.result?.data?.error || res.result?.data?.errRaw?.response?.text || '';
-
-                let errMsg = '请稍后重试';
+                // 提取失败信息
+                let detail = '请稍后重试';
                 try {
-                  if (errText) {
-                    const parsed = JSON.parse(errText);
-                    errMsg = parsed.message || errMsg;
-                  }
+                  if (raw) detail = JSON.parse(raw).message || detail;
+                  else if (errorMsg) detail = errorMsg;
                 } catch (e) {}
-
-                wx.showToast({
-                  title: errMsg,
-                  icon: 'error',
-                  duration: 3000
+  
+                wx.showModal({
+                  title: '退款失败',
+                  content: '付款金额为0，请重新选择订单',
+                  showCancel: false
                 });
               }
-
-              this.onLoad();
+  
             } else {
-              wx.showToast({
-                title: res.result.errMsg || '退款失败', 
-                icon: 'none' 
+              wx.showModal({
+                title: '退款失败',
+                content: res.result.errMsg || '退款失败，请稍后重试',
+                showCancel: false
               });
             }
+  
           } catch (err) {
-            wx.showToast({ title: '系统错误', icon: 'none' });
-            console.log('系统错误：', err)
-          } finally {
             wx.hideLoading();
+            console.error('系统错误：', err)
+            wx.showModal({
+              title: '系统错误',
+              content: '服务器出错，请稍后再试',
+              showCancel: false
+            });
           }
         }
       }
     });
   }
+
 });

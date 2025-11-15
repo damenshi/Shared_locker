@@ -56,14 +56,20 @@ Page({
    * @param {Function} callback - 回调函数
    * @param {number} duration - 提示时长
    */
-  showSuccess(message, callback, duration = 3000) {
-    wx.showToast({
-      title: message,
-      icon: 'success',
-      duration
+  showSuccess(message, callback) {
+    wx.showModal({
+      title: '提示',
+      content: message,
+      showCancel: false,     // 只保留“确定”
+      confirmText: '好的',   // iOS 风格按钮
+      success: () => {
+        if (typeof callback === 'function') {
+          callback();
+        }
+      }
     });
-    setTimeout(callback, duration);
   },
+  
 
   /**
    * 验证输入格式
@@ -167,7 +173,7 @@ Page({
       this.setData({ isLoading: false });
       this.showSuccess(
         `取件成功，柜门 ${order.lockerNo} 已打开`,
-        () => { wx.navigateBack({ delta: 1 }); }
+        () => { wx.navigateBack({ delta: 2 }); }
       );
       wx.setStorageSync('showLockerBox', false);
       wx.setStorageSync('openedLockerNo', '');

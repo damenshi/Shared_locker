@@ -426,8 +426,18 @@ Page({
         }
   
         wx.hideLoading();
-        wx.showToast({ title: `柜门 ${lockerInfo.lockerNo} 已打开`, icon: 'none', duration: 5000});
-          setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
+        wx.showModal({
+          title: '提示',
+          content: `柜门 ${lockerInfo.lockerNo} 已打开`,
+          showCancel: false,
+          confirmText: '好的',
+          success: (res) => {
+            if (res.confirm) {
+              // 用户点击了“好的”
+              wx.navigateBack({ delta: 1 });
+            }
+          }
+        });        
       }
 
     } catch (e) {
