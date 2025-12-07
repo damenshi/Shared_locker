@@ -81,8 +81,13 @@
 
 <view wx:if="{{showLockerBox}}" class="locker-box-large">
   <text class="locker-box-text">柜门 {{openedLockerNo}} 使用中</text>
-  <button class="reopen-btn" bindtap="midopenLocker">中途开柜</button>
+
+  <view class="locker-btn-row">
+    <button class="reopen-btn" bindtap="midopenLocker">中途开柜</button>
+    <button class="reopen-btn finish-btn" bindtap="finishUse">结束使用</button>
+  </view>
 </view>
+
 
 <!-- 自定义确认弹窗 -->
 <view wx:if="{{showConfirmModal}}" class="custom-modal-mask">

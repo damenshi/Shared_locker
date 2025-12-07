@@ -272,8 +272,8 @@ Page({
     try {
       // 1. 参数验证
       if (!this.validateParams()) {
-        setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
-        return;
+        // setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
+        throw new Error('请输入手机号和取件码');
       }
 
       //2.检查是否有进行中的订单
@@ -288,9 +288,10 @@ Page({
       if (checkRes.result?.success){
         const orderInfo = checkRes.result.data;
         if(orderInfo.status == this.data.constants.ORDER_STATUS_PROCESSING){
-          wx.showToast({ title: '已有订单，请先取件', icon: 'none', duration: 2000});
-          setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
-          return;
+          // wx.showToast({ title: '已有订单，请先取件', icon: 'none', duration: 2000});
+          // setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
+          // return;
+          throw new Error('已有订单，请先取件');
         }
       }
 
@@ -303,7 +304,7 @@ Page({
           phone: this.data.phone,
         }
       });
-      if (!userRes.result?.success) throw new Error('获取用户信息失败');
+      if (!userRes.result?.success) throw new Error('无相关用户信息');
       const userInfo = userRes.result.data;
 
       //3.获取可用柜子并占用
@@ -316,7 +317,7 @@ Page({
       });
   
       if (!freeRes.result?.success) 
-        throw new Error('查询空闲柜门失败');
+        throw new Error('无空闲柜门');
       lockerInfo = freeRes.result.data;
 
       // 4. 创建订单
@@ -414,7 +415,7 @@ Page({
       if (!openDoorRes.result?.success){
         wx.hideLoading();
         wx.showToast({ title: '开门失败，请重试', icon: 'none' });
-        throw new Error('开门失败');
+        throw new Error('开门失败，请重试');
       }else{
         //缓存手机号和密码
         await this.saveUserCredentials(this.data.openid, this.data.phone, this.data.password);
@@ -442,9 +443,24 @@ Page({
 
     } catch (e) {
       console.error("存包流程异常", e);
-      wx.showToast({ title: '开门失败，请重试', icon: 'none' });
       if (lockerInfo) await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
       if (orderId) await this.recoverOrder(orderId);
+
+       // 根据错误信息弹窗提示
+      const msg = e.message || '开柜失败，请重试';
+
+      wx.showModal({
+        title: '提示',
+        content: msg,
+        showCancel: false,
+        confirmText: '好的',
+        success: (res) => {
+          if (res.confirm) {
+            // 用户点击了“好的”
+            wx.navigateBack({ delta: 1 });
+          }
+        }
+      });
     } finally {
       this.setData({ isLoading: false });
       wx.hideLoading();

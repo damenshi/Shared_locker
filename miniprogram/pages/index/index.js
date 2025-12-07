@@ -175,6 +175,12 @@ Page({
     }
   },
 
+  finishUse() {
+    wx.navigateTo({
+      url: '/pages/take/take'
+    })
+  },
+
   // 监听手机号输入
   onPhoneInput(e) {
     const phone = e.detail.value;

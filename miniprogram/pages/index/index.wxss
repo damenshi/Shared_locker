@@ -298,6 +298,26 @@
   box-shadow: 0 2rpx 6rpx rgba(22,119,255,0.2);
 }
 
+.locker-btn-row {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 24rpx;
+}
+
+.finish-btn {
+  background-color: #ff4d4f;
+  color: #ffffff;
+  border-color: #ff4d4f;
+  box-shadow: 0 4rpx 10rpx rgba(255, 77, 79, 0.15);
+}
+
+.finish-btn:active {
+  box-shadow: 0 2rpx 6rpx rgba(255, 77, 79, 0.2);
+}
+
+
 /* 遮罩层 */
 .custom-modal-mask {
   position: fixed;

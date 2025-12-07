@@ -97,47 +97,114 @@ exports.main = async (event, context) => {
       return { ok: false, errMsg: validation.msg }
     }
 
-    const callHardwareOpen = async (deviceId, cabinetNo, doorNo) => {
-      try {
-        // 2. 调用socket服务器接口
-        const formatNumber = (num) => {
-          return num.toString().padStart(2, '0');
-        };
-        const formattedCabinetNo = formatNumber(cabinetNo); // 2 → "02"
-        const formattedDoorNo = formatNumber(doorNo);       // 1 → "01"
-        const combinedCode = formattedCabinetNo + formattedDoorNo; // "0201"
+    // const callHardwareOpen = async (deviceId, cabinetNo, doorNo) => {
+    //   try {
+    //     // 2. 调用socket服务器接口
+    //     const formatNumber = (num) => {
+    //       return num.toString().padStart(2, '0');
+    //     };
+    //     const formattedCabinetNo = formatNumber(cabinetNo); // 2 → "02"
+    //     const formattedDoorNo = formatNumber(doorNo);       // 1 → "01"
+    //     const combinedCode = formattedCabinetNo + formattedDoorNo; // "0201"
 
-        const axios = require('axios');
-        const response = await axios.post(
-          'http://1.116.109.239:3000/send-command', 
-          {
-            direct: 'openDoor',
-            deviceId: deviceId,
-            data: {
-              doorSort: combinedCode,
+    //     const axios = require('axios');
+    //     const response = await axios.post(
+    //       'http://1.116.109.239:3000/send-command', 
+    //       {
+    //         direct: 'openDoor',
+    //         deviceId: deviceId,
+    //         data: {
+    //           doorSort: combinedCode,
+    //         }
+    //       },
+    //       { timeout: 8000 }  // 8秒超时设置
+    //     );
+
+    //     // 3. 验证服务器返回结果
+    //     if (response.data.code !== 200 || response.data.doorSort != combinedCode) {
+    //       throw new Error(`服务器响应异常: ${response.data.message || '未知错误'}`);
+    //     }
+    //     return true;
+    //   } catch (err) {
+    //     if (err.code === 'ECONNABORTED') {
+    //       throw new Error(`连接超时，请检查服务器是否在线`);
+    //     }
+    //     if (err.response) {
+    //       const errorMsg = err.response.data?.message || err.response.statusText;
+    //       console.error(`服务器返回错误: 设备${deviceId}，状态码${err.response.status}，message: ${errorMsg}`);
+    //       throw new Error(`服务器返回错误: ${err.response.status} ${errorMsg}`);
+    //     }
+    //     throw new Error(`开柜接口调用失败: ${err.message}`);
+    //   }
+    // };
+
+    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 5) => {
+      let attempt = 0;
+    
+      // 延迟函数
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    
+      while (attempt < maxRetries) {
+        try {
+          attempt++;
+    
+          // 2. 调用socket服务器接口
+          const formatNumber = (num) => {
+            return num.toString().padStart(2, '0');
+          };
+          const formattedCabinetNo = formatNumber(cabinetNo);
+          const formattedDoorNo = formatNumber(doorNo);
+          const combinedCode = formattedCabinetNo + formattedDoorNo;
+    
+          const axios = require('axios');
+          const response = await axios.post(
+            'http://1.116.109.239:3000/send-command',
+            {
+              direct: 'openDoor',
+              deviceId: deviceId,
+              data: {
+                doorSort: combinedCode,
+              }
+            },
+            { timeout: 8000 }
+          );
+    
+          //成功条件
+          if (response.data.code === 200 && response.data.doorSort == combinedCode) {
+            return true;
+          }
+    
+          console.warn(`第 ${attempt} 次返回非200，准备重试`);
+    
+          //最后一次仍非200 → 按原逻辑抛错
+          if (attempt >= maxRetries) {
+            throw new Error(`服务器响应异常: ${response.data.message || '未知错误'}`);
+          }
+    
+        } catch (err) {
+          console.warn(`第 ${attempt} 次请求异常: ${err.message}`);
+    
+          //最后一次失败才走原有错误处理逻辑
+          if (attempt >= maxRetries) {
+            if (err.code === 'ECONNABORTED') {
+              throw new Error(`连接超时，请检查服务器是否在线`);
             }
-          },
-          { timeout: 8000 }  // 8秒超时设置
-        );
-
-        // 3. 验证服务器返回结果
-        if (response.data.code !== 200 || response.data.doorSort != combinedCode) {
-          throw new Error(`服务器响应异常: ${response.data.message || '未知错误'}`);
+            if (err.response) {
+              const errorMsg = err.response.data?.message || err.response.statusText;
+              console.error(`服务器返回错误: 设备${deviceId}，状态码${err.response.status}，message: ${errorMsg}`);
+              throw new Error(`服务器返回错误: ${err.response.status} ${errorMsg}`);
+            }
+            throw new Error(`开柜接口调用失败: ${err.message}`);
+          }
         }
-        return true;
-      } catch (err) {
-        if (err.code === 'ECONNABORTED') {
-          throw new Error(`连接超时，请检查服务器是否在线`);
-        }
-        if (err.response) {
-          const errorMsg = err.response.data?.message || err.response.statusText;
-          console.error(`服务器返回错误: 设备${deviceId}，状态码${err.response.status}，message: ${errorMsg}`);
-          throw new Error(`服务器返回错误: ${err.response.status} ${errorMsg}`);
-        }
-        throw new Error(`开柜接口调用失败: ${err.message}`);
+    
+        //等待时间递增：500ms * 2^(attempt-1)
+        const waitTime = 500 * Math.pow(2, attempt - 1);
+        console.log(`等待 ${waitTime}ms 后进行第 ${attempt + 1} 次尝试...`);
+        await delay(waitTime);
       }
     };
-
+    
     try {
       return await db.runTransaction(async transaction => {
         // 查询柜子信息
@@ -365,44 +432,70 @@ exports.main = async (event, context) => {
       return { ok: false, errMsg: validation.msg }
     }
 
-    const callHardwareOpen = async (deviceId, cabinetNo, doorNo) => {
-      try {
-        // 2. 调用socket服务器接口
-        const formatNumber = (num) => {
-          return num.toString().padStart(2, '0');
-        };
-        const formattedCabinetNo = formatNumber(cabinetNo); // 2 → "02"
-        const formattedDoorNo = formatNumber(doorNo);       // 1 → "01"
-        const combinedCode = formattedCabinetNo + formattedDoorNo; // "0201"
-
-        const axios = require('axios');
-        const response = await axios.post(
-          'http://1.116.109.239:3000/send-command', 
-          {
-            direct: 'openDoor',
-            deviceId: deviceId,
-            data: {
-              doorSort: combinedCode,
+    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 5) => {
+      let attempt = 0;
+    
+      // 延迟函数
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    
+      while (attempt < maxRetries) {
+        try {
+          attempt++;
+    
+          // 2. 调用socket服务器接口
+          const formatNumber = (num) => {
+            return num.toString().padStart(2, '0');
+          };
+          const formattedCabinetNo = formatNumber(cabinetNo);
+          const formattedDoorNo = formatNumber(doorNo);
+          const combinedCode = formattedCabinetNo + formattedDoorNo;
+    
+          const axios = require('axios');
+          const response = await axios.post(
+            'http://1.116.109.239:3000/send-command',
+            {
+              direct: 'openDoor',
+              deviceId: deviceId,
+              data: {
+                doorSort: combinedCode,
+              }
+            },
+            { timeout: 8000 }
+          );
+    
+          //成功条件
+          if (response.data.code === 200 && response.data.doorSort == combinedCode) {
+            return true;
+          }
+    
+          console.warn(`第 ${attempt} 次返回非200，准备重试`);
+    
+          //最后一次仍非200 → 按原逻辑抛错
+          if (attempt >= maxRetries) {
+            throw new Error(`服务器响应异常: ${response.data.message || '未知错误'}`);
+          }
+    
+        } catch (err) {
+          console.warn(`第 ${attempt} 次请求异常: ${err.message}`);
+    
+          //最后一次失败才走原有错误处理逻辑
+          if (attempt >= maxRetries) {
+            if (err.code === 'ECONNABORTED') {
+              throw new Error(`连接超时，请检查服务器是否在线`);
             }
-          },
-          { timeout: 8000 }  // 8秒超时设置
-        );
-
-        // 3. 验证服务器返回结果
-        if (response.data.code !== 200 || response.data.doorSort != combinedCode) {
-          throw new Error(`服务器响应异常: ${response.data.message || '未知错误'}`);
+            if (err.response) {
+              const errorMsg = err.response.data?.message || err.response.statusText;
+              console.error(`服务器返回错误: 设备${deviceId}，状态码${err.response.status}，message: ${errorMsg}`);
+              throw new Error(`服务器返回错误: ${err.response.status} ${errorMsg}`);
+            }
+            throw new Error(`开柜接口调用失败: ${err.message}`);
+          }
         }
-        return true;
-      } catch (err) {
-        if (err.code === 'ECONNABORTED') {
-          throw new Error(`连接超时，请检查服务器是否在线`);
-        }
-        if (err.response) {
-          const errorMsg = err.response.data?.message || err.response.statusText;
-          console.error(`服务器返回错误: 设备${deviceId}，状态码${err.response.status}，message: ${errorMsg}`);
-          throw new Error(`服务器返回错误: ${err.response.status} ${errorMsg}`);
-        }
-        throw new Error(`开柜接口调用失败: ${err.message}`);
+    
+        //等待时间递增：500ms * 2^(attempt-1)
+        const waitTime = 500 * Math.pow(2, attempt - 1);
+        console.log(`等待 ${waitTime}ms 后进行第 ${attempt + 1} 次尝试...`);
+        await delay(waitTime);
       }
     };
 

@@ -107,10 +107,7 @@ Page({
       if (!this.validateInput()) {
         this.setData({ isLoading: false });
         wx.hideLoading();
-        this.showError('参数错误', () => {
-          wx.navigateBack({ delta: 1 });
-        });
-        return;
+        throw new Error('手机号或取件码无效');
       }
 
       // 2. 查询匹配订单
@@ -123,7 +120,7 @@ Page({
         }
       });
       if (!matchOrder.result?.success) 
-        throw new Error('查询用户订单失败');
+        throw new Error('用户无进行中订单');
       const order = matchOrder.result.data;
 
       // 3. 验证订单状态
@@ -131,10 +128,7 @@ Page({
       if (!validStatus.includes(order.status)) {
         this.setData({ isLoading: false });
         wx.hideLoading();
-        this.showError(`订单状态异常：${order.status}`, () => {
-          wx.navigateBack({ delta: 1 });
-        });
-        return;
+        throw new Error('订单已结束或已取消');
       }
 
       // 4. 打开柜门
@@ -152,9 +146,6 @@ Page({
       if (!isDoorOpen.result?.success){
         this.setData({ isLoading: false });
         wx.hideLoading();
-        this.showError('柜门打开失败，请重试', () => {
-          wx.navigateBack({ delta: 1 });
-        });
         throw new Error('取件开门失败');
       }
 
@@ -185,8 +176,19 @@ Page({
       console.error("取件流程异常:", e);
       this.setData({ isLoading: false });
       wx.hideLoading();
-      this.showError(`取件错误: ${e.message}`, () => {
-        wx.navigateBack({ delta: 1});
+      const msg = e.message || '取件失败，请重试';
+
+      wx.showModal({
+        title: '提示',
+        content: msg,
+        showCancel: false,
+        confirmText: '好的',
+        success: (res) => {
+          if (res.confirm) {
+            // 用户点击了“好的”
+            wx.navigateBack({ delta: 1 });
+          }
+        }
       });
     }
   }
