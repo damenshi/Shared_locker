@@ -286,11 +286,12 @@ Page({
       });
       if (checkRes.result?.success){
         const orderInfo = checkRes.result.data;
+        //检测到有进行中订单
         if(orderInfo.status == this.data.constants.ORDER_STATUS_PROCESSING){
           await new Promise((resolve, reject) => {
             wx.showModal({
               title: '提示',
-              content: '已有进行中订单，是否继续创建新订单？', // 询问内容
+              content: '检测到您有未完成的订单，是否结算旧订单并继续存包？', 
               showCancel: true,       // 显示取消按钮
               cancelText: '取消',     // 左边按钮
               confirmText: '继续',    // 右边按钮
@@ -309,6 +310,21 @@ Page({
               }
             });
           });
+
+          wx.showLoading({ title: '正在结算旧订单...' });
+          
+          const orderFinishRes = await wx.cloud.callFunction({
+            name: "order",
+            data: {
+              action: "finishOrder",
+              orderId: orderInfo._id
+            }
+          });
+
+          // 3. 检查结算结果
+          if (!orderFinishRes.result?.success) {
+            throw new Error('旧订单结算失败：' + (orderFinishRes.result?.errMsg || '未知错误'));
+          }
         }
       }
 

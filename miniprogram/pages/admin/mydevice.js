@@ -213,54 +213,102 @@ Page({
     });
   },
 
-  // === 全开 ===
   confirmOpenAllLockers(e) {
     const internalNo = e.currentTarget.dataset.internalno;
     const cabinetCount = e.currentTarget.dataset.cabinetcount;
     const doorCount = e.currentTarget.dataset.doorcount;
-
+  
     const totalDoors = cabinetCount * doorCount;
+    
     wx.showModal({
       title: '确认全开',
-      content: `确定打开本设备的所有${totalDoors} 个柜门？`,
+      content: `确定打开本设备的所有 ${totalDoors} 个柜门？`,
       success: async res => {
         if (res.confirm) {
-          wx.showLoading('正在打开所有柜门...');
-    
+          // 初始化统计
+          let successCount = 0;
+          let failCount = 0;
+          const failList = [];
+  
           try {
-             // 构建所有开门任务
-          const openTasks = [];
-          for (let lockerNo = 1; lockerNo <= totalDoors; lockerNo++) {
-            openTasks.push(
-              wx.cloud.callFunction({
-                name: 'locker',
-                data: {
-                  action: 'openDoorByAdmin',
-                  internalNo,
-                  lockerNo
-                }
-              })
-            );
-          }
-
-          // 控制并发（一次执行5个，避免云函数超时）
-          const batchSize = 5;
-          for (let i = 0; i < openTasks.length; i += batchSize) {
-            const batch = openTasks.slice(i, i + batchSize);
-            await Promise.all(batch);
-          }
-
-          wx.hideLoading();
-          wx.showToast({ title: '所有柜门已打开', icon: 'success' });
-            
+            // 1. 仅生成柜号列表（此时不发送请求）
+            const lockerNos = [];
+            for (let i = 1; i <= totalDoors; i++) {
+              lockerNos.push(i);
+            }
+  
+            // 2. 真正控制并发（一次执行5个）
+            const batchSize = 5;
+            for (let i = 0; i < lockerNos.length; i += batchSize) {
+              // 获取当前批次的柜号
+              const batchNos = lockerNos.slice(i, i + batchSize);
+              
+              // 更新 UI 进度提示
+              wx.showLoading({
+                title: `正在打开 ${i + 1}-${Math.min(i + batchSize, totalDoors)}/${totalDoors}`,
+                mask: true
+              });
+  
+              // 3. 在这里才真正发起请求，并处理单个请求的异常
+              const batchPromises = batchNos.map(lockerNo => {
+                return wx.cloud.callFunction({
+                  name: 'locker',
+                  data: {
+                    action: 'openDoorByAdmin',
+                    internalNo,
+                    lockerNo
+                  }
+                })
+                .then(res => {
+                  // 根据你的云函数返回结构判断是否成功，假设 result.success 为 true
+                  if (res.result && res.result.success) {
+                      successCount++;
+                  } else {
+                      failCount++;
+                      failList.push(lockerNo);
+                      console.error(`柜门 ${lockerNo} 业务逻辑失败:`, res);
+                  }
+                })
+                .catch(err => {
+                  console.error(`柜门 ${lockerNo} 网络/系统失败:`, err);
+                  failCount++;
+                  failList.push(lockerNo);
+                  // 这里 catch 住错误，保证 Promise.all 不会崩
+                  return null; 
+                });
+              });
+  
+              // 等待当前批次完成
+              await Promise.all(batchPromises);
+  
+              // 4.增加 300ms 延时，防止瞬间请求过密导致硬件处理不过来
+              if (i + batchSize < totalDoors) {
+                  await new Promise(resolve => setTimeout(resolve, 300));
+              }
+            }
+  
+            wx.hideLoading();
+  
+            // 5. 最终结果汇总报告
+            if (failCount === 0) {
+              wx.showToast({ title: '全部打开成功', icon: 'success' });
+            } else {
+              wx.showModal({
+                title: '执行完成',
+                content: `成功: ${successCount} 个\n失败: ${failCount} 个\n失败柜号: ${failList.join(',')}`,
+                showCancel: false,
+                confirmText: '知道了'
+              });
+            }
+  
           } catch (err) {
             wx.hideLoading();
-            console.error('全开柜门失败：', err);
-            wx.showToast({ title: '全开柜门失败', icon: 'none' });
-            this.closeModal();
+            console.error('全开流程异常：', err);
+            wx.showToast({ title: '流程执行异常', icon: 'none' });
           }
         }
       }
     });
   }
+
 });
