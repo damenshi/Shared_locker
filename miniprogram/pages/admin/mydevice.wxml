@@ -87,7 +87,12 @@
 
               <view class="row">
                 <text class="label">收费标准</text>
-                <text class="value">{{item.deviceDeposit}}</text>
+                <text class="value">{{item.deviceDeposit}}元</text>
+              </view>
+
+              <view class="row">
+                <text class="label">收费策略</text>
+                <text class="value">{{item.unitPrice}}元/小时</text>
               </view>
 
               <view class="row">

@@ -12,6 +12,27 @@ function formatDate(dateStr) {
   return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
 }
 
+function formatDuration(totalMinutes) {
+  // 1. 确保输入是正整数
+  if (typeof totalMinutes !== 'number' || totalMinutes < 0) {
+    return '0分钟';
+  }
+
+  // 2. 计算小时和剩余分钟
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = Math.floor(totalMinutes % 60);
+
+  // 3. 格式化输出
+  if (hours > 0) {
+    // 如果超过1小时，显示 "X小时Y分钟"
+    // 如果分钟数为0，也可以选择只显示 "X小时"
+    return `${hours}小时${minutes}分钟`;
+  } else {
+    // 如果不足1小时，只显示 "Y分钟"
+    return `${minutes}分钟`;
+  }
+}
+
 Page({
   data: {
     orders: [],
@@ -52,6 +73,11 @@ Page({
           } else {
             order.createdAtFormatted = '无';
           }
+          if(order.endAt){
+            order.endAtFormatted = formatDate(order.endAt);
+            order.usageDurationFormatted = formatDuration(order.usageDuration);
+          }
+
           return order;
         });
         this.setData({

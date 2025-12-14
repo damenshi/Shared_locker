@@ -38,10 +38,10 @@
               <text class="label">设备地址</text>
               <text class="value">{{item.deviceAddress}}</text>
             </view>
-            <view class="row">
+            <!-- <view class="row">
               <text class="label">用户ID</text>
               <text class="value">{{item.openid}}</text>
-            </view>
+            </view> -->
             <view class="row">
               <text class="label">创建时间</text>
               <text class="value">{{item.createdAtFormatted}}</text>
@@ -50,6 +50,24 @@
               <text class="label">付款金额</text>
               <text class="value">{{item.deposit}}</text>
             </view>
+            <block wx:if="{{item.endAtFormatted}}">
+              <view class="row">
+                <text class="label">结束时间</text>
+                <text class="value">{{item.endAtFormatted}}</text>
+              </view>
+              <view class="row">
+                <text class="label">使用时长</text>
+                <text class="value">{{item.usageDurationFormatted}}</text>
+              </view>
+              <view class="row">
+                <text class="label">使用费用</text>
+                <text class="value">{{item.fee}}</text>
+              </view>
+              <view class="row">
+                <text class="label">可退金额</text>
+                <text class="value">{{item.refundAmount}}</text>
+              </view>
+            </block>
           </view>
           <button class="btn refund"
                   bindtap="refund"

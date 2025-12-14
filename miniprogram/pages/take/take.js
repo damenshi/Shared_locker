@@ -107,7 +107,7 @@ Page({
       if (!this.validateInput()) {
         this.setData({ isLoading: false });
         wx.hideLoading();
-        throw new Error('手机号或取件码无效');
+        throw new Error('您的手机号或取件码无效');
       }
 
       // 2. 查询匹配订单
@@ -120,7 +120,7 @@ Page({
         }
       });
       if (!matchOrder.result?.success) 
-        throw new Error('用户无进行中订单');
+        throw new Error('本柜无您进行中的订单，请检查柜号!');
       const order = matchOrder.result.data;
 
       // 3. 验证订单状态
@@ -128,7 +128,7 @@ Page({
       if (!validStatus.includes(order.status)) {
         this.setData({ isLoading: false });
         wx.hideLoading();
-        throw new Error('订单已结束或已取消');
+        throw new Error('您的订单已结束或已取消');
       }
 
       // 4. 打开柜门
@@ -163,7 +163,7 @@ Page({
       wx.hideLoading();
       this.setData({ isLoading: false });
       this.showSuccess(
-        `取件成功，柜门 ${order.lockerNo} 已打开`,
+        `取件成功，柜门 ${order.lockerNo} 已打开，订单已结束`,
         () => { wx.navigateBack({ delta: 2 }); }
       );
       wx.setStorageSync('showLockerBox', false);

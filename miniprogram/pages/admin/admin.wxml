@@ -99,6 +99,17 @@
     </view>
 
     <view class="input-item">
+      <text>收费策略：</text>
+      <input 
+        type="text" 
+        value="{{unitPrice}}" 
+        data-field="unitPrice"
+        bindinput="onInputChange"
+        placeholder="请输入每小时费用"
+      />
+    </view>
+
+    <view class="input-item">
       <text>屏幕编号：</text>
       <input 
         type="text" 

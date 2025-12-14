@@ -122,6 +122,57 @@ function decryptNotify(resource) {
   return JSON.parse(decoded);
 }
 
+async function calculateFee(order) {
+  const now = Date.now();
+
+  const startTime = new Date(order.createdAt).getTime(); 
+  
+  const durationMs = now - startTime;
+  const durationMinutes = Math.ceil(durationMs / 1000 / 60); // 分钟
+  const durationHours = Math.ceil(durationMinutes / 60);       // 小时
+
+  let fee = 0; // 单位：分
+  let unitPrice = 0; // 默认价格（0元/小时)
+  try {
+    const devRes = await db.collection('devices')
+      .where({ deviceId: order.deviceId })
+      .get();
+      
+    if (devRes.data.length > 0) {
+      const device = devRes.data[0];
+      unitPrice = device.unitPrice !== undefined ? device.unitPrice : (device.unitPrice || 0);
+    }
+  } catch (err) {
+    console.error('获取设备价格失败，使用默认价格', err);
+  }
+  
+  // 计费规则：免费时长5分钟
+  const FREE_MINUTES = 0;
+  if (durationMinutes > FREE_MINUTES) {
+    fee = durationHours * unitPrice * 100;
+  }
+
+  // 押金转为分
+  const depositInCents = Math.round(order.deposit * 100); 
+
+  // 费用不能超过押金
+  if (fee > depositInCents) {
+    fee = depositInCents;
+  }
+
+  const refundAmount = depositInCents - fee; // 应退金额
+
+  console.log(`[calculateFee] 结算: 单价${unitPrice}, 分钟${durationMinutes}, 小时${durationHours}, 费用${fee}`);
+
+  return {
+    durationMinutes,
+    durationHours,
+    fee,            // 实收费用 (分)
+    refundAmount,   // 应退金额 (分)
+    depositInCents, // 原押金 (分)
+    unitPrice
+  };
+}
 
 exports.main = async (event, context) => {
   const { action } = event
@@ -287,15 +338,23 @@ exports.main = async (event, context) => {
         }
 
         // 验证订单状态
-        if (orderDoc.data.status !== CONSTANTS.ORDER_STATUSES.IN_PROGRESS) {
-          throw new Error(`订单状态不可完成，当前状态：${orderDoc.data.status}`)
+        const order = orderDoc.data;
+        if (order.status !== CONSTANTS.ORDER_STATUSES.IN_PROGRESS) {
+          throw new Error(`订单状态不可完成，当前状态：${order.status}`)
         }
+
+        const bill = await calculateFee(order); 
+      
+        console.log(`[finishOrder] 结算: 单价${bill.unitPrice}, 时长${bill.durationMinutes}, 费用${bill.fee}`);
 
         // 更新订单状态
         await transaction.collection('orders').doc(orderId).update({
           data: {
             status: CONSTANTS.ORDER_STATUSES.COMPLETED,
-            endTime: db.serverDate(),
+            endAt: db.serverDate(),
+            usageDuration: bill.durationMinutes,
+            fee: bill.fee / 100,
+            refundAmount: bill.refundAmount / 100,
             updatedAt: db.serverDate()
           }
         })
@@ -329,12 +388,20 @@ exports.main = async (event, context) => {
         if (!orderDoc.data) {
           throw new Error('订单不存在')
         }
+        const order = orderRes.data;
+
+        const bill = await calculateFee(order); 
+      
+        console.log(`[finishOrder] 结算: 单价${bill.unitPrice}, 时长${bill.durationMinutes}, 费用${bill.fee}`);
 
         // 更新订单状态
         await transaction.collection('orders').doc(orderId).update({
           data: {
             status: CONSTANTS.ORDER_STATUSES.FORCE_FINISHED,
-            endTime: db.serverDate(),
+            endAt: db.serverDate(),
+            usageDuration: bill.durationMinutes,
+            fee: bill.fee / 100,
+            refundAmount: bill.refundAmount / 100,
             updatedAt: db.serverDate()
           }
         })
@@ -461,11 +528,18 @@ exports.main = async (event, context) => {
           throw new Error('订单当前状态为${order.status}，无需恢复');
         }
 
+        const bill = await calculateFee(order); 
+      
+        console.log(`[finishOrder] 结算: 单价${bill.unitPrice}, 时长${bill.durationMinutes}, 费用${bill.fee}`);
+
         // 3. 更新订单状态为目标状态
         await transaction.collection('orders').doc(orderId).update({
           data: {
             status: targetStatus,
-            recoverAt: db.serverDate(), // 记录恢复时间
+            endAt: db.serverDate(), // 记录结束时间
+            usageDuration: bill.durationMinutes,
+            fee: bill.fee / 100,
+            refundAmount: bill.refundAmount / 100,
             updatedAt: db.serverDate()
           }
         });
@@ -506,7 +580,11 @@ exports.main = async (event, context) => {
           status: true,
           openid: true,
           createdAt: true,
-          deposit: true
+          deposit: true,
+          endAt: true,
+          usageDuration: true,
+          fee: true,
+          refundAmount: true
         })
         .get()
 
@@ -549,7 +627,11 @@ exports.main = async (event, context) => {
           status: true,
           openid: true,
           createdAt: true,
-          deposit: true
+          deposit: true,
+          endAt: true,
+          usageDuration: true,
+          fee: true,
+          refundAmount: true
         })
         .get()
 
@@ -596,7 +678,11 @@ exports.main = async (event, context) => {
           status: true,
           openid: true,
           createdAt: true,
-          deposit: true
+          deposit: true,
+          endAt: true,
+          usageDuration: true,
+          fee: true,
+          refundAmount: true
         })
         .get()
 
@@ -633,7 +719,7 @@ exports.main = async (event, context) => {
         transaction_id: order.transactionId,
         out_refund_no: `refund_${Date.now()}`,
         amount: {
-          refund: order.deposit * 100,
+          refund: order.refundAmount * 100,
           total: order.deposit * 100,
           currency: 'CNY'
         },

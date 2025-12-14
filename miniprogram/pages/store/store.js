@@ -272,7 +272,6 @@ Page({
     try {
       // 1. 参数验证
       if (!this.validateParams()) {
-        // setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
         throw new Error('请输入手机号和取件码');
       }
 
@@ -288,10 +287,28 @@ Page({
       if (checkRes.result?.success){
         const orderInfo = checkRes.result.data;
         if(orderInfo.status == this.data.constants.ORDER_STATUS_PROCESSING){
-          // wx.showToast({ title: '已有订单，请先取件', icon: 'none', duration: 2000});
-          // setTimeout(() => wx.navigateBack({ delta: 1 }), this.data.constants.NAVIGATE_DELAY);
-          // return;
-          throw new Error('已有订单，请先取件');
+          await new Promise((resolve, reject) => {
+            wx.showModal({
+              title: '提示',
+              content: '已有进行中订单，是否继续创建新订单？', // 询问内容
+              showCancel: true,       // 显示取消按钮
+              cancelText: '取消',     // 左边按钮
+              confirmText: '继续',    // 右边按钮
+              success: (res) => {
+                if (res.confirm) {
+                  // 用户点击“继续”，解决 Promise，代码继续向下执行
+                  resolve();
+                } else {
+                  // 用户点击“取消”，拒绝 Promise，触发 catch 流程
+                  reject(new Error('有进行中订单，请先取件结束订单后再存包'));
+                }
+              },
+              fail: () => {
+                // 异常情况也视为取消
+                reject(new Error('操作取消'));
+              }
+            });
+          });
         }
       }
 
@@ -347,29 +364,28 @@ Page({
         throw new Error('更新柜子当前订单失败');
 
       // 5. 查询用户是否有余额
-      const userDeposit = await this.getUserDeposit(this.data.openid);
+      // const userDeposit = await this.getUserDeposit(this.data.openid);
       const deviceDeposit = await this.getDeviceDeposit(this.data.deviceId);
       let newDeposit = 0;
-      if (userDeposit >= deviceDeposit) {
-        wx.showToast({ title: '余额充足，无需支付', icon: 'none', duration: 2000});
-        //更新订单状态为进行中并更新付款金额
-        const updateOrderRes = await wx.cloud.callFunction({
-          name: "order",
-          data: {
-            action: "updateOrder",
-            orderId: orderId,
-            status: this.data.constants.ORDER_STATUS_PROCESSING,
-            deposit: newDeposit
-          }
-        });
-        if (!updateOrderRes.result?.success) 
-          throw new Error('更新订单状态为进行中失败');
+      // if (userDeposit >= deviceDeposit) {
+      //   wx.showToast({ title: '余额充足，无需支付', icon: 'none', duration: 2000});
+      //   //更新订单状态为进行中并更新付款金额
+      //   const updateOrderRes = await wx.cloud.callFunction({
+      //     name: "order",
+      //     data: {
+      //       action: "updateOrder",
+      //       orderId: orderId,
+      //       status: this.data.constants.ORDER_STATUS_PROCESSING,
+      //       deposit: newDeposit
+      //     }
+      //   });
+      //   if (!updateOrderRes.result?.success) 
+      //     throw new Error('更新订单状态为进行中失败');
         
-      } else {
-        // 押金不足，需要支付
+      // } else {
+        // 每次支付押金
         const confirmPay = await this.showPaymentConfirmModal(lockerInfo.deviceDeposit, lockerInfo.lockerNo);
         if (!confirmPay) {
-          wx.navigateBack({ delta: 1 });
           throw new Error('未确认支付');
         }
 
@@ -383,7 +399,7 @@ Page({
         if (!confirmed) 
           throw new Error('支付结果未确认');
         newDeposit = deviceDeposit;
-      }
+      //}
 
       // 7.更新用户余额
       const userUpdate = await wx.cloud.callFunction({
@@ -414,7 +430,6 @@ Page({
 
       if (!openDoorRes.result?.success){
         wx.hideLoading();
-        wx.showToast({ title: '开门失败，请重试', icon: 'none' });
         throw new Error('开门失败，请重试');
       }else{
         //缓存手机号和密码
@@ -447,7 +462,7 @@ Page({
       if (orderId) await this.recoverOrder(orderId);
 
        // 根据错误信息弹窗提示
-      const msg = e.message || '开柜失败，请重试';
+      const msg = e.message || '开柜失败，订单已取消，请重试';
 
       wx.showModal({
         title: '提示',

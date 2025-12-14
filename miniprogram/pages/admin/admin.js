@@ -77,7 +77,7 @@ Page({
   
   //配置设备
   async batchCreateLockersByDevice() {
-    const { internalNo, deviceAddress, deviceDeposit, screenNo, cabinetCount, lockersPerCabinet } = this.data;
+    const { internalNo, deviceAddress, deviceDeposit, unitPrice, screenNo, cabinetCount, lockersPerCabinet } = this.data;
     
     if (!deviceAddress || !internalNo || cabinetCount <= 0 || lockersPerCabinet <= 0) {
       return wx.showToast({ 
@@ -96,6 +96,7 @@ Page({
           internalNo: internalNo, // 指定设备ID
           deviceAddress: deviceAddress,
           deviceDeposit: parseInt(deviceDeposit),
+          unitPrice: parseInt(unitPrice),
           screenNo: parseInt(screenNo),
           cabinetCount: parseInt(cabinetCount),
           lockersPerCabinet: parseInt(lockersPerCabinet)
@@ -122,54 +123,6 @@ Page({
       wx.showToast({ title: '网络错误，请重试', icon: 'none' });
     }
   },
-
-  // 4. 查询柜门状态（新增方法）
-  // async queryDoorStatus() {
-  //   const { queryDeviceId, queryCabinetNo, queryDoorNo } = this.data;
-    
-  //   // 参数校验
-  //   if (!queryDeviceId || !queryCabinetNo || !queryDoorNo) {
-  //     return wx.showToast({ title: '请输入设备ID、锁板号和柜门号', icon: 'none' });
-  //   }
-  //   if (!/^L\d+$/.test(queryDeviceId)) { // 验证设备ID格式（如L0001）
-  //     return wx.showToast({ title: '设备ID格式错误（如L0001）', icon: 'none' });
-  //   }
-  //   if (isNaN(queryCabinetNo) || isNaN(queryDoorNo)) { // 验证数字格式
-  //     return wx.showToast({ title: '锁板号和柜门号必须为数字', icon: 'none' });
-  //   }
-
-  //   this.showLoading('查询柜门状态中...');
-    
-  //   try {
-  //     const result = await wx.cloud.callFunction({
-  //       name: 'locker', // 调用locker云函数的queryDoorStatus接口
-  //       data: {
-  //         action: 'queryDoorStatus',
-  //         deviceId: queryDeviceId,
-  //         cabinetNo: parseInt(queryCabinetNo), // 转换为数字
-  //         doorNo: parseInt(queryDoorNo)       // 转换为数字
-  //       }
-  //     });
-
-  //     this.hideLoading();
-      
-  //     if (result.result.success) {
-  //       // 存储查询结果，用于页面展示
-  //       this.setData({
-  //         doorStatusResult: `柜门状态：${result.result.data.status}（最后更新：${new Date().toLocaleString()}）`
-  //       });
-  //       wx.showToast({ title: '查询成功', icon: 'success' });
-  //     } else {
-  //       this.setData({ doorStatusResult: null });
-  //       wx.showToast({ title: result.result.errMsg || '查询失败', icon: 'none' });
-  //     }
-  //   } catch (err) {
-  //     this.hideLoading();
-  //     this.setData({ doorStatusResult: null });
-  //     console.error('查询柜门状态失败：', err);
-  //     wx.showToast({ title: '操作失败，请重试', icon: 'none' });
-  //   }
-  // },
 
   // 页面加载时验证管理员权限
   async onLoad() {

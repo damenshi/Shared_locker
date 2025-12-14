@@ -36,30 +36,16 @@
               <text class="value">{{item.todayPaid || 0}}</text>
             </view>
 
-            <!-- <view class="row">
-              <text class="label">今日退款订单</text>
-              <text class="value">{{item.todayRefunded || 0}}</text>
-            </view> -->
-
             <view class="row">
               <text class="label">本月订单</text>
               <text class="value">{{item.thisMonthPaid || 0}}</text>
             </view>
-
-            <!-- <view class="row">
-              <text class="label">本月退款订单</text>
-              <text class="value">{{item.thisMonthRefunded || 0}}</text>
-            </view> -->
 
             <view class="row">
               <text class="label">上月订单</text>
               <text class="value">{{item.lastMonthPaid || 0}}</text>
             </view>
 
-            <!-- <view class="row">
-              <text class="label">上月退款订单</text>
-              <text class="value">{{item.lastMonthRefunded || 0}}</text>
-            </view> -->
           </view>
 
           <!-- ✅ 展开详情 -->

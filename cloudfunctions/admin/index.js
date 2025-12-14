@@ -7,13 +7,13 @@ const ADMIN_OPENIDS = (process.env.ADMIN_OPENIDS || '').split(',').filter(Boolea
 
 
 const batchCreateLockers = async (event) => {
-  const { internalNo, deviceAddress, deviceDeposit, screenNo,cabinetCount, lockersPerCabinet } = event
+  const { internalNo, deviceAddress, deviceDeposit, unitPrice, screenNo,cabinetCount, lockersPerCabinet } = event
   
   // 验证参数
-  if (!internalNo || !deviceAddress || !deviceDeposit || !screenNo || !cabinetCount || !lockersPerCabinet) {
+  if (!internalNo || !deviceAddress || !deviceDeposit || !unitPrice|| !screenNo || !cabinetCount || !lockersPerCabinet) {
     return { 
       success: false, 
-      errMsg: '请指定设备ID、设备地址、设备收费标准、屏幕编号、锁板数量和每个锁板的锁数量' 
+      errMsg: '请指定设备ID、设备地址、设备收费标准、收费策略、屏幕编号、锁板数量和每个锁板的锁数量' 
     }
   }
 
@@ -36,6 +36,7 @@ const batchCreateLockers = async (event) => {
           isConfigured: true,                    // 标记为已配置
           deviceAddress: deviceAddress,          // 设备地址
           deviceDeposit: deviceDeposit,
+          unitPrice: unitPrice,
           screenNo: screenNo,
           updatedAt: db.serverDate()             // 更新时间
         }
