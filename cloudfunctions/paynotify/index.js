@@ -53,6 +53,36 @@ async function handlePayNotify(notifyData) {
   const amountFen = notifyData.amount?.total || 0;
   const amountYuan = amountFen / 100;
 
+  console.log(`[回调] 订单 ${orderId} 支付成功，准备开门...`);
+
+  // 1. 先查询订单信息获取柜门号 (新增)
+  const orderRes = await db.collection('orders').doc(orderId).get();
+  const order = orderRes.data;
+
+  // 2. 调用 locker 云函数执行开门 (新增核心逻辑)
+  // 哪怕这里开门报错，也不能阻塞更新订单状态，否则微信会一直重试
+  try {
+    // 只有当订单状态不是进行中时才开门，防止微信重复回调导致重复开门
+    if (order.status !== CONSTANTS.ORDER_STATUSES.IN_PROGRESS) {
+       await cloud.callFunction({
+        name: 'locker',
+        data: {
+          action: 'openDoor',
+          deviceId: order.deviceId,
+          doorNo: order.doorNo,
+          cabinetNo: order.cabinetNo,
+          orderId: orderId,
+          type: 'store'
+        }
+      });
+      console.log(`[回调] 柜门 ${order.lockerNo} 开门指令发送成功`);
+    }
+  } catch (err) {
+    console.error(`[回调] 开门失败 (可能是硬件离线或已开):`, err);
+    // 这里不抛出错误，继续向下执行更新订单状态，保证支付流程完整
+  }
+
+  // 3. 更新数据库状态 (原逻辑)
   await db.collection('orders').doc(orderId).update({
     data: {
       status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,

@@ -10,7 +10,7 @@ const batchCreateLockers = async (event) => {
   const { internalNo, deviceAddress, deviceDeposit, unitPrice, screenNo,cabinetCount, lockersPerCabinet } = event
   
   // 验证参数
-  if (!internalNo || !deviceAddress || !deviceDeposit || !unitPrice|| !screenNo || !cabinetCount || !lockersPerCabinet) {
+  if (!internalNo || !deviceAddress || deviceDeposit === undefined || unitPrice === undefined || !screenNo || !cabinetCount || !lockersPerCabinet) {
     return { 
       success: false, 
       errMsg: '请指定设备ID、设备地址、设备收费标准、收费策略、屏幕编号、锁板数量和每个锁板的锁数量' 

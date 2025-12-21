@@ -734,7 +734,7 @@ exports.main = async (event, context) => {
           .where({ openid })
           .update({
             data: {
-              deposit: _.inc(-order.deposit),
+              deposit: _.inc(-order.refundAmount),
               updatedAt: db.serverDate()
             }
           });

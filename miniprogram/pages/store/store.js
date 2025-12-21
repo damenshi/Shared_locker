@@ -406,7 +406,7 @@ Page({
         }
 
         //支付
-        wx.showLoading({ title: '支付预付费用...' });
+        // wx.showLoading({ title: '支付预付费用...' });
         const paySuccess = await this.payment(orderId, lockerInfo.deviceDeposit);
         if (!paySuccess) {
           throw new Error('支付失败');
@@ -430,47 +430,30 @@ Page({
         throw new Error('更新用户余额失败');
 
       // 8. 开柜操作
-      wx.showLoading({ title: '打开柜门中...' });
-      // const openSuccess = await this.openCabinet(lockerInfo, orderId);
-      const openDoorRes = await wx.cloud.callFunction({
-        name: "locker",
-        data: {
-          action: "openDoor",
-          deviceId: lockerInfo.deviceId,
-          doorNo: lockerInfo.doorNo,
-          orderId: orderId,
-          cabinetNo: lockerInfo.cabinetNo,
-          type: "store"
+      console.log('支付确认完成，后端已自动开门');
+
+      //缓存手机号和密码
+      await this.saveUserCredentials(this.data.openid, this.data.phone, this.data.password);
+      
+      const pages = getCurrentPages();
+      const indexPage = pages.find(p => p.route === 'pages/index/index');
+      if (indexPage) {
+        indexPage.showOpenedLocker(lockerInfo.lockerNo);
+      }
+
+      wx.hideLoading();
+      wx.showModal({
+        title: '提示',
+        content: `柜门 ${lockerInfo.lockerNo} 已打开`,
+        showCancel: false,
+        confirmText: '好的',
+        success: (res) => {
+          if (res.confirm) {
+            // 用户点击了“好的”
+            wx.navigateBack({ delta: 1 });
+          }
         }
       });
-
-      if (!openDoorRes.result?.success){
-        wx.hideLoading();
-        throw new Error('开门失败，请重试');
-      }else{
-        //缓存手机号和密码
-        await this.saveUserCredentials(this.data.openid, this.data.phone, this.data.password);
-
-        const pages = getCurrentPages();
-        const indexPage = pages.find(p => p.route === 'pages/index/index');
-        if (indexPage) {
-          indexPage.showOpenedLocker(lockerInfo.lockerNo);
-        }
-  
-        wx.hideLoading();
-        wx.showModal({
-          title: '提示',
-          content: `柜门 ${lockerInfo.lockerNo} 已打开`,
-          showCancel: false,
-          confirmText: '好的',
-          success: (res) => {
-            if (res.confirm) {
-              // 用户点击了“好的”
-              wx.navigateBack({ delta: 1 });
-            }
-          }
-        });        
-      }
 
     } catch (e) {
       console.error("存包流程异常", e);
@@ -478,11 +461,15 @@ Page({
       if (orderId) await this.recoverOrder(orderId);
 
        // 根据错误信息弹窗提示
-      const msg = e.message || '开柜失败，订单已取消，请重试';
+      let showMsg = e.message || '开柜失败，订单已取消，请重试';
+      // 如果错误信息包含 'cloud.callFunction' 或 'fail' 等系统关键词，强制替换为友好提示
+      if (showMsg.includes('cloud.callFunction') || showMsg.includes('fail')) {
+        showMsg = '网络或设备异常，请重试';
+      }
 
       wx.showModal({
         title: '提示',
-        content: msg,
+        content: showMsg,
         showCancel: false,
         confirmText: '好的',
         success: (res) => {
