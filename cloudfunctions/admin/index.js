@@ -7,7 +7,7 @@ const ADMIN_OPENIDS = (process.env.ADMIN_OPENIDS || '').split(',').filter(Boolea
 
 
 const batchCreateLockers = async (event) => {
-  const { internalNo, deviceAddress, deviceDeposit, unitPrice, screenNo,cabinetCount, lockersPerCabinet } = event
+  const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefund, screenNo,cabinetCount, lockersPerCabinet } = event
   
   // 验证参数
   if (!internalNo || !deviceAddress || deviceDeposit === undefined || unitPrice === undefined || !screenNo || !cabinetCount || !lockersPerCabinet) {
@@ -37,6 +37,7 @@ const batchCreateLockers = async (event) => {
           deviceAddress: deviceAddress,          // 设备地址
           deviceDeposit: deviceDeposit,
           unitPrice: unitPrice,
+          delayedRefund: delayedRefund || false,
           screenNo: screenNo,
           updatedAt: db.serverDate()             // 更新时间
         }

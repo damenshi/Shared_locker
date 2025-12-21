@@ -96,6 +96,13 @@
               </view>
 
               <view class="row">
+              <text class="label">延时退款</text>
+                <text class="value {{item.delayedRefund ? 'green-text' : 'red-text'}}">
+                  {{item.delayedRefund ? '是' : '否'}}
+                </text>
+              </view>
+            
+              <view class="row">
                 <text class="label">创建时间</text>
                 <text class="value">{{item.createdAtFormatted}}</text>
               </view>

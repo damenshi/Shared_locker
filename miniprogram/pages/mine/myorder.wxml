@@ -1,14 +1,14 @@
 <view class="container">
-  <!-- 如果没有订单 -->
   <block wx:if="{{!loading && orders.length === 0}}">
     <view class="empty">暂无订单</view>
   </block>
 
-  <!-- 有订单时 -->
   <block wx:if="{{orders.length > 0}}">
     <view class="order-list">
       <block wx:for="{{orders}}" wx:key="_id">
-        <view class="order-card">
+        
+        <view class="order-card" wx:if="{{index === 0 || isExpanded}}">
+          
           <view class="order-header">
             <text class="order-id">订单号：{{item._id}}</text>
           </view>
@@ -38,10 +38,6 @@
               <text class="label">设备地址</text>
               <text class="value">{{item.deviceAddress}}</text>
             </view>
-            <!-- <view class="row">
-              <text class="label">用户ID</text>
-              <text class="value">{{item.openid}}</text>
-            </view> -->
             <view class="row">
               <text class="label">创建时间</text>
               <text class="value">{{item.createdAtFormatted}}</text>
@@ -77,9 +73,17 @@
           </button>
         </view>
       </block>
+
+      <view class="footer-tips">
+        点击退款后会在0～3天内完成结算，并转入余额。
+        可前往【我的余额】提现。
+      </view>
+
+      <view wx:if="{{orders.length > 1}}" class="expand-control" bindtap="toggleHistory">
+        <text>{{isExpanded ? '收起历史订单' : '历史订单'}}</text>
+        <text class="arrow">{{isExpanded ? '▲' : '▼'}}</text>
+      </view>
+
     </view>
   </block>
-  <view style="width: 100%; text-align: center; font-size: 24rpx; color: #cccccc; padding: 30rpx 0;">
-  已显示七天内订单
-  </view>
 </view>

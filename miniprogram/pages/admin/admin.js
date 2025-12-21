@@ -15,10 +15,11 @@ Page({
     internalNo: '',
     cabinetCount: '', //每个设备的锁板数量
     lockersPerCabinet: '', // 每个锁板的锁数量
-    // queryDeviceId: '',      // 要查询的设备ID
-    // queryCabinetNo: '',     // 要查询的锁板号
-    // queryDoorNo: '',        // 要查询的柜门号
-    // doorStatusResult: null,  // 查询结果（存储柜门状态）
+    unitPrice: '',
+    delayedRefundInput: '',
+    screenNo: '',
+    deviceAddress: '',
+    deviceDeposit: '',
 
     // 加载状态
     loading: false
@@ -77,7 +78,7 @@ Page({
   
   //配置设备
   async batchCreateLockersByDevice() {
-    const { internalNo, deviceAddress, deviceDeposit, unitPrice, screenNo, cabinetCount, lockersPerCabinet } = this.data;
+    const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefundInput,screenNo, cabinetCount, lockersPerCabinet } = this.data;
     
     if (!deviceAddress || !internalNo || cabinetCount <= 0 || lockersPerCabinet <= 0) {
       return wx.showToast({ 
@@ -86,6 +87,7 @@ Page({
       });
     }
 
+    const delayedRefund = (delayedRefundInput === '是');
     this.showLoading('生成锁具中...');
     
     try {
@@ -97,6 +99,7 @@ Page({
           deviceAddress: deviceAddress,
           deviceDeposit: parseInt(deviceDeposit),
           unitPrice: parseInt(unitPrice),
+          delayedRefund: delayedRefund || false,
           screenNo: parseInt(screenNo),
           cabinetCount: parseInt(cabinetCount),
           lockersPerCabinet: parseInt(lockersPerCabinet)

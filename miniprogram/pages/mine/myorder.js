@@ -37,7 +37,14 @@ Page({
   data: {
     orders: [],
     loading: true,
-    openid: ''
+    openid: '',
+    isExpanded: false
+  },
+
+  toggleHistory() {
+    this.setData({
+      isExpanded: !this.data.isExpanded
+    });
   },
 
   onLoad() {
@@ -127,6 +134,21 @@ Page({
   
             // 统一弹窗通知结果
             if (res.result.success) {
+
+              // 如果后端返回 delayed，说明是延迟退款，拦截后续流程
+              if (res.result.action === 'delayed') {
+                wx.showModal({
+                  title: '退款申请已提交',
+                  content: '退款会在0～3天内完成结算，并转入余额。可前往【我的余额】提现。',
+                  showCancel: false,
+                  success: () => {
+                    if (this.onLoad) this.onLoad(); // 刷新列表
+                    else this.handleStoreItem(); // 防止 onLoad 不存在的情况
+                  }
+                });
+                return; // 结束函数，不再执行下面的成功弹窗
+              }
+            
               const errorMsg = res.result.data?.error;
               const raw = res.result.data?.errRaw?.response?.text;
               let finalMsg = '';

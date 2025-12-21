@@ -1,0 +1,53 @@
+<view class="container">
+  <view class="page-header">
+    <view class="header-title">我的余额</view>
+    <view class="header-desc">系统结算完成后可提现</view>
+  </view>
+  
+  <block wx:if="{{list.length > 0}}">
+    <view class="card" wx:for="{{list}}" wx:key="_id">
+      
+      <view class="card-header">
+        <text class="label">订单号</text>
+        <text class="value">{{item.outTradeNo || item._id}}</text>
+      </view>
+
+      <view class="card-body">
+        <view class="amount-box">
+          <text class="symbol">￥</text>
+          <text class="num">{{item.refundAmount}}</text>
+        </view>
+
+        <view class="action-box">
+          <button 
+            wx:if="{{item.canWithdraw}}" 
+            class="btn-withdraw"
+            hover-class="btn-hover"
+            bindtap="doWithdraw" 
+            data-id="{{item._id}}">提现</button>
+          
+          <view wx:else class="status-tag">
+            <text class="icon">⏳</text>
+            <text>结算中</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="card-footer">
+        <view class="time-row">
+          <text class="label">申请时间：</text>
+          <text class="val">{{item.displayTime}}</text>
+        </view>
+        <view class="time-row highlight" wx:if="{{!item.canWithdraw}}">
+          <text class="label">预计可提：</text>
+          <text class="val">{{item.availableTime}}</text>
+        </view>
+      </view>
+
+    </view>
+  </block>
+  
+  <view wx:else class="empty-state">
+    <image class="empty-icon" src="" /> <text>暂无退款记录</text>
+  </view>
+</view>

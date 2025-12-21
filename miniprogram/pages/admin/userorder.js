@@ -121,7 +121,8 @@ Page({
               data: {
                 action: 'refundOrder',
                 openid: openid,
-                orderId: orderId
+                orderId: orderId,
+                force: true
               }
             });
             console.log('退款结果：', res)

@@ -61,3 +61,27 @@
   color: #333;
   font-size: 26rpx;
 }
+
+/* === 新增样式：展开控制条 === */
+.expand-control {
+  padding: 20rpx 0;
+  text-align: center;
+  color: #999;
+  font-size: 26rpx;
+  display: flex;     
+  align-items: center; 
+  justify-content: center;
+}
+
+.arrow {
+  margin-left: 10rpx;
+  font-size: 20rpx;
+}
+
+.footer-tips {
+  text-align: center;
+  font-size: 28rpx; /* 字号较小 */
+  color: #999;      /* 浅灰色 */
+  padding: 30rpx 0; /* 上下留出间距 */
+  margin-top: 10rpx;
+}

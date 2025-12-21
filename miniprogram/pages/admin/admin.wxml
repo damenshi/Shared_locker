@@ -110,6 +110,17 @@
     </view>
 
     <view class="input-item">
+      <text>延迟退款：</text>
+      <input 
+        type="text" 
+        value="{{delayedRefundInput}}" 
+        data-field="delayedRefundInput"
+        bindinput="onInputChange"
+        placeholder="输入“是”开启，否则关闭"
+      />
+    </view>
+
+    <view class="input-item">
       <text>屏幕编号：</text>
       <input 
         type="text" 

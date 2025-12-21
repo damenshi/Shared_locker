@@ -15,6 +15,11 @@
 
   <!-- 功能菜单 -->
   <view class="menu-list">
+    <!-- 我的余额 -->
+    <view class="menu-item" bindtap="goMywallet">
+      <view class="menu-text">我的余额</view>
+    </view>
+
     <!-- 我的订单 -->
     <view class="menu-item" bindtap="goMyOrders">
       <view class="menu-text">我的订单</view>

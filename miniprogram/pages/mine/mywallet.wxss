@@ -1,0 +1,162 @@
+/* miniprogram/pages/mine/wallet/wallet.wxss */
+.container {
+  padding: 30rpx;
+  background-color: #f7f8fa; /* 更柔和的背景灰 */
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* 页面头部 */
+.page-header {
+  margin-bottom: 40rpx;
+}
+.header-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+.header-desc {
+  font-size: 26rpx;
+  color: #999;
+}
+
+/* 卡片整体 */
+.card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.03); /* 轻柔的阴影 */
+  position: relative;
+  overflow: hidden;
+}
+
+/* 1. 头部：订单号 */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid #f5f5f5;
+  margin-bottom: 20rpx;
+}
+.card-header .label {
+  font-size: 24rpx;
+  color: #999;
+}
+.card-header .value {
+  font-size: 24rpx;
+  color: #666;
+  font-family: monospace; /* 等宽字体显示订单号更好看 */
+}
+
+/* 2. 中部：金额与动作 */
+.card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.amount-box {
+  display: flex;
+  align-items: baseline;
+  color: #333;
+}
+.amount-box .symbol {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-right: 4rpx;
+}
+.amount-box .num {
+  font-size: 56rpx; /* 大字号突出金额 */
+  font-weight: bold;
+  color: #e64340; /* 红色 */
+  letter-spacing: -1px;
+}
+
+/* 按钮样式 */
+.btn-withdraw {
+  background: #07c160;
+  color: #fff;
+  font-size: 24rpx;   /* 字体稍微改小 */
+  
+  /* === 核心修改点 === */
+  width: 160rpx !important; /* 强制设置固定宽度，约等于原来的 1/2 */
+  padding: 0;               /* 清除内边距，依靠 width 定宽 */
+  text-align: center;       /* 文字居中 */
+  /* ================= */
+  
+  height: 52rpx;      /* 高度稍微调低 */
+  line-height: 52rpx; /* 保持垂直居中 */
+  border-radius: 26rpx;
+  
+  margin: 0;
+  min-height: 0;      /* 清除小程序按钮默认的最小高度限制 */
+  font-weight: 500;
+  box-shadow: 0 4rpx 10rpx rgba(7, 193, 96, 0.3);
+}
+
+.btn-hover {
+  opacity: 0.9;
+  transform: scale(0.98);
+}
+
+/* 结算中标签 */
+.status-tag {
+  background: #fff7e6;
+  padding: 8rpx 20rpx;
+  border-radius: 8rpx;
+  display: flex;
+  align-items: center;
+  border: 1rpx solid #ffd591;
+}
+.status-tag .icon {
+  font-size: 24rpx;
+  margin-right: 8rpx;
+}
+.status-tag text {
+  font-size: 26rpx;
+  color: #fa8c16;
+  font-weight: 500;
+}
+
+/* 3. 底部：时间信息 */
+.card-footer {
+  background-color: #f9f9f9;
+  margin: 0 -30rpx -30rpx -30rpx; /* 抵消父元素的padding */
+  padding: 20rpx 30rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 24rpx;
+  margin-bottom: 8rpx;
+  color: #999;
+}
+.time-row:last-child {
+  margin-bottom: 0;
+}
+
+/* 预计提现时间高亮 */
+.time-row.highlight .label {
+  color: #fa8c16;
+}
+.time-row.highlight .val {
+  color: #fa8c16;
+  font-weight: 500;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 200rpx;
+  color: #ccc;
+  font-size: 28rpx;
+}

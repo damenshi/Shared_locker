@@ -406,7 +406,7 @@ Page({
         }
 
         //支付
-        // wx.showLoading({ title: '支付预付费用...' });
+        wx.showLoading({ title: '处理中...' });
         const paySuccess = await this.payment(orderId, lockerInfo.deviceDeposit);
         if (!paySuccess) {
           throw new Error('支付失败');
@@ -467,9 +467,11 @@ Page({
         showMsg = '网络或设备异常，请重试';
       }
 
+      const finalMsg = `${showMsg}\n\n如有疑问请拨打客服电话19942291657`;
+
       wx.showModal({
         title: '提示',
-        content: showMsg,
+        content: finalMsg,
         showCancel: false,
         confirmText: '好的',
         success: (res) => {
