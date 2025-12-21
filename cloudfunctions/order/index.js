@@ -566,9 +566,14 @@ exports.main = async (event, context) => {
     }
 
     try {
+      // === 新增部分开始：计算7天前的时间 ===
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
       const orderInfo = await db.collection('orders')
         .where({
           openid,
+          createdAt: _.gte(sevenDaysAgo)
         })
         .field({
           _id: true,
@@ -586,6 +591,7 @@ exports.main = async (event, context) => {
           fee: true,
           refundAmount: true
         })
+        .orderBy('createdAt', 'desc')
         .get()
 
       if (orderInfo.data.length === 0) {

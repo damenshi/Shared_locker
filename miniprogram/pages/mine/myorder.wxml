@@ -79,4 +79,7 @@
       </block>
     </view>
   </block>
+  <view style="width: 100%; text-align: center; font-size: 24rpx; color: #cccccc; padding: 30rpx 0;">
+  已显示七天内订单
+  </view>
 </view>
