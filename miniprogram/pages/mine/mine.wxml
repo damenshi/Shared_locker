@@ -25,16 +25,16 @@
       <view class="menu-text">我的订单</view>
     </view>
 
-    <!-- 申请退款 -->
-    <!-- <view class="menu-item" bindtap="handleRefund">
-      <view class="menu-text">申请退款</view>
-    </view> -->
-
     <!-- 客服电话 -->
     <view class="menu-item" bindtap="customerService">
       <view class="menu-text">客服电话</view>
       <view class="customerphone">{{'19942291657'}}</view>
     </view>
+
+    <!-- <view class="menu-item" bindtap="customerService">
+      <view class="menu-text">客服电话</view>
+      <view class="customerphone">{{'19942291657'}}</view>
+    </view> -->
 
     <!-- 管理员界面 -->
     <view class="menu-item" bindtap="goAdmin" wx:if="{{isAdmin}}">

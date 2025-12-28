@@ -160,3 +160,47 @@
   color: #ccc;
   font-size: 28rpx;
 }
+
+/* ... 原有样式保持不变 ... */
+
+/* 新增：分区标题 */
+.section-title {
+  font-size: 28rpx;
+  color: #666;
+  margin-bottom: 20rpx;
+  margin-left: 10rpx;
+  font-weight: 500;
+}
+
+/* 新增：历史记录开关 */
+.history-toggle {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 30rpx 10rpx;
+  font-size: 24rpx;
+  color: #999;
+  /* margin-top: 20rpx; */
+}
+
+.history-toggle .arrow {
+  font-size: 20rpx;       
+  margin-left: 10rpx;    
+  transition: transform 0.3s;
+}
+
+
+/* 箭头旋转动画 */
+.history-toggle .arrow.up {
+  transform: rotate(180deg);
+}
+
+/* 历史内容容器 */
+.history-content {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}

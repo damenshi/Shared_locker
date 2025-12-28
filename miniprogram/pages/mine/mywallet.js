@@ -2,16 +2,24 @@ const app = getApp();
 
 Page({
   data: {
-    list: []
+    latestItem: null, // 修改点：单独存储最新一条
+    historyList: [],  // 修改点：存储历史记录
+    showHistory: false // 修改点：控制历史记录折叠状态
   },
 
   onShow() {
     this.loadWallet();
   },
 
-  // 下拉刷新
   onPullDownRefresh() {
     this.loadWallet();
+  },
+
+  // 修改点：新增切换折叠状态的函数
+  toggleHistory() {
+    this.setData({
+      showHistory: !this.data.showHistory
+    });
   },
 
   async loadWallet() {
@@ -26,14 +34,13 @@ Page({
 
       if (res.result.success) {
         const now = Date.now();
-        // const delayTimes = 1 * 1000;
-        const delayTimes = 12 * 60 * 60 * 1000; // 这里的延迟时间按你实际需求设定
+        const delayTimes = 16 * 60 * 60 * 1000;
 
-        const list = res.result.data.map(item => {
+        // 1. 先处理所有数据格式
+        let allList = res.result.data.map(item => {
           const applyTime = new Date(item.refundApplyTime).getTime();
           const canWithdraw = (now - applyTime) >= delayTimes;
           
-          // 格式化函数：补零
           const formatNum = (n) => n.toString().padStart(2, '0');
           const formatFullTime = (date) => `${formatNum(date.getMonth() + 1)}-${formatNum(date.getDate())} ${formatNum(date.getHours())}:${formatNum(date.getMinutes())}`;
 
@@ -43,14 +50,23 @@ Page({
           return {
             ...item,
             canWithdraw,
-            // 申请时间：显示 月-日 时:分
             displayTime: formatFullTime(dateObj),
-            // 预计到账：显示 月-日 时:分 
-            availableTime: formatFullTime(unlockTimeObj)
+            availableTime: formatFullTime(unlockTimeObj),
+            rawTime: applyTime // 用于排序
           };
         });
+
+        // 2. 按时间倒序排序（确保最新的在最前）
+        allList.sort((a, b) => b.rawTime - a.rawTime);
+
+        // 3. 拆分数据
+        const latestItem = allList.length > 0 ? allList[0] : null;
+        const historyList = allList.length > 1 ? allList.slice(1) : [];
         
-        this.setData({ list });
+        this.setData({ 
+          latestItem, 
+          historyList 
+        });
       }
     } catch (err) {
       console.error(err);
@@ -61,9 +77,8 @@ Page({
   },
 
   async doWithdraw(e) {
+    // ... 保持原有逻辑不变 ...
     const orderId = e.currentTarget.dataset.id;
-    
-    // 二次确认
     wx.showModal({
       title: '提现',
       content: '确认将该笔款项退回原支付账户？',
@@ -73,22 +88,17 @@ Page({
           try {
             const callRes = await wx.cloud.callFunction({
               name: 'order',
-              data: {
-                action: 'withdrawRefund',
-                orderId: orderId
-              }
+              data: { action: 'withdrawRefund', orderId: orderId }
             });
-            
             wx.hideLoading();
             if (callRes.result.success) {
               wx.showModal({
                 title: '提现成功',
                 content: '提现已成功，请注意查收。',
-                showCancel: false, // 不显示取消按钮
+                showCancel: false,
                 confirmText: '好的',
                 success: (res) => {
                   if (res.confirm) {
-                    // 用户点击“好的”之后再刷新列表
                     this.loadWallet(); 
                   }
                 }
