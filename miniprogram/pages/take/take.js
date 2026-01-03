@@ -136,7 +136,7 @@ Page({
         name: "locker",
         data: {
           action: "openDoor",
-          deviceId: order.deviceId,
+          deviceId: this.data.deviceId,
           doorNo: order.doorNo,
           orderId: order._id,
           cabinetNo: order.cabinetNo,

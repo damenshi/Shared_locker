@@ -253,14 +253,31 @@ async function handleDeviceHeartbeat(deviceId, data, timestamp) {
  */
 async function handleOpenByPhone(deviceId, data) {
   const {phone, password} = data;
-  
+
+  // 1. 先查询当前设备信息，看是否是从设备
+  let searchDeviceId = deviceId;
+  try {
+    const devRes = await db.collection('devices').where({ deviceId }).get();
+    if (devRes.data.length > 0) {
+      const deviceData = devRes.data[0];
+      // 如果存在 masterId，说明是从设备，需要去查主设备的订单
+      if (deviceData.masterId) {
+        searchDeviceId = deviceData.masterId;
+        console.log(`[handleOpenByPhone] 检测到从设备 ${deviceId}，切换查询主设备 ${searchDeviceId} 的订单`);
+      }
+    }
+  } catch (e) {
+    console.error('查询设备信息失败', e);
+    // 查询失败时继续尝试用原ID查，或者直接报错视业务而定
+  }
+
   // 1. 验证订单信息
   const orderRes = await db.collection('orders')
       .where({
           phone,
           password,
           status: '进行中', // 有效订单
-          deviceId
+          deviceId: searchDeviceId //使用映射后的 ID (主设备ID) 查单
       })
       .limit(1)
       .get();
@@ -277,7 +294,7 @@ async function handleOpenByPhone(deviceId, data) {
           name: 'locker',
           data: {
               action: 'openDoor',
-              deviceId: deviceId,
+              deviceId: deviceId, //传入用户所在的物理设备ID，确保开对门
               doorNo: order.doorNo,
               orderId: order._id,
               cabinetNo: order.cabinetNo,
@@ -332,14 +349,28 @@ async function handleOpenByPhone(deviceId, data) {
  */
 async function handleMidwayOpen(deviceId, data) {
   const {phone, password} = data;
-  
+
+  let searchDeviceId = deviceId;
+  try {
+    const devRes = await db.collection('devices').where({ deviceId }).get();
+    if (devRes.data.length > 0) {
+      const deviceData = devRes.data[0];
+      if (deviceData.masterId) {
+        searchDeviceId = deviceData.masterId;
+        console.log(`[handleMidwayOpen] 检测到从设备 ${deviceId}，切换查询主设备 ${searchDeviceId} 的订单`);
+      }
+    }
+  } catch (e) {
+    console.error('查询设备信息失败', e);
+  }
+
   // 1. 验证订单信息
   const orderRes = await db.collection('orders')
       .where({
           phone,
           password,
           status: '进行中', // 有效订单
-          deviceId
+          deviceId: searchDeviceId //使用映射后的 ID 查单
       })
       .limit(1)
       .get();

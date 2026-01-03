@@ -40,7 +40,21 @@ exports.main = async (event, context) => {
   if (action === 'listFree') {
     try {
       const { deviceId } = event;
-  
+      
+      //拦截从设备存包请求 ===
+      // 1. 获取设备信息
+      const devRes = await db.collection('devices').where({ deviceId }).get();
+      if (devRes.data.length > 0) {
+        const device = devRes.data[0];
+        // 2. 如果存在 masterId，说明这是取包面（从设备）
+        if (device.masterId) {
+           return { 
+             success: false, 
+             errMsg: '此处为取包口，请前往柜子正面（存包区）进行存包' 
+           };
+        }
+      }
+
       return await db.runTransaction(async transaction => {
         const whereCondition = {
           status: 'free',
@@ -165,10 +179,27 @@ exports.main = async (event, context) => {
     };
     
     try {
+      // 查询当前设备
+      const devRes = await db.collection('devices').where({ deviceId }).get();
+      const currentDevice = devRes.data[0] || {};
+      
+      // 判断是否是从设备
+      const isSlave = !!currentDevice.masterId;
+      
+      // dataLockerId: 数据存储在哪个设备名下？(如果有masterId，则数据在masterId名下)
+      const dataLockerId = isSlave ? currentDevice.masterId : deviceId;
+      
+      // targetHardwareId: 发指令给哪个设备？(发给用户当前扫码的设备)
+      const targetHardwareId = deviceId;
+
       return await db.runTransaction(async transaction => {
         // 查询柜子信息
         const lockerQuery = await transaction.collection('lockers')
-          .where({ deviceId, doorNo, cabinetNo})
+          .where({ 
+                  deviceId: dataLockerId, 
+                  doorNo, 
+                  cabinetNo
+                })
           .get({ readFresh: true })
 
         if (lockerQuery.data.length === 0) {
@@ -181,6 +212,7 @@ exports.main = async (event, context) => {
 
         // 存包开柜逻辑
         if (type === 'store') {
+
           // 状态校验
           if (locker.status !== 'occupied' || locker.currentOrderId !== orderId) {
             throw new Error(
@@ -188,24 +220,15 @@ exports.main = async (event, context) => {
             )
           }
 
-          // 订单校验
-          // const orderQuery = await transaction.collection('orders').doc(orderId).get()
-          // if (!orderQuery.data) {
-          //   throw new Error(`订单 ${orderId} 不存在`)
-          // }
-          // if (!['进行中', '已支付'].includes(orderQuery.data.status)) {
-          //   throw new Error(`订单 ${orderId} 未支付，无法开柜`)
-          // }
-
           //硬件开柜
-          const openSuccess = await callHardwareOpen(deviceId, cabinetNo, doorNo);
+          const openSuccess = await callHardwareOpen(targetHardwareId, cabinetNo, doorNo);
           if (!openSuccess) {
-            throw new Error(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 硬件开柜失败`)
+            throw new Error(`柜门 ${targetHardwareId}_${cabinetNo}_${doorNo} 硬件开柜失败`)
           }
 
           return { 
             success: true, 
-            message: `存包成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`
+            message: `存包成功，柜门 ${targetHardwareId}_${cabinetNo}_${doorNo} 已打开`
           }
         }
 
@@ -214,17 +237,18 @@ exports.main = async (event, context) => {
           // 状态校验
           if (locker.status !== 'occupied' || locker.currentOrderId !== orderId) {
             throw new Error(
-              `取包失败：柜门 ${deviceId}_${cabinetNo}_${doorNo} 与订单不匹配（当前关联：${locker.currentOrderId}，传入：${orderId}）`
+              `取包失败：柜门 ${targetHardwareId}_${cabinetNo}_${doorNo} 与订单不匹配（当前关联：${locker.currentOrderId}，传入：${orderId}）`
             )
           }
 
           // 模拟硬件开柜
-          const openSuccess = callHardwareOpen(deviceId, cabinetNo, doorNo);
+          const openSuccess = callHardwareOpen(targetHardwareId, cabinetNo, doorNo);
           if (!openSuccess) {
             throw new Error(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 硬件开柜失败`)
           }
 
           // 更新柜子状态为空闲
+          // 更新的是 dataLockerId (主设备) 的记录
           await transaction.collection('lockers').doc(lockerId).update({
             data: {
               status: 'free',

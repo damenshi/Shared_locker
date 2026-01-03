@@ -438,15 +438,27 @@ exports.main = async (event, context) => {
     }
 
     try {
+      const devRes = await db.collection('devices').where({ deviceId }).get();
+      // 默认为当前设备ID。如果当前设备配置了 masterId，说明它是从设备(背面)，
+      // 我们应该去查它对应的主设备(正面)名下的订单。
+      let searchDeviceId = deviceId;
+      if (devRes.data.length > 0) {
+        const device = devRes.data[0];
+        if (device.masterId) {
+          searchDeviceId = device.masterId; 
+          console.log(`[queryByOpenid] 检测到从设备 ${deviceId}，切换查询主设备 ${searchDeviceId} 的订单`);
+        }
+      }
+
       const orderInfo = await db.collection('orders')
         .where({
           openid,
-          deviceId,
+          deviceId: searchDeviceId,
           status: _.in(CONSTANTS.VALID_STATUSES_FOR_QUERY)
         })
         .field({        
           status: true,
-          deviceId: true,
+          deviceId: true, //这里返回的将是主设备ID
           doorNo: true,
           orderId: true,
           cabinetNo: true,
