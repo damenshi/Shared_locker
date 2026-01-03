@@ -178,7 +178,7 @@ Page({
       wx.hideLoading();
       const msg = e.message || '取件失败，请重试';
 
-      const finalMsg = `${msg}\n\n如有疑问请拨打客服电话19942291657`;
+      const finalMsg = `${msg}\n\n如有疑问请拨打客服电话400-832-6132`;
 
       wx.showModal({
         title: '提示',
