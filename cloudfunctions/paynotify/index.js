@@ -47,51 +47,106 @@ function decryptNotify(resource) {
   return JSON.parse(decrypted.toString('utf8'))
 }
 
+//疑罪从无
 async function handlePayNotify(notifyData) {
   const orderId = notifyData.out_trade_no;
   const transactionId = notifyData.transaction_id;
   const amountFen = notifyData.amount?.total || 0;
   const amountYuan = amountFen / 100;
 
-  console.log(`[回调] 订单 ${orderId} 支付成功，准备开门...`);
+  console.log(`[回调] 订单 ${orderId} 支付成功，准备处理...`);
 
-  // 1. 先查询订单信息获取柜门号 (新增)
+  // 1. 查询订单
   const orderRes = await db.collection('orders').doc(orderId).get();
   const order = orderRes.data;
 
-  // 2. 调用 locker 云函数执行开门 (新增核心逻辑)
-  // 哪怕这里开门报错，也不能阻塞更新订单状态，否则微信会一直重试
-  try {
-    // 只有当订单状态不是进行中时才开门，防止微信重复回调导致重复开门
-    if (order.status !== CONSTANTS.ORDER_STATUSES.IN_PROGRESS) {
-       await cloud.callFunction({
-        name: 'locker',
-        data: {
-          action: 'openDoor',
-          deviceId: order.deviceId,
-          doorNo: order.doorNo,
-          cabinetNo: order.cabinetNo,
-          orderId: orderId,
-          type: 'store'
-        }
-      });
-      console.log(`[回调] 柜门 ${order.lockerNo} 开门指令发送成功`);
-    }
-  } catch (err) {
-    console.error(`[回调] 开门失败 (可能是硬件离线或已开):`, err);
-    // 这里不抛出错误，继续向下执行更新订单状态，保证支付流程完整
+  // === 修复点 1：入口拦截 (防止重试请求覆盖最终状态) ===
+  // 如果订单已经是终态（已取消/已完成/已退款），说明上一次请求已经处理完了，直接返回成功
+  if ([CONSTANTS.ORDER_STATUSES.CANCELLED, 
+       CONSTANTS.ORDER_STATUSES.COMPLETED, 
+       CONSTANTS.ORDER_STATUSES.REFUNDED].includes(order.status)) {
+    console.log(`[回调] 订单 ${orderId} 处于终态(${order.status})，跳过处理`);
+    return;
+  }
+  
+  // 如果已经是进行中，也说明处理过了，直接返回
+  if (order.status === CONSTANTS.ORDER_STATUSES.IN_PROGRESS) {
+    console.log(`[回调] 订单 ${orderId} 已是进行中，跳过重复处理`);
+    return;
   }
 
-  // 3. 更新数据库状态 (原逻辑)
-  await db.collection('orders').doc(orderId).update({
-    data: {
-      status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
-      transactionId: transactionId,
-      deposit: amountYuan,
-      payTime: db.serverDate(),
-      updatedAt: db.serverDate()
+  try {
+    // 2. 调用 locker 开门
+    // (因为上面已经拦截了 IN_PROGRESS，这里可以直接调)
+    console.log(`[回调] 尝试调用开柜: ${orderId}`);
+    const lockerRes = await cloud.callFunction({
+      name: 'locker',
+      data: {
+        action: 'openDoor',
+        deviceId: order.deviceId,
+        doorNo: order.doorNo,
+        cabinetNo: order.cabinetNo,
+        orderId: orderId,
+        type: 'store'
+      }
+    });
+
+    if (!lockerRes.result.success) {
+      throw new Error('开门失败：' + lockerRes.result.errMsg); 
     }
-  });
+
+    // === 情况A：成功 ===
+    await db.collection('orders').doc(orderId).update({
+      data: {
+        status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
+        transactionId: transactionId,
+        deposit: amountYuan,
+        payTime: db.serverDate(),
+        updatedAt: db.serverDate()
+      }
+    });
+
+  } catch (err) {
+    console.error(`[回调] 开门异常:`, err);
+    const errMsg = err.message || '';
+
+    // === 修复点 2：补全硬伤判断 ===
+    // 增加 '状态异常', 'free' 等关键字，确保"柜子被释放"这种逻辑错误被认定为硬伤
+    const isHardError = errMsg.includes('不在线') || 
+                        errMsg.includes('不存在') || 
+                        errMsg.includes('缺少参数') ||
+                        errMsg.includes('状态异常') || // 关键：柜子状态不对
+                        errMsg.includes('free');       // 关键：柜子是空闲的
+
+    // 1. 软错误 -> 保持进行中 (防白嫖)
+    if (!isHardError) {
+       console.warn(`[回调] 软错误(${errMsg})，保留订单为【进行中】`);
+       await db.collection('orders').doc(orderId).update({
+          data: {
+            status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
+            transactionId: transactionId,
+            deposit: amountYuan,
+            payTime: db.serverDate(),
+            updatedAt: db.serverDate(),
+          }
+       });
+       return;
+    }
+
+    // 2. 硬错误 -> 取消订单
+    console.warn(`[回调] 硬错误(${errMsg})，取消订单`);
+    await db.collection('orders').doc(orderId).update({
+      data: {
+        status: CONSTANTS.ORDER_STATUSES.CANCELLED,
+        transactionId: transactionId,               
+        deposit: amountYuan,                        
+        refundAmount: amountYuan,
+        payTime: db.serverDate(),
+        updatedAt: db.serverDate(),
+      }
+    });
+    
+  }
 }
 
 async function handleRefundNotify(notifyData) {

@@ -139,7 +139,7 @@ exports.main = async (event, context) => {
                 doorSort: combinedCode,
               }
             },
-            { timeout: 8000 }
+            { timeout: 15000 }
           );
     
           //成功条件
@@ -443,7 +443,7 @@ exports.main = async (event, context) => {
                 doorSort: combinedCode,
               }
             },
-            { timeout: 8000 }
+            { timeout: 15000 }
           );
     
           //成功条件

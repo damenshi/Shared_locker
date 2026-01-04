@@ -413,7 +413,7 @@ Page({
         }
         const confirmed = await this.waitForPayment(orderId);
         if (!confirmed) 
-          throw new Error('支付结果未确认');
+          throw new Error('柜门未打开');
         newDeposit = deviceDeposit;
       //}
 

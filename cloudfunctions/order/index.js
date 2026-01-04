@@ -720,8 +720,7 @@ exports.main = async (event, context) => {
     }
   }
 
-  
-  //申请退款
+  // 申请退款
   if (action === 'refundOrder') {
     const { openid, orderId, force } = event 
     
@@ -742,50 +741,72 @@ exports.main = async (event, context) => {
       }
 
       // ============================================================
-      // 2. 统一状态校验 (核心修改点：校验前置)
+      // 2. 统一状态校验
       // ============================================================
       const validStatuses = [
         CONSTANTS.ORDER_STATUSES.COMPLETED, 
-        CONSTANTS.ORDER_STATUSES.CANCELLED
+        CONSTANTS.ORDER_STATUSES.CANCELLED,
+        CONSTANTS.ORDER_STATUSES.IN_PROGRESS 
       ];
 
-      // 只有管理员开启强制模式，才允许对“待提现”订单操作
       if (force) {
         validStatuses.push('待提现');
       }
 
-      // 开始校验
       if (!validStatuses.includes(order.status)) {
-        // 针对“延迟模式”下的重复点击，给个更友好的提示（可选）
         if (isDelayed && order.status === '待提现') {
            return { success: false, errMsg: '该订单已申请退款，请前往余额查看' };
         }
         if (order.status === '已退款') {
            return { success: false, errMsg: '该订单已退款，请勿重复操作' };
         }
-        
         throw new Error(`当前状态【${order.status}】不支持退款操作，请先取件`);
       }
 
       // ============================================================
-      // 3. 分支处理：延迟退款逻辑
+      // 预先计算退款金额 (无论是延迟还是直接退，都需要这个数值)
+      // ============================================================
+      let refundFee = order.refundAmount;
+      // 兜底
+      if (refundFee === undefined || refundFee === null) {
+         refundFee = order.deposit; 
+      }
+
+      // ============================================================
+      // 3. 分支处理：延迟退款逻辑 (修改了内部逻辑)
       // ============================================================
       if (isDelayed) {
-         // 能走到这里，说明状态一定是 [已完成] 或 [已取消]
-         // 因为 force=false，validStatuses 里没有 '待提现'
-         
-         await db.collection('orders').doc(orderId).update({
-           data: {
-             status: '待提现', 
-             refundApplyTime: db.serverDate(),
-             updatedAt: db.serverDate()
-           }
+         // 使用事务，确保状态更新和柜子释放原子操作
+         await db.runTransaction(async (transaction) => {
+             // 1. [核心] 如果是“进行中”状态，必须立即释放柜子！
+             if (order.status === CONSTANTS.ORDER_STATUSES.IN_PROGRESS && order.lockerId) {
+                  await transaction.collection('lockers').doc(order.lockerId).update({
+                    data: {
+                      status: 'free',
+                      currentOrderId: null,
+                      currentUserPhone: null,
+                      updatedAt: db.serverDate()
+                    }
+                  });
+             }
+
+             // 2. 更新订单为“待提现”
+             // 注意：必须把 refundAmount 写入，否则后续提现时金额为0
+             await transaction.collection('orders').doc(orderId).update({
+               data: {
+                 status: '待提现', 
+                 refundApplyTime: db.serverDate(),
+                 updatedAt: db.serverDate(),
+                 refundAmount: refundFee, // 记录应退金额
+               }
+             });
          });
+
          return { success: true, action: 'delayed' };
       }
 
       // ============================================================
-      // 4. 分支处理：直接微信退款逻辑 (包含管理员强制处理待提现)
+      // 4. 分支处理：直接微信退款逻辑 (保持不变，但使用了上面计算好的refundFee)
       // ============================================================
       const client = await getClient();
       const refundParams = {
@@ -793,7 +814,7 @@ exports.main = async (event, context) => {
         transaction_id: order.transactionId,
         out_refund_no: `refund_${Date.now()}`,
         amount: {
-          refund: Math.round(order.refundAmount * 100),
+          refund: Math.round(refundFee * 100),
           total: Math.round(order.deposit * 100),
           currency: 'CNY'
         },
@@ -804,6 +825,7 @@ exports.main = async (event, context) => {
       console.log('退款结果：', refundRes)
 
       await db.runTransaction(async (transaction) => {
+        // 1. 扣减用户押金余额
         await transaction.collection('users')
           .where({ openid: order.openid })
           .update({
@@ -813,14 +835,28 @@ exports.main = async (event, context) => {
             }
           });
 
+        // 2. 更新订单状态为已退款
         await transaction.collection('orders').doc(orderId)
           .update({
             data: {
               status: CONSTANTS.ORDER_STATUSES.REFUNDED,
               refundTime: new Date(),
-              refundTransactionId: refundRes.id
+              refundTransactionId: refundRes.id,
+              note: order.status === CONSTANTS.ORDER_STATUSES.IN_PROGRESS ? '进行中直接退款' : db.command.remove()
             }
           });
+
+        // 3. 释放柜子 (直接退款的情况)
+        if (order.status === CONSTANTS.ORDER_STATUSES.IN_PROGRESS && order.lockerId) {
+             await transaction.collection('lockers').doc(order.lockerId).update({
+                data: {
+                  status: 'free',
+                  currentOrderId: null,
+                  currentUserPhone: null,
+                  updatedAt: db.serverDate()
+                }
+              })
+        }
       });
 
       return { success: true, data: refundRes };
@@ -829,6 +865,7 @@ exports.main = async (event, context) => {
       return { success: false, errMsg: err.message }
     }
   }
+
     // === 新增功能：钱包余额查询 ===
     if (action === 'getMyWallet') {
       const { openid } = event;
