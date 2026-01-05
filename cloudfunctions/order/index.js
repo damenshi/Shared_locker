@@ -842,7 +842,7 @@ exports.main = async (event, context) => {
               status: CONSTANTS.ORDER_STATUSES.REFUNDED,
               refundTime: new Date(),
               refundTransactionId: refundRes.id,
-              note: order.status === CONSTANTS.ORDER_STATUSES.IN_PROGRESS ? '进行中直接退款' : db.command.remove()
+              refundNo: generatedRefundNo
             }
           });
 
@@ -929,7 +929,8 @@ exports.main = async (event, context) => {
             data: {
               status: CONSTANTS.ORDER_STATUSES.REFUNDED,
               refundTime: new Date(),
-              refundTransactionId: refundRes.id
+              refundTransactionId: refundRes.id,
+              refundNo: generatedRefundNo
             }
           });
           

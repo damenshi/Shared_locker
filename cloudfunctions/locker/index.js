@@ -151,7 +151,8 @@ exports.main = async (event, context) => {
     
           //最后一次仍非200 → 按原逻辑抛错
           if (attempt >= maxRetries) {
-            throw new Error(`服务器响应异常: ${response.data.message || '未知错误'}`);
+            // 这里的 response.data.code 就是你服务器返回的业务错误码（如 500）
+            throw new Error(`服务器返回错误: ${response.data.code} ${response.data.message || '未知错误'}`)
           }
     
         } catch (err) {
@@ -160,12 +161,18 @@ exports.main = async (event, context) => {
           //最后一次失败才走原有错误处理逻辑
           if (attempt >= maxRetries) {
             if (err.code === 'ECONNABORTED') {
-              throw new Error(`连接超时，请检查服务器是否在线`);
+                throw new Error(`连接超时，请检查服务器是否在线`);
             }
+    
             if (err.response) {
-              const errorMsg = err.response.data?.message || err.response.statusText;
-              console.error(`服务器返回错误: 设备${deviceId}，状态码${err.response.status}，message: ${errorMsg}`);
-              throw new Error(`服务器返回错误: ${err.response.status} ${errorMsg}`);
+                //优先取 response.data.code (业务码)，取不到才用 response.status (HTTP码)
+                const businessCode = err.response.data?.code || err.response.status;
+                const errorMsg = err.response.data?.message || err.response.statusText;
+                console.error(`服务器返回错误: 设备${deviceId}，业务码${businessCode}，HTTP码${err.response.status}，message: ${errorMsg}`);
+                
+                // 这样抛出去就是 "服务器返回错误: 500 设备 xxx 不在线"
+                // paynotify 就能正确识别并取消订单了
+                throw new Error(`服务器返回错误: ${businessCode} ${errorMsg}`);
             }
             throw new Error(`开柜接口调用失败: ${err.message}`);
           }

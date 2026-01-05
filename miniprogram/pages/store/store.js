@@ -244,18 +244,33 @@ Page({
   },
 
   async waitForPayment(orderId) {
-    let retries = 10; // 最多查询 5次
+    let retries = 20; // 20s
     while (retries-- > 0) {
       const res = await wx.cloud.callFunction({
         name: 'order',
         data: { action: 'getOrder', orderId }
       });
-      if (res.result?.success && res.result.data?.status === this.data.constants.ORDER_STATUS_PROCESSING) {
-        return true; // 支付已确认
+
+      if (res.result?.success) {
+        const status = res.result.data?.status;
+        
+        // 【修改点2】明确成功
+        if (status === this.data.constants.ORDER_STATUS_PROCESSING) {
+          return true; 
+        }
+        
+        // 【修改点3】明确失败（只有后端明确标记为取消/退款，前端才认作失败）
+        if (['已取消', '已退款', '已完成'].includes(status)) {
+          console.warn('后端返回明确的失败状态:', status);
+          return false;
+        }
       }
       await new Promise(r => setTimeout(r, 1000)); // 每 1 秒查一次
     }
-    return false; // 超时
+    
+    // 【修改点4】超时返回 null，而不是 false
+    console.warn('查询支付结果超时');
+    return null; 
   },
 
   /**
@@ -268,6 +283,9 @@ Page({
 
     let lockerInfo = null;
     let orderId = null;
+
+    // 初始为 true，表示在支付成功前，如果有错可以回滚
+    let canRecover = true;
 
     try {
       // 1. 参数验证
@@ -411,9 +429,32 @@ Page({
         if (!paySuccess) {
           throw new Error('支付失败');
         }
+
+        canRecover = false;
         const confirmed = await this.waitForPayment(orderId);
-        if (!confirmed) 
-          throw new Error('柜门未打开');
+        // 【修改点3】处理超时情况 (confirmed === null)
+        if (confirmed === null) {
+          wx.hideLoading();
+          // 仅仅提示用户，不做任何数据回滚
+          wx.showModal({
+            title: '提示',
+            content: '系统正在确认支付结果，请稍后在“我的订单”中查看状态。如果柜门已开请正常使用。',
+            showCancel: false,
+            success: (res) => {
+              if (res.confirm) wx.navigateBack({ delta: 1 });
+            }
+          });
+          // 直接返回，跳过后续逻辑，也跳过 catch
+          return;
+        }
+
+        // 处理明确失败的情况 (confirmed === false)
+        if (confirmed === false) {
+          // 后端已经明确是“已取消”，说明后端处理了异常
+          // 我们只需要抛错提示用户，不需要前端再 recover（否则可能重复释放）
+          throw new Error('开门失败');
+        }
+        
         newDeposit = deviceDeposit;
       //}
 
@@ -457,16 +498,25 @@ Page({
 
     } catch (e) {
       console.error("存包流程异常", e);
-      if (lockerInfo) await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
-      if (orderId) await this.recoverOrder(orderId);
+      // 【修改点4】关键：只有在允许回滚时才调用 recover
+      if (canRecover) {
+        console.warn('触发前端自动回滚逻辑');
+        if (lockerInfo) await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
+        if (orderId) await this.recoverOrder(orderId);
+      } else {
+        console.warn('支付已提交，跳过前端自动回滚，交由后端兜底');
+      }
 
        // 根据错误信息弹窗提示
-      let showMsg = e.message || '开柜失败，订单已取消，请重试';
+      let showMsg = e.message || '开柜失败，请重试';
       // 如果错误信息包含 'cloud.callFunction' 或 'fail' 等系统关键词，强制替换为友好提示
       if (showMsg.includes('cloud.callFunction') || showMsg.includes('fail')) {
         showMsg = '网络或设备异常，请重试';
       }
 
+      if (!canRecover) {
+        showMsg += '\n(如已扣款请在“我的订单”查看状态)';
+      }
       const finalMsg = `${showMsg}\n\n如有疑问请拨打客服电话400-832-6132`;
 
       wx.showModal({

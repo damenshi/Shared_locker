@@ -47,7 +47,7 @@ function decryptNotify(resource) {
   return JSON.parse(decrypted.toString('utf8'))
 }
 
-//疑罪从无
+
 async function handlePayNotify(notifyData) {
   const orderId = notifyData.out_trade_no;
   const transactionId = notifyData.transaction_id;
@@ -60,25 +60,27 @@ async function handlePayNotify(notifyData) {
   const orderRes = await db.collection('orders').doc(orderId).get();
   const order = orderRes.data;
 
-  // === 修复点 1：入口拦截 (防止重试请求覆盖最终状态) ===
-  // 如果订单已经是终态（已取消/已完成/已退款），说明上一次请求已经处理完了，直接返回成功
+  // 拦截终态
   if ([CONSTANTS.ORDER_STATUSES.CANCELLED, 
        CONSTANTS.ORDER_STATUSES.COMPLETED, 
        CONSTANTS.ORDER_STATUSES.REFUNDED].includes(order.status)) {
-    console.log(`[回调] 订单 ${orderId} 处于终态(${order.status})，跳过处理`);
+    console.log(`[回调] 订单 ${orderId} 处于终态，跳过`);
     return;
   }
   
-  // 如果已经是进行中，也说明处理过了，直接返回
+  // 拦截进行中
   if (order.status === CONSTANTS.ORDER_STATUSES.IN_PROGRESS) {
-    console.log(`[回调] 订单 ${orderId} 已是进行中，跳过重复处理`);
+    console.log(`[回调] 订单 ${orderId} 已是进行中，跳过`);
     return;
   }
 
+  // 定义一个变量来标记最终决定：是“通过”还是“取消”
+  let isPassed = false;
+  let failReason = '';
+
   try {
-    // 2. 调用 locker 开门
-    // (因为上面已经拦截了 IN_PROGRESS，这里可以直接调)
-    console.log(`[回调] 尝试调用开柜: ${orderId}`);
+    // 2. 尝试开门
+    console.log(`[回调] 尝试开门: ${orderId}`);
     const lockerRes = await cloud.callFunction({
       name: 'locker',
       data: {
@@ -91,11 +93,39 @@ async function handlePayNotify(notifyData) {
       }
     });
 
-    if (!lockerRes.result.success) {
-      throw new Error('开门失败：' + lockerRes.result.errMsg); 
+    // === 核心逻辑分支 ===
+    if (lockerRes.result.success) {
+      // 场景A：明确成功
+      isPassed = true;
+      console.log(`[回调] 开门成功`);
+    } else {
+      // 场景B：开门报错，分析错误原因
+      const errMsg = lockerRes.result.errMsg || '';
+      console.error(`[回调] 开门返回失败: ${errMsg}`);
+
+      //关键判断：只有服务器明确返回 500 时，才认定为硬伤
+      // 匹配 openDoor 中的 throw Error(`服务器返回错误: ${err.response.status} ...`)
+      if (errMsg.includes('服务器返回错误: 500')) {
+         isPassed = false;
+         failReason = errMsg; // 记录原因，准备取消订单
+      } else {
+         // 其他所有情况（超时、网络波动、404、未知错误等），一律视为“软错误”
+         // 策略：疑罪从无，认为是成功的（防止白嫖）
+         isPassed = true;
+         console.warn(`[回调] 捕获软错误(${errMsg})，降级处理为【成功】`);
+      }
     }
 
-    // === 情况A：成功 ===
+  } catch (err) {
+    // 场景C：调用云函数本身崩了（极少见）
+    // 同样视为软错误，防止白嫖
+    console.error(`[回调] 云函数调用异常:`, err);
+    isPassed = true; 
+  }
+
+  // === 3. 根据最终决定执行数据库更新 ===
+  if (isPassed) {
+    //成功（或软错误强制成功） -> 进行中
     await db.collection('orders').doc(orderId).update({
       data: {
         status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
@@ -105,36 +135,10 @@ async function handlePayNotify(notifyData) {
         updatedAt: db.serverDate()
       }
     });
-
-  } catch (err) {
-    console.error(`[回调] 开门异常:`, err);
-    const errMsg = err.message || '';
-
-    // === 修复点 2：补全硬伤判断 ===
-    // 增加 '状态异常', 'free' 等关键字，确保"柜子被释放"这种逻辑错误被认定为硬伤
-    const isHardError = errMsg.includes('不在线') || 
-                        errMsg.includes('不存在') || 
-                        errMsg.includes('缺少参数') ||
-                        errMsg.includes('状态异常') || // 关键：柜子状态不对
-                        errMsg.includes('free');       // 关键：柜子是空闲的
-
-    // 1. 软错误 -> 保持进行中 (防白嫖)
-    if (!isHardError) {
-       console.warn(`[回调] 软错误(${errMsg})，保留订单为【进行中】`);
-       await db.collection('orders').doc(orderId).update({
-          data: {
-            status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
-            transactionId: transactionId,
-            deposit: amountYuan,
-            payTime: db.serverDate(),
-            updatedAt: db.serverDate(),
-          }
-       });
-       return;
-    }
-
-    // 2. 硬错误 -> 取消订单
-    console.warn(`[回调] 硬错误(${errMsg})，取消订单`);
+    console.log(`[回调] 订单 ${orderId} 已设为【进行中】`);
+  } else {
+    //失败（明确的 500 硬伤） -> 取消订单 + 释放柜子
+    console.warn(`[回调] 订单 ${orderId} 判定为硬伤(${failReason})，执行取消`);
     await db.collection('orders').doc(orderId).update({
       data: {
         status: CONSTANTS.ORDER_STATUSES.CANCELLED,
@@ -143,37 +147,87 @@ async function handlePayNotify(notifyData) {
         refundAmount: amountYuan,
         payTime: db.serverDate(),
         updatedAt: db.serverDate(),
+        note: `自动取消：${failReason}`
       }
     });
-    
+
+    try {
+      await cloud.callFunction({
+        name: 'locker',
+        data: {
+          action: 'recoverLocker',
+          deviceId: order.deviceId,
+          doorNo: order.doorNo,
+          cabinetNo: order.cabinetNo
+        }
+      });
+      console.log(`[回调] 柜子 ${order.cabinetNo}-${order.doorNo} 已释放`);
+    } catch (e) {
+      console.error(`[回调] 释放柜子失败（需人工介入）:`, e);
+    }
   }
 }
 
 async function handleRefundNotify(notifyData) {
-  const outRefundNo = notifyData.out_refund_no;
-  const refundId = notifyData.refund_id;
+  const outRefundNo = notifyData.out_refund_no; // 微信传回的退款单号
+  const outTradeNo = notifyData.out_trade_no;   // 微信传回的商户订单号 (对应你的 _id)
+  const refundId = notifyData.refund_id;        // 微信生成的退款流水号
   const refundAmountFen = notifyData.amount?.refund || 0;
   const refundAmountYuan = refundAmountFen / 100;
 
-  const orderRes = await db.collection('orders')
-    .where({ refundNo: outRefundNo })
-    .limit(1)
-    .get();
+  console.log(`[退款回调] 开始处理，退款单号:${outRefundNo}, 订单号(ID):${outTradeNo}`);
 
-  if (orderRes.data.length === 0) {
-    throw new Error(`未找到退款单号为 ${outRefundNo} 的订单`);
+  let order = null;
+
+  // === 策略1：优先用 _id (out_trade_no) 直接查 ===
+  try {
+    const doc = await db.collection('orders').doc(outTradeNo).get();
+    order = doc.data;
+  } catch (e) {
+    // 如果ID格式不对或找不到，doc()会抛错，这里捕获它
+    console.warn(`[退款回调] 按ID查询失败，尝试字段查询`);
   }
-  const order = orderRes.data[0];
-  const orderId = order._id;
 
+  // === 策略2：如果按ID没查到，尝试按 outTradeNo 字段查 ===
+  // (防止有些订单用了自定义的 outTradeNo 而不是 _id)
+  if (!order) {
+    const res = await db.collection('orders').where({ outTradeNo: outTradeNo }).limit(1).get();
+    if (res.data.length > 0) order = res.data[0];
+  }
+
+  // === 策略3：最后尝试按 refundNo 查 (兼容以后修复后的新数据) ===
+  if (!order) {
+    const res = await db.collection('orders').where({ refundNo: outRefundNo }).limit(1).get();
+    if (res.data.length > 0) order = res.data[0];
+  }
+
+  // === 关键修复：如果还是找不到，必须 return，不能抛 Error ===
+  if (!order) {
+    console.warn(`[退款回调-跳过] 数据库未找到订单，可能是测试数据或脏数据。停止重试。`);
+    // 直接返回成功，骗过微信，停止重试
+    return; 
+  }
+
+  const orderId = order._id;
+  
+  // 检查状态，防止重复处理
+  if (order.status === CONSTANTS.ORDER_STATUSES.REFUNDED) {
+    console.log(`[退款回调] 订单 ${orderId} 已经是退款状态，跳过`);
+    return;
+  }
+
+  // === 更新数据库 ===
+  // 顺便把缺失的 refundNo 补进去
   const updateData = {
     status: CONSTANTS.ORDER_STATUSES.REFUNDED,
-    refundId: refundId,
+    refundId: refundId,          
+    refundNo: outRefundNo,       // 补全这个字段！
     refundAmount: refundAmountYuan,
     updatedAt: db.serverDate()
   };
 
   await db.collection('orders').doc(orderId).update({ data: updateData });
+  console.log(`[退款回调] 订单 ${orderId} 退款状态更新成功`);
 }
 
 // 云函数入口
