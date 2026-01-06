@@ -35,6 +35,7 @@ Page({
       if (res.result.success) {
         const now = Date.now();
         const delayTimes = 16 * 60 * 60 * 1000;
+        // const delayTimes = 10 * 1000;
 
         // 1. 先处理所有数据格式
         let allList = res.result.data.map(item => {
@@ -76,8 +77,56 @@ Page({
     }
   },
 
+  // async doWithdraw(e) {
+  //   // ... 保持原有逻辑不变 ...
+  //   const orderId = e.currentTarget.dataset.id;
+  //   wx.showModal({
+  //     title: '提现',
+  //     content: '确认将该笔款项退回原支付账户？',
+  //     success: async (res) => {
+  //       if (res.confirm) {
+  //         wx.showLoading({ title: '提现中...' });
+  //         try {
+  //           const callRes = await wx.cloud.callFunction({
+  //             name: 'order',
+  //             data: { action: 'withdrawRefund', orderId: orderId }
+  //           });
+  //           wx.hideLoading();
+  //           if (callRes.result.success) {
+  //             wx.showModal({
+  //               title: '提现成功',
+  //               content: '提现已成功，请注意查收。',
+  //               showCancel: false,
+  //               confirmText: '好的',
+  //               success: (res) => {
+  //                 if (res.confirm) {
+  //                   //this.loadWallet(); 
+  //                 }
+  //               }
+  //             });
+  //           } else {
+  //             wx.showModal({
+  //               title: '提现失败',
+  //               content: callRes.result.errMsg || '未知原因，请联系客服',
+  //               showCancel: false,
+  //               confirmText: '关闭'
+  //             });
+  //           }
+  //         } catch (err) {
+  //           wx.hideLoading();
+  //           wx.showModal({
+  //             title: '系统提示',
+  //             content: '网络异常或服务繁忙，请稍后重试',
+  //             showCancel: false,
+  //             confirmText: '关闭'
+  //           });
+  //         }
+  //       }
+  //     }
+  //   })
+  // }
+
   async doWithdraw(e) {
-    // ... 保持原有逻辑不变 ...
     const orderId = e.currentTarget.dataset.id;
     wx.showModal({
       title: '提现',
@@ -91,18 +140,33 @@ Page({
               data: { action: 'withdrawRefund', orderId: orderId }
             });
             wx.hideLoading();
+            
             if (callRes.result.success) {
-              wx.showModal({
-                title: '提现成功',
-                content: '提现已成功，请注意查收。',
-                showCancel: false,
-                confirmText: '好的',
-                success: (res) => {
-                  if (res.confirm) {
-                    this.loadWallet(); 
-                  }
+              // === 修改点开始：手动更新本地数据状态，不刷新列表 ===
+              
+              // 1. 提示成功
+              wx.showToast({ title: '提现成功', icon: 'success' });
+
+              // 2. 查找并更新 latestItem (如果当前操作的是最新那条)
+              if (this.data.latestItem && this.data.latestItem._id === orderId) {
+                this.setData({
+                  'latestItem.status': '已退款',
+                  'latestItem.canWithdraw': false // 禁用按钮逻辑
+                });
+              } else {
+                // 3. 查找并更新 historyList (如果是在历史记录里)
+                const index = this.data.historyList.findIndex(item => item._id === orderId);
+                if (index !== -1) {
+                  const key = `historyList[${index}].status`;
+                  const keyCanWithdraw = `historyList[${index}].canWithdraw`;
+                  this.setData({
+                    [key]: '已退款',
+                    [keyCanWithdraw]: false
+                  });
                 }
-              });
+              }
+              // === 修改点结束 ===
+
             } else {
               wx.showModal({
                 title: '提现失败',

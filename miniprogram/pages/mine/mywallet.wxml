@@ -19,12 +19,18 @@
         </view>
 
         <view class="action-box">
-          <button 
-            wx:if="{{latestItem.canWithdraw}}" 
-            class="btn-withdraw"
-            hover-class="btn-hover"
-            bindtap="doWithdraw" 
-            data-id="{{latestItem._id}}">提现</button>
+          <view wx:if="{{latestItem.status === '已退款'}}" class="status-tag" style="color: #52c41a; background: #f6ffed; border: 1px solid #b7eb8f;">
+            <text class="icon">✅</text>
+            <text>已退款</text>
+          </view>
+          
+          <view 
+              wx:elif="{{latestItem.canWithdraw}}" 
+              class="text-withdraw" 
+              bindtap="doWithdraw" 
+              data-id="{{latestItem._id}}">
+              提现 >
+            </view>
           
           <view wx:else class="status-tag">
             <text class="icon">⏳</text>
@@ -66,12 +72,19 @@
           </view>
 
           <view class="action-box">
-            <button 
-              wx:if="{{item.canWithdraw}}" 
-              class="btn-withdraw"
-              hover-class="btn-hover"
+            <view wx:if="{{item.status === '已退款'}}" class="status-tag" style="color: #52c41a; background: #f6ffed; border: 1px solid #b7eb8f;">
+              <text class="icon">✅</text>
+              <text>已退款</text>
+            </view>
+
+            <view 
+              wx:elif="{{latestItem.canWithdraw}}" 
+              class="text-withdraw" 
               bindtap="doWithdraw" 
-              data-id="{{item._id}}">提现</button>
+              data-id="{{latestItem._id}}">
+              提现 >
+            </view>
+            
             <view wx:else class="status-tag">
               <text class="icon">⏳</text>
               <text>结算中</text>

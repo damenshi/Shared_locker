@@ -809,6 +809,7 @@ exports.main = async (event, context) => {
       // 4. 分支处理：直接微信退款逻辑 (保持不变，但使用了上面计算好的refundFee)
       // ============================================================
       const client = await getClient();
+      const generatedRefundNo = `refund_withdraw_${Date.now()}`;
       const refundParams = {
         out_trade_no: order.outTradeNo || order._id,
         transaction_id: order.transactionId,
@@ -866,25 +867,29 @@ exports.main = async (event, context) => {
     }
   }
 
-    // === 新增功能：钱包余额查询 ===
-    if (action === 'getMyWallet') {
-      const { openid } = event;
-      try {
-        // 查询所有“待提现”的订单
-        const res = await db.collection('orders')
-          .where({
-            openid: openid,
-            status: '待提现'
-          })
-          .orderBy('refundApplyTime', 'desc')
-          .get();
-        return { success: true, data: res.data };
-      } catch(err) {
-        return { success: false, errMsg: err.message };
-      }
-  }
+   // === 钱包余额查询 ===
+  if (action === 'getMyWallet') {
+    const { openid } = event;
+    try {
+      // 修改点：状态查询范围扩大，包含 '待提现' 和 '已退款'
+      // 同时确保 refundApplyTime 存在（只显示走过钱包流程的订单，过滤掉直接退款的偶发订单）
+      const res = await db.collection('orders')
+        .where({
+          openid: openid,
+          status: _.in(['待提现', '已退款']), // 🔥 核心修改：允许查询已退款记录
+          refundApplyTime: _.exists(true)     // 🔥 仅查询有申请时间的记录（防止脏数据报错）
+        })
+        .orderBy('refundApplyTime', 'desc')   // 按申请时间倒序
+        .limit(100)                           // 限制最近 100 条，防止数据量过大
+        .get();
+        
+      return { success: true, data: res.data };
+    } catch(err) {
+      return { success: false, errMsg: err.message };
+    }
+}
 
-  // === 新增功能：余额提现 (真正的退款) ===
+  //余额提现 (真正的退款) ===
   if (action === 'withdrawRefund') {
     const { orderId } = event;
     try {
@@ -899,14 +904,32 @@ exports.main = async (event, context) => {
       // 2. 延时12小时退款
       const now = Date.now();
       const applyTime = new Date(order.refundApplyTime).getTime();
-      const delayTimes = 12 * 60 * 60 * 1000;
+      const delayHours = 12; //12 小时
+      const delayTimes = delayHours * 60 * 60 * 1000;
 
       if (now - applyTime < delayTimes) {
-        throw new Error('系统结算中，请耐心等待！');
+        throw new Error(`系统结算排队中，请在申请 ${delayHours} 小时后再试！`);
+      }
+
+      //1小时
+      // const oneDayAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
+      const oneDayAgo = new Date(Date.now() - 15 * 60 * 1000);
+      // 查询该用户过去15分钟内是否有成功的提现记录
+      const recentWithdrawals = await db.collection('orders')
+        .where({
+          openid: order.openid,
+          status: '已退款', // 或者是 CONSTANTS.ORDER_STATUSES.REFUNDED
+          refundTime: _.gte(oneDayAgo)
+        })
+        .count();
+
+      if (recentWithdrawals.total > 0) {
+        throw new Error('提现过于频繁，请15分钟后再试');
       }
 
       // 3. 发起微信退款
       const client = await getClient();
+      const generatedRefundNo = `refund_withdraw_${Date.now()}`;
       const refundParams = {
         out_trade_no: order.outTradeNo || order._id,
         transaction_id: order.transactionId,
