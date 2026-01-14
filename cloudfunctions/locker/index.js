@@ -5,7 +5,7 @@ const _ = db.command
 
 // 常量定义：集中管理固定值
 const CONSTANTS = {
-  LOCKER_STATUSES: ['free', 'occupied'], // 柜子允许的状态
+  LOCKER_STATUSES: ['free', 'occupied', 'broken'], // 柜子允许的状态
   OPERATION_TYPES: ['store', 'take']     // 允许的操作类型
 }
 
@@ -576,7 +576,8 @@ exports.main = async (event, context) => {
         await db.collection('lockers')
           .where({
             deviceId,
-            lockerNo: _.neq(screenNo)
+            lockerNo: _.neq(screenNo),
+            status: _.neq('broken')
           })
           .update({
             data: {
@@ -590,6 +591,64 @@ exports.main = async (event, context) => {
         return { success: true }
     } catch (err) {
       console.error('清空柜门失败', { error: err.message })
+      return { success: false, errMsg: err.message }
+    }
+  }
+
+  // 5. 管理员强制设置柜门状态（维护/测试模式）
+  if (action === 'setLockerStatus') {
+    const { internalNo, lockerNo, status } = event
+
+    // 1. 校验状态是否在允许的列表里
+    const validStatuses = ['free', 'broken', 'occupied'];
+    if (!validStatuses.includes(status)) {
+      return { success: false, errMsg: `状态无效，只能设为: ${validStatuses.join(' / ')}` }
+    }
+
+    try {
+      return await db.runTransaction(async transaction => {
+        // 2. 查询柜子
+        const lockerQuery = await transaction.collection('lockers')
+          .where({ internalNo, lockerNo })
+          .get()
+
+        if (lockerQuery.data.length === 0) {
+          throw new Error(`设备${internalNo} 柜门${lockerNo}不存在`)
+        }
+
+        const locker = lockerQuery.data[0]
+
+        // 3. 准备更新数据
+        let updateData = {
+          status: status,
+          updatedAt: db.serverDate()
+        };
+
+        // 🔥 智能处理：如果强制设为“空闲”，为了保证逻辑正常，应该清除关联的订单信息
+        // 否则如果残留着 currentOrderId，可能导致某些逻辑判定异常
+        if (status === 'free') {
+          updateData.currentOrderId = null;
+          updateData.currentUserPhone = null;
+        }
+
+        // 4. 执行更新
+        await transaction.collection('lockers').doc(locker._id).update({
+          data: updateData
+        })
+
+        // 5. 生成友好的返回文案
+        let statusText = '';
+        switch (status) {
+          case 'free': statusText = '启用(空闲)'; break;
+          case 'broken': statusText = '停用(故障)'; break;
+          case 'occupied': statusText = '占用(保留)'; break;
+          default: statusText = status;
+        }
+
+        return { success: true, message: `柜门 ${lockerNo} 已设为 ${statusText}` }
+      })
+    } catch (err) {
+      console.error('设置柜门状态失败', err)
       return { success: false, errMsg: err.message }
     }
   }

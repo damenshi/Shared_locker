@@ -20,7 +20,9 @@ Page({
     showOpenLocker: false,
     currentDeviceId: null,
     currentInternalNo: null,
-    lockerNo: ''
+    lockerNo: '',
+    showStatusModal: false,
+    statusLockerNo: '',
   },
 
   onLoad() {
@@ -237,8 +239,8 @@ Page({
               lockerNos.push(i);
             }
   
-            // 2. 真正控制并发（一次执行5个）
-            const batchSize = 5;
+            // 2. 真正控制并发（一次执行3个）
+            const batchSize = 3;
             for (let i = 0; i < lockerNos.length; i += batchSize) {
               // 获取当前批次的柜号
               const batchNos = lockerNos.slice(i, i + batchSize);
@@ -309,6 +311,96 @@ Page({
         }
       }
     });
-  }
+  },
+
+  // 1. 显示状态管理弹窗
+  showStatusModal(e) {
+    const internalNo = e.currentTarget.dataset.internalno;
+    this.setData({
+      showStatusModal: true,
+      currentInternalNo: internalNo,
+      statusLockerNo: '' // 清空输入框
+    });
+  },
+
+  // 2. 关闭弹窗
+  closeStatusModal() {
+    this.setData({ showStatusModal: false });
+  },
+
+  // 3. 监听柜号输入
+  onStatusLockerInput(e) {
+    this.setData({ statusLockerNo: e.detail.value });
+  },
+
+  // 4. 执行状态修改核心逻辑
+  async updateLockerStatus(e) {
+    const targetStatus = e.currentTarget.dataset.status; // 获取点击的是哪个按钮 (free/occupied/broken)
+    const { currentInternalNo, statusLockerNo } = this.data;
+
+    if (!statusLockerNo) {
+      wx.showToast({ title: '请输入柜号', icon: 'none' });
+      return;
+    }
+
+    // 定义提示颜色和文案
+    let actionText = '';
+    let confirmColor = '#576b95';
+    switch (targetStatus) {
+      case 'free': 
+        actionText = '设为空闲'; 
+        confirmColor = '#07c160'; 
+        break;
+      case 'occupied': 
+        actionText = '设为占用'; 
+        confirmColor = '#ffc300'; 
+        break;
+      case 'broken': 
+        actionText = '设为故障'; 
+        confirmColor = '#ff4d4f'; 
+        break;
+    }
+
+    wx.showModal({
+      title: '操作确认',
+      content: `确定将设备 ${currentInternalNo} 的 ${statusLockerNo} 号柜 ${actionText} 吗？`,
+      confirmColor: confirmColor,
+      success: async res => {
+        if (res.confirm) {
+          wx.showLoading({ title: '设置中...' });
+
+          try {
+            // 调用云函数 locker -> setLockerStatus
+            const result = await wx.cloud.callFunction({
+              name: 'locker',
+              data: {
+                action: 'setLockerStatus',
+                internalNo: currentInternalNo,
+                lockerNo: parseInt(statusLockerNo),
+                status: targetStatus
+              }
+            });
+
+            wx.hideLoading();
+
+            if (result.result.success) {
+              wx.showToast({ title: '设置成功', icon: 'success' });
+              this.closeStatusModal(); // 成功后关闭弹窗
+            } else {
+              wx.showModal({
+                title: '设置失败',
+                content: result.result.errMsg || '未知错误',
+                showCancel: false
+              });
+            }
+          } catch (err) {
+            wx.hideLoading();
+            console.error('设置状态异常', err);
+            wx.showToast({ title: '网络异常', icon: 'none' });
+          }
+        }
+      }
+    });
+  },
 
 });

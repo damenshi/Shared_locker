@@ -223,3 +223,127 @@
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* [miniprogram/pages/admin/mydevice.wxss] */
+
+/* 原有的弹窗样式应该已经有了，如果没有请补充 modal-mask 等基础样式 */
+
+/* 🔥 [新增] 状态管理弹窗样式 */
+.device-info-tip {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20rpx;
+  text-align: center;
+}
+
+.input-box {
+  border: 1rpx solid #ddd;
+  padding: 10rpx 20rpx;
+  border-radius: 8rpx;
+  margin-bottom: 20rpx;
+  height: 80rpx;
+  font-size: 32rpx;
+}
+
+.tips {
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 20rpx;
+}
+
+/* 按钮组容器 */
+.status-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-top: 20rpx;
+}
+
+/* 按钮通用样式 */
+.btn-status {
+  width: 100% !important;
+  color: white;
+  font-size: 28rpx;
+  padding: 20rpx 0;
+  border-radius: 40rpx;
+  font-weight: normal;
+}
+
+/* 不同状态的颜色 */
+.btn-status.free {
+  background-color: #07c160; /* 绿色 */
+}
+
+.btn-status.occupied {
+  background-color: #faad14; /* 黄色/橙色 */
+}
+
+.btn-status.broken {
+  background-color: #ff4d4f; /* 红色 */
+}
+
+/* 点击态 */
+.btn-status:active {
+  opacity: 0.8;
+}
+
+/* [miniprogram/pages/admin/mydevice.wxss] */
+
+/* 🔥 [新增] 紫色按钮样式 (用于列表中的入口按钮) */
+.ios-btn.purple {
+  background: linear-gradient(135deg, #b37feb, #722ed1);
+  color: #fff;
+}
+.ios-btn.purple:active {
+  background: #531dab;
+}
+
+/* 🔥 [新增] 弹窗内部样式优化 */
+.modal-content-body {
+  margin-bottom: 30rpx;
+  width: 100%;
+}
+
+.device-tip {
+  text-align: center;
+  font-size: 28rpx;
+  color: #666;
+  margin-bottom: 20rpx;
+  font-weight: bold;
+}
+
+/* 状态选择按钮组 */
+.status-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx; /* 按钮之间的间距 */
+  width: 100%;
+}
+
+.status-btn {
+  width: 100% !important;
+  font-weight: normal;
+  font-size: 30rpx;
+  padding: 20rpx 0;
+  border-radius: 12rpx;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 三种状态的具体颜色 */
+.status-btn.free {
+  background-color: #07c160; /* 微信绿 */
+}
+.status-btn.occupied {
+  background-color: #ffc300; /* 警示黄 */
+}
+.status-btn.broken {
+  background-color: #ff4d4f; /* 故障红 */
+}
+
+.status-btn:active {
+  opacity: 0.8;
+}

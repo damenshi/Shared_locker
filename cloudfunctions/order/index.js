@@ -146,8 +146,8 @@ async function calculateFee(order) {
     console.error('获取设备价格失败，使用默认价格', err);
   }
   
-  // 计费规则：免费时长5分钟
-  const FREE_MINUTES = 0;
+  // 计费规则：免费时长10分钟
+  const FREE_MINUTES = 10;
   if (durationMinutes > FREE_MINUTES) {
     fee = durationHours * unitPrice * 100;
   }
@@ -276,6 +276,44 @@ exports.main = async (event, context) => {
       const doc = await db.collection('orders').doc(orderId).get()
       if (!doc.data) {
         throw new Error('订单不存在');
+      }
+
+      let order = doc.data;
+      // 如果数据库显示“待支付”，我们去微信那边核实一下到底付没付
+      if (order.status === CONSTANTS.ORDER_STATUSES.PENDING_PAY) {
+        try {
+          const client = await getClient();
+          // 查询微信订单状态
+          const wxRes = await client.transactions_out_trade_no({
+            mchid: CONFIG.mchid,
+            out_trade_no: orderId
+          });
+
+          // 如果微信说“已支付” (SUCCESS)
+          if (wxRes.data && wxRes.data.trade_state === 'SUCCESS') {
+            console.log(`[getOrder] 发现掉单：订单 ${orderId} 微信已支付但数据库为待支付，自动修复。`);
+            
+            const amountFen = wxRes.data.amount?.total || 0;
+            const amountYuan = amountFen / 100;
+
+            // 自动修正数据库状态
+            const updateData = {
+              status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
+              transactionId: wxRes.data.transaction_id,
+              deposit: amountYuan,
+              payTime: wxRes.data.success_time || db.serverDate(),
+              updatedAt: db.serverDate()
+            };
+
+            await db.collection('orders').doc(orderId).update({ data: updateData });
+            
+            // 更新返回给前端的数据
+            order = { ...order, ...updateData };
+          }
+        } catch (wxErr) {
+           // 查询微信失败（比如还没付），忽略错误，按原状态返回
+           console.log(`[getOrder] 主动查询支付状态未果: ${wxErr.message}`);
+        }
       }
       return { success: true, data: doc.data }
     } catch (err) {

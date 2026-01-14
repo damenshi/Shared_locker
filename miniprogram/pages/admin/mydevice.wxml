@@ -130,6 +130,10 @@
               data-cabinetCount="{{item.cabinetCount}}"
               data-doorCount="{{item.doorCount}}"
               bindtap="confirmOpenAllLockers">全开</button>
+
+              <button class="ios-btn purple" 
+              data-internalNo="{{item.internalNo}}"
+              bindtap="showStatusModal">柜门状态</button>
             </view>
           </view>
 
@@ -160,3 +164,37 @@
     </view>
   </view>
 </view>
+
+<view class="modal-mask" wx:if="{{showStatusModal}}" bindtap="closeStatusModal">
+    <view class="modal">
+      <view class="modal-title">设置柜门状态</view>
+      
+      <view class="modal-content-body">
+        <view class="device-tip">当前设备：{{currentInternalNo}}</view>
+        <input 
+          class="modal-input" 
+          type="number" 
+          placeholder="请输入柜号 (如: 1)" 
+          value="{{statusLockerNo}}"
+          bindinput="onStatusLockerInput"
+          catchtap="true"
+        />
+      </view>
+
+      <view class="status-btn-group">
+        <button class="status-btn free" catchtap="updateLockerStatus" data-status="free">
+          设为空闲
+        </button>
+        <button class="status-btn occupied" catchtap="updateLockerStatus" data-status="occupied">
+          设为占用
+        </button>
+        <button class="status-btn broken" catchtap="updateLockerStatus" data-status="broken">
+          设为故障
+        </button>
+      </view>
+
+      <view class="modal-buttons" style="margin-top: 20rpx;">
+        <button class="cancel-btn" catchtap="closeStatusModal" style="width: 100%;">取消关闭</button>
+      </view>
+    </view>
+  </view>
