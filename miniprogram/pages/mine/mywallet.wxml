@@ -78,10 +78,10 @@
             </view>
 
             <view 
-              wx:elif="{{latestItem.canWithdraw}}" 
+              wx:elif="{{item.canWithdraw}}" 
               class="text-withdraw" 
               bindtap="doWithdraw" 
-              data-id="{{latestItem._id}}">
+              data-id="{{item._id}}">
               提现 >
             </view>
             

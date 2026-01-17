@@ -944,6 +944,7 @@ exports.main = async (event, context) => {
       const applyTime = new Date(order.refundApplyTime).getTime();
       const delayHours = 12; //12 小时
       const delayTimes = delayHours * 60 * 60 * 1000;
+      // const delayTimes = 10 * 1000;
 
       if (now - applyTime < delayTimes) {
         throw new Error(`系统结算排队中，请在申请 ${delayHours} 小时后再试！`);
