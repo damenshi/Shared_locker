@@ -11,7 +11,9 @@
     "pages/admin/devorder",
     "pages/mine/mine",
     "pages/mine/myorder",
-    "pages/mine/mywallet"
+    "pages/mine/mywallet",
+    "pages/mine/about",
+    "pages/mine/agreement/userAgreement"
   ],
   "window": {
     "navigationBarTitleText": "珊星储物",

@@ -1,0 +1,60 @@
+<view class="agreement-container">
+  <view class="title">用户服务协议</view>
+  <view class="date">版本生效日期：2025年10月</view>
+  
+  <view class="content">
+    
+    <view class="section">
+      <view class="h3">【首部及导言】</view>
+      <text class="p">甲方（本小程序主体公司）向符合本协议规定条件的乙方（个人用户）提供储物柜使用服务。</text>
+      <text class="p bold">在使用本服务前，请您务必审慎阅读、充分理解各条款内容，特别是免除或者限制责任的条款、法律适用和争议解决条款（已用粗体标识）。如您点击“同意”或实际使用本服务，即视为您已完全接受本协议。</text>
+    </view>
+
+    <view class="section">
+      <view class="h3">一、禁止寄存物品</view>
+      <text class="p bold">为保障公共安全，严禁在储物柜内存放以下物品。一经发现，甲方有权拒绝提供服务、强制清理并报警，且不承担任何赔偿责任：</text>
+      <text class="p">1. 易燃、易爆、易渗漏、易挥发、易潮物品；</text>
+      <text class="p">2. 有毒有害、放射性、腐蚀性化学品；</text>
+      <text class="p">3. 鲜活易腐物品（如海鲜、熟食）、活体动物；</text>
+      <text class="p">4. 毒品、枪支弹药、管制刀具等违禁品；</text>
+      <text class="p bold">5. 单件价值超过人民币 500 元的贵重物品。若乙方未声明并执意存放，因设备故障或治安事件导致的丢失或损坏，甲方仅按普通物品赔偿规则处理。</text>
+    </view>
+
+    <view class="section">
+      <view class="h3">二、费用、续租与押金（重要）</view>
+      <text class="p">1. 预付费模式：乙方付费成功后获得对应时段的使用权。</text>
+      
+      <text class="p bold">2. 续租规则：</text>
+      <text class="p">若乙方在许可使用期届满时愿意续租，<text class="bold">应在许可使用期届满前 5 分钟内交纳续租费用。</text>续租手续办理完毕后，本协议自动展期至新缴费用对应的期限。续租时，如遇费率调整，将执行调整后的价格。</text>
+
+      <text class="p bold">3. 押金退还与弃权：</text>
+      <text class="p bold">乙方若不续租，应当在退租之日（即订单结束日）起 7 日内通过小程序办理押金退还。</text>
+      <text class="p bold">若乙方自退租之日起满两年（24个月）仍未办理押金退还手续的，视为乙方自动放弃该笔押金的追索权，甲方有权将该笔款项作为长期滞留的管理费用予以处置。</text>
+    </view>
+    
+    <view class="section">
+      <view class="h3">三、滞留物品处置</view>
+      <text class="p">1. 最长寄存期限：除特殊说明外，单次寄存及欠费滞留的最长时限为 24小时。</text>
+      <text class="p bold">2. 视为放弃：若乙方滞留物品超过上述时限，且甲方通过短信/电话通知后 24 小时内仍未领取的，视为乙方自愿放弃该物品所有权。甲方有权开柜清理并按废弃物处理，所得款项用于抵扣欠费。</text>
+    </view>
+
+    <view class="section">
+      <view class="h3">四、责任限制与免责</view>
+      <text class="p">1. 不可抗力：因电力中断、网络故障等导致无法开柜，不属于甲方违约。</text>
+      <text class="p bold">2. 有限赔偿：因甲方设备硬件故障直接导致物品丢失的，赔偿责任仅限于该物品实际价值，且最高不超过人民币 300 元。</text>
+    </view>
+
+    <view class="section">
+      <view class="h3">五、违约责任</view>
+      <text class="p">若乙方造成柜体损坏，赔偿标准如下：</text>
+      <text class="p">1. 柜体/箱门损坏：赔偿维修费或 4200元/个；</text>
+      <text class="p">2. 控制单元损坏：赔偿维修费或 2500元/套。</text>
+    </view>
+
+    <view class="section">
+      <view class="h3">六、争议解决</view>
+      <text class="p bold">协商不成的，任何一方均有权向甲方经营所在地人民法院提起诉讼。</text>
+    </view>
+
+  </view>
+</view>

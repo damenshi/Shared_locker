@@ -418,14 +418,14 @@ Page({
         
       // } else {
         // 每次支付押金
-        const confirmPay = await this.showPaymentConfirmModal(lockerInfo.deviceDeposit, lockerInfo.lockerNo);
+        const confirmPay = await this.showPaymentConfirmModal(deviceDeposit, lockerInfo.lockerNo);
         if (!confirmPay) {
           throw new Error('未确认支付');
         }
 
         //支付
         wx.showLoading({ title: '处理中...' });
-        const paySuccess = await this.payment(orderId, lockerInfo.deviceDeposit);
+        const paySuccess = await this.payment(orderId, deviceDeposit);
         if (!paySuccess) {
           throw new Error('支付失败');
         }

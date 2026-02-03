@@ -77,55 +77,6 @@ Page({
     }
   },
 
-  // async doWithdraw(e) {
-  //   // ... 保持原有逻辑不变 ...
-  //   const orderId = e.currentTarget.dataset.id;
-  //   wx.showModal({
-  //     title: '提现',
-  //     content: '确认将该笔款项退回原支付账户？',
-  //     success: async (res) => {
-  //       if (res.confirm) {
-  //         wx.showLoading({ title: '提现中...' });
-  //         try {
-  //           const callRes = await wx.cloud.callFunction({
-  //             name: 'order',
-  //             data: { action: 'withdrawRefund', orderId: orderId }
-  //           });
-  //           wx.hideLoading();
-  //           if (callRes.result.success) {
-  //             wx.showModal({
-  //               title: '提现成功',
-  //               content: '提现已成功，请注意查收。',
-  //               showCancel: false,
-  //               confirmText: '好的',
-  //               success: (res) => {
-  //                 if (res.confirm) {
-  //                   //this.loadWallet(); 
-  //                 }
-  //               }
-  //             });
-  //           } else {
-  //             wx.showModal({
-  //               title: '提现失败',
-  //               content: callRes.result.errMsg || '未知原因，请联系客服',
-  //               showCancel: false,
-  //               confirmText: '关闭'
-  //             });
-  //           }
-  //         } catch (err) {
-  //           wx.hideLoading();
-  //           wx.showModal({
-  //             title: '系统提示',
-  //             content: '网络异常或服务繁忙，请稍后重试',
-  //             showCancel: false,
-  //             confirmText: '关闭'
-  //           });
-  //         }
-  //       }
-  //     }
-  //   })
-  // }
-
   async doWithdraw(e) {
     const orderId = e.currentTarget.dataset.id;
     wx.showModal({

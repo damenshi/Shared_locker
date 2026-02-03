@@ -1,0 +1,73 @@
+/* pages/mine/about.wxss */
+.container {
+  padding: 0;
+  background-color: #f6f6f6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0;
+}
+
+.logo {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 20rpx;
+  margin-bottom: 20rpx;
+  background-color: #fff; /* 临时占位色 */
+}
+
+.app-name {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+
+.version {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.list-group {
+  width: 100%;
+  background-color: #fff;
+  margin-top: 20rpx;
+}
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx 40rpx;
+  font-size: 30rpx;
+  color: #333;
+}
+
+.list-item:active {
+  background-color: #fafafa;
+}
+
+.arrow {
+  color: #ccc;
+  font-family: monospace;
+}
+
+.divider {
+  height: 1rpx;
+  background-color: #eee;
+  margin-left: 40rpx;
+}
+
+.footer {
+  position: absolute;
+  bottom: 40rpx;
+  font-size: 20rpx;
+  color: #ccc;
+}

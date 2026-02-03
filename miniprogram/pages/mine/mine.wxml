@@ -31,6 +31,11 @@
       <view class="customerphone">{{'400-832-6132'}}</view>
     </view>
 
+    <!-- 关于我们 -->
+    <view class="menu-item" bindtap="goAbout">
+      <view class="menu-text">关于我们</view>
+    </view>
+
     <!-- <view class="menu-item" bindtap="customerService">
       <view class="menu-text">客服电话</view>
       <view class="customerphone">{{'400-832-6132'}}</view>

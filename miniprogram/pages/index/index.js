@@ -52,19 +52,62 @@ Page({
     app.globalData.freedoorReadyCallback = null;
   },
 
+  // onShow() {
+  //   this.setData({
+  //     openid: app.globalData.openid || '',
+  //     deviceId: app.globalData.deviceId || '',
+  //   });
+
+  //   const showLockerBox = wx.getStorageSync('showLockerBox');
+  //   const openedLockerNo = wx.getStorageSync('openedLockerNo');
+  //   if (showLockerBox) {
+  //     this.setData({
+  //       showLockerBox,
+  //       openedLockerNo
+  //     });
+  //   }
+  // },
+
   onShow() {
     this.setData({
       openid: app.globalData.openid || '',
       deviceId: app.globalData.deviceId || '',
     });
 
+    // 1. 获取缓存中的显示状态和时间
     const showLockerBox = wx.getStorageSync('showLockerBox');
     const openedLockerNo = wx.getStorageSync('openedLockerNo');
+    const lockerShowTime = wx.getStorageSync('lockerShowTime') || 0;
+
+    // 2. 定义超时时间 (24小时)
+    const EXPIRE_TIME = 24 * 60 * 60 * 1000;
+
+    const now = Date.now();
+
     if (showLockerBox) {
-      this.setData({
-        showLockerBox,
-        openedLockerNo
-      });
+      // 3. 核心判断：如果距离上次显示已经超过 24 小时
+      if (now - lockerShowTime > EXPIRE_TIME) {
+        // === 超时处理 ===
+        console.log('柜门显示状态已超时(超过1天)，自动隐藏');
+        
+        // (1) 清除页面数据，隐藏UI
+        this.setData({
+          showLockerBox: false,
+          openedLockerNo: ''
+        });
+
+        //清除过期缓存，防止下次进来还显示
+        wx.removeStorageSync('showLockerBox');
+        wx.removeStorageSync('openedLockerNo');
+        wx.removeStorageSync('lockerShowTime');
+      } else {
+        // === 未超时 ===
+        // 正常恢复显示
+        this.setData({
+          showLockerBox: true,
+          openedLockerNo: openedLockerNo
+        });
+      }
     }
   },
 
@@ -110,6 +153,8 @@ Page({
       showLockerBox: true,
       openedLockerNo: lockerNo
     });
+
+    wx.setStorageSync('lockerShowTime', Date.now());
     wx.setStorageSync('showLockerBox', true);
     wx.setStorageSync('openedLockerNo', lockerNo);
   },

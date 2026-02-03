@@ -118,9 +118,9 @@ async function handlePayNotify(notifyData) {
 
   } catch (err) {
     // 场景C：调用云函数本身崩了（极少见）
-    // 视为硬错误
+    // 视为软错误
     console.error(`[回调] 云函数调用异常:`, err);
-    isPassed = false; 
+    isPassed = true;
   }
 
   // === 3. 根据最终决定执行数据库更新 ===

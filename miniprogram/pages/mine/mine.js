@@ -78,6 +78,8 @@ Page({
   // 页面跳转方法
   goMyOrders() { wx.navigateTo({ url: '/pages/mine/myorder' }); },
 
+  goAbout() { wx.navigateTo({ url: '/pages/mine/about' }); },
+
   goMywallet() { wx.navigateTo({ url: '/pages/mine/mywallet' }); },
 
   async goAdmin() {
