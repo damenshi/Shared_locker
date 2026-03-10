@@ -397,27 +397,36 @@ Page({
       if (!updateRes.result?.success) 
         throw new Error('更新柜子当前订单失败');
 
-      // 5. 查询用户是否有余额
-      // const userDeposit = await this.getUserDeposit(this.data.openid);
-      const deviceDeposit = await this.getDeviceDeposit(this.data.deviceId);
+      // 5. 免费or付费
+      const deviceConfig = await this.getDeviceDeposit(this.data.deviceId);
+      const deviceDeposit = deviceConfig.deviceDeposit || 0;
+      const isFree = deviceConfig.isFree || false; // 获取我们批量添加的字段
+
       let newDeposit = 0;
-      // if (userDeposit >= deviceDeposit) {
-      //   wx.showToast({ title: '余额充足，无需支付', icon: 'none', duration: 2000});
-      //   //更新订单状态为进行中并更新付款金额
-      //   const updateOrderRes = await wx.cloud.callFunction({
-      //     name: "order",
-      //     data: {
-      //       action: "updateOrder",
-      //       orderId: orderId,
-      //       status: this.data.constants.ORDER_STATUS_PROCESSING,
-      //       deposit: newDeposit
-      //     }
-      //   });
-      //   if (!updateOrderRes.result?.success) 
-      //     throw new Error('更新订单状态为进行中失败');
+      
+      if (isFree) {
+        //免费模式 ---
+        wx.showLoading({ title: '正在开门...' });
+
+        // 直接将订单状态更新为“进行中”，押金设为 0
+        const updateOrderRes = await wx.cloud.callFunction({
+          name: "order",
+          data: {
+            action: "updateOrder",
+            orderId: orderId,
+            status: this.data.constants.ORDER_STATUS_PROCESSING,
+            deposit: 0
+          }
+        });
+
+        if (!updateOrderRes.result?.success) 
+          throw new Error('激活免费服务失败');
         
-      // } else {
-        // 每次支付押金
+        canRecover = false; // 状态已更新，不再执行前端回滚
+        newDeposit = 0;
+        console.log('免费模式：已直接激活订单');
+
+      } else {
         const confirmPay = await this.showPaymentConfirmModal(deviceDeposit, lockerInfo.lockerNo);
         if (!confirmPay) {
           throw new Error('未确认支付');
@@ -447,16 +456,14 @@ Page({
           // 直接返回，跳过后续逻辑，也跳过 catch
           return;
         }
-
-        // 处理明确失败的情况 (confirmed === false)
+        // 处理明确失败的情况 
         if (confirmed === false) {
           // 后端已经明确是“已取消”，说明后端处理了异常
           // 我们只需要抛错提示用户，不需要前端再 recover（否则可能重复释放）
           throw new Error('开门失败');
         }
-        
         newDeposit = deviceDeposit;
-      //}
+      }
 
       // 7.更新用户余额
       const userUpdate = await wx.cloud.callFunction({

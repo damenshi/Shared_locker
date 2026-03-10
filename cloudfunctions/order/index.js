@@ -141,15 +141,22 @@ async function calculateFee(order) {
     if (devRes.data.length > 0) {
       const device = devRes.data[0];
       unitPrice = device.unitPrice !== undefined ? device.unitPrice : (device.unitPrice || 0);
+      isFree = device.isFree || false;
     }
   } catch (err) {
     console.error('获取设备价格失败，使用默认价格', err);
   }
-  
-  // 计费规则：免费时长10分钟
-  const FREE_MINUTES = 10;
-  if (durationMinutes > FREE_MINUTES) {
-    fee = durationHours * unitPrice * 100;
+
+  //优先判断是否免费
+  if (isFree) {
+    fee = 0; // 免费模式下，无论时长多久，费用恒为 0
+    console.log(`[calculateFee] 设备 ${order.deviceId} 处于免费模式，不计费`);
+  } else {
+    // 计费规则：免费时长10分钟
+    const FREE_MINUTES = 10;
+    if (durationMinutes > FREE_MINUTES) {
+      fee = durationHours * unitPrice * 100;
+    }
   }
 
   // 押金转为分

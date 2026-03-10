@@ -45,13 +45,21 @@ exports.main = async (event, context) => {
           deviceId:deviceId
         })
         .field({
-          deviceDeposit: true
+          deviceDeposit: true,
+          isFree: true
         })
         .get()
       
       if(result.data?.length === 0)
         throw new Error('获取设备收费标准失败');
-      return { success: true, data: result.data[0].deviceDeposit }
+      
+      return { 
+        success: true, 
+        data: {
+          deviceDeposit: result.data[0].deviceDeposit,
+          isFree: result.data[0].isFree || false
+        }
+      }
     } catch (err) {
       console.error('获取设备收费标准失败', err)
       return { success: false, errMsg: `${err.message}` }
