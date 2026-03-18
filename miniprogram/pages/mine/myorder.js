@@ -179,9 +179,10 @@ Page({
               }
   
             } else {
+              const errMsg = res.result.errMsg || '退款失败，请稍后重试';
               wx.showModal({
                 title: '退款失败',
-                content: res.result.errMsg || '退款失败，请稍后重试',
+                content: `${errMsg}\n\n如有疑问，请拨打客服电话400-832-6132`,
                 showCancel: false
               });
             }

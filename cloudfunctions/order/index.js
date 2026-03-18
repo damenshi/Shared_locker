@@ -44,14 +44,14 @@ const validateParams = (params, rules) => {
 
 // 以下配置请使用环境变量或云函数的安全配置
 const CONFIG = {
-  mchid: process.env.MCHID,
+  mchid: process.env.MCHID_XYH,
   appid: process.env.APPID,
   notify_url: 'https://cloudbase-3gnr17whd71a5b45-1379469522.ap-shanghai.app.tcloudbase.com/paynotify',
-  privateKeyPath: './private/apiclient_key.pem',
-  wechatPayPublicKeyPath: './private/pub_key.pem',
-  publicKeyPath: './private/apiclient_cert.pem',
-  merchantSerialNo: process.env.MERCHANT_SERIAL_NO, // 商户证书序列号
-  apiv3Key: process.env.WX_API_V3_KEY
+  privateKeyPath: './private/apiclient_key_xyh.pem',
+  wechatPayPublicKeyPath: './private/pub_key_xyh.pem',
+  publicKeyPath: './private/apiclient_cert_xyh.pem',
+  merchantSerialNo: process.env.MERCHANT_SERIAL_NO_XYH, // 商户证书序列号
+  apiv3Key: process.env.WX_API_V3_KEY_XYH
 };
 
 function getClient() {
@@ -870,6 +870,16 @@ exports.main = async (event, context) => {
       const refundRes = await client.refunds(refundParams);
       console.log('退款结果：', refundRes)
 
+      // 检查退款是否真正成功
+      if (!refundRes || refundRes.status !== 200) {
+        throw new Error(`退款请求失败: ${refundRes?.message || '未知错误'}`);
+      }
+
+      // 检查微信返回的业务状态
+      if (refundRes.data && refundRes.data.status !== 'SUCCESS' && refundRes.data.status !== 'PROCESSING') {
+        throw new Error(`退款失败: ${refundRes.data?.message || refundRes.data?.status || '未知错误'}`);
+      }
+
       await db.runTransaction(async (transaction) => {
         // 1. 扣减用户押金余额
         await transaction.collection('users')
@@ -989,7 +999,17 @@ exports.main = async (event, context) => {
       };
 
       const refundRes = await client.refunds(refundParams);
-      
+
+      // 检查退款是否真正成功
+      if (!refundRes || refundRes.status !== 200) {
+        throw new Error(`退款请求失败: ${refundRes?.message || '未知错误'}`);
+      }
+
+      // 检查微信返回的业务状态
+      if (refundRes.data && refundRes.data.status !== 'SUCCESS' && refundRes.data.status !== 'PROCESSING') {
+        throw new Error(`退款失败: ${refundRes.data?.message || refundRes.data?.status || '未知错误'}`);
+      }
+
       // 4. 更新数据库
         await db.runTransaction(async (transaction) => {
           // 更新订单状态为已退款
