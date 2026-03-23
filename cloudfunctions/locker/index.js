@@ -111,16 +111,49 @@ exports.main = async (event, context) => {
       return { ok: false, errMsg: validation.msg }
     }
 
-    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 5) => {
+    // P0优化: 指令结果查询接口
+    const queryCommandResult = async (requestId, maxRetries = 3) => {
+      const axios = require('axios');
       let attempt = 0;
-    
-      // 延迟函数
-      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-    
       while (attempt < maxRetries) {
         try {
           attempt++;
-    
+          const queryRes = await axios.get(
+            `http://1.116.109.239:3000/command-result/${requestId}`,
+            { timeout: 5000 }
+          );
+          if (queryRes.data.code === 200) {
+            return { success: true, data: queryRes.data.data };
+          }
+          if (queryRes.data.code === 202) {
+            // 仍在处理中，等待后重试
+            console.log(`[查询指令] requestId=${requestId}, 第${attempt}次查询，指令处理中，等待1秒`);
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+          // 408超时 或 404不存在
+          return { success: false, message: queryRes.data.message };
+        } catch (err) {
+          console.warn(`[查询指令] requestId=${requestId}, 第${attempt}次查询异常: ${err.message}`);
+          if (attempt >= maxRetries) {
+            return { success: false, message: err.message };
+          }
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+      return { success: false, message: '查询超时' };
+    };
+
+    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 2) => {
+      let attempt = 0;
+
+      // 延迟函数
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+      while (attempt < maxRetries) {
+        try {
+          attempt++;
+
           // 2. 调用socket服务器接口
           const formatNumber = (num) => {
             return num.toString().padStart(2, '0');
@@ -128,7 +161,7 @@ exports.main = async (event, context) => {
           const formattedCabinetNo = formatNumber(cabinetNo);
           const formattedDoorNo = formatNumber(doorNo);
           const combinedCode = formattedCabinetNo + formattedDoorNo;
-    
+
           const axios = require('axios');
           const response = await axios.post(
             'http://1.116.109.239:3000/send-command',
@@ -139,37 +172,55 @@ exports.main = async (event, context) => {
                 doorSort: combinedCode,
               }
             },
-            { timeout: 15000 }
+            { timeout: 10000 }
           );
-    
-          //成功条件
+
+          // 成功条件
           if (response.data.code === 200 && response.data.doorSort == combinedCode) {
             return true;
           }
-    
+
+          // P0优化: 202响应处理 - 使用相同的requestId查询结果
+          if (response.data.code === 202) {
+            const existingRequestId = response.data.requestId;
+            console.warn(`[202响应] deviceId=${deviceId}, doorSort=${combinedCode}, requestId=${existingRequestId}, 等待后查询结果`);
+
+            // 使用相同的requestId查询结果
+            const queryRes = await queryCommandResult(existingRequestId, 5);
+            if (queryRes.success) {
+              console.log(`[202查询成功] deviceId=${deviceId}, doorSort=${combinedCode}, requestId=${existingRequestId}`);
+              return true;
+            }
+
+            // 查询失败，等待后重试（但用相同的requestId让服务端处理）
+            console.warn(`[202查询失败] deviceId=${deviceId}, requestId=${existingRequestId}, ${queryRes.message}, 等待后重试`);
+            await delay(2000);
+            continue;
+          }
+
           console.warn(`第 ${attempt} 次返回非200，准备重试`);
-    
-          //最后一次仍非200 → 按原逻辑抛错
+
+          // 最后一次仍非200 → 按原逻辑抛错
           if (attempt >= maxRetries) {
             // 这里的 response.data.code 就是你服务器返回的业务错误码（如 500）
             throw new Error(`服务器返回错误: ${response.data.code} ${response.data.message || '未知错误'}`)
           }
-    
+
         } catch (err) {
           console.warn(`第 ${attempt} 次请求异常: ${err.message}`);
-    
-          //最后一次失败才走原有错误处理逻辑
+
+          // 最后一次失败才走原有错误处理逻辑
           if (attempt >= maxRetries) {
             if (err.code === 'ECONNABORTED') {
                 throw new Error(`连接超时，请检查服务器是否在线`);
             }
-    
+
             if (err.response) {
-                //优先取 response.data.code (业务码)，取不到才用 response.status (HTTP码)
+                // 优先取 response.data.code (业务码)，取不到才用 response.status (HTTP码)
                 const businessCode = err.response.data?.code || err.response.status;
                 const errorMsg = err.response.data?.message || err.response.statusText;
                 console.error(`服务器返回错误: 设备${deviceId}，业务码${businessCode}，HTTP码${err.response.status}，message: ${errorMsg}`);
-                
+
                 // 这样抛出去就是 "服务器返回错误: 500 设备 xxx 不在线"
                 // paynotify 就能正确识别并取消订单了
                 throw new Error(`服务器返回错误: ${businessCode} ${errorMsg}`);
@@ -177,9 +228,9 @@ exports.main = async (event, context) => {
             throw new Error(`开柜接口调用失败: ${err.message}`);
           }
         }
-    
-        //等待时间递增：500ms * 2^(attempt-1)
-        const waitTime = 500 * Math.pow(2, attempt - 1);
+
+        // 等待时间递增：500ms * 2^(attempt-1)
+        const waitTime = 200 * Math.pow(2, attempt - 1);
         console.log(`等待 ${waitTime}ms 后进行第 ${attempt + 1} 次尝试...`);
         await delay(waitTime);
       }
@@ -249,7 +300,7 @@ exports.main = async (event, context) => {
           }
 
           // 模拟硬件开柜
-          const openSuccess = callHardwareOpen(targetHardwareId, cabinetNo, doorNo);
+          const openSuccess = await callHardwareOpen(targetHardwareId, cabinetNo, doorNo);
           if (!openSuccess) {
             throw new Error(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 硬件开柜失败`)
           }
@@ -422,16 +473,47 @@ exports.main = async (event, context) => {
       return { ok: false, errMsg: validation.msg }
     }
 
-    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 5) => {
+    // P0优化: 指令结果查询接口 (管理员版本)
+    const queryCommandResultAdmin = async (requestId, maxRetries = 3) => {
+      const axios = require('axios');
       let attempt = 0;
-    
-      // 延迟函数
-      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-    
       while (attempt < maxRetries) {
         try {
           attempt++;
-    
+          const queryRes = await axios.get(
+            `http://1.116.109.239:3000/command-result/${requestId}`,
+            { timeout: 5000 }
+          );
+          if (queryRes.data.code === 200) {
+            return { success: true, data: queryRes.data.data };
+          }
+          if (queryRes.data.code === 202) {
+            console.log(`[查询指令-Admin] requestId=${requestId}, 第${attempt}次查询，指令处理中，等待1秒`);
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+          return { success: false, message: queryRes.data.message };
+        } catch (err) {
+          console.warn(`[查询指令-Admin] requestId=${requestId}, 第${attempt}次查询异常: ${err.message}`);
+          if (attempt >= maxRetries) {
+            return { success: false, message: err.message };
+          }
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+      return { success: false, message: '查询超时' };
+    };
+
+    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 2) => {
+      let attempt = 0;
+
+      // 延迟函数
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+      while (attempt < maxRetries) {
+        try {
+          attempt++;
+
           // 2. 调用socket服务器接口
           const formatNumber = (num) => {
             return num.toString().padStart(2, '0');
@@ -439,7 +521,7 @@ exports.main = async (event, context) => {
           const formattedCabinetNo = formatNumber(cabinetNo);
           const formattedDoorNo = formatNumber(doorNo);
           const combinedCode = formattedCabinetNo + formattedDoorNo;
-    
+
           const axios = require('axios');
           const response = await axios.post(
             'http://1.116.109.239:3000/send-command',
@@ -450,25 +532,41 @@ exports.main = async (event, context) => {
                 doorSort: combinedCode,
               }
             },
-            { timeout: 15000 }
+            { timeout: 10000 }
           );
-    
-          //成功条件
+
+          // 成功条件
           if (response.data.code === 200 && response.data.doorSort == combinedCode) {
             return true;
           }
-    
+
+          // P0优化: 202响应处理 - 使用相同的requestId查询结果
+          if (response.data.code === 202) {
+            const existingRequestId = response.data.requestId;
+            console.warn(`[202响应-Admin] deviceId=${deviceId}, doorSort=${combinedCode}, requestId=${existingRequestId}, 等待后查询结果`);
+
+            const queryRes = await queryCommandResultAdmin(existingRequestId, 5);
+            if (queryRes.success) {
+              console.log(`[202查询成功-Admin] deviceId=${deviceId}, doorSort=${combinedCode}, requestId=${existingRequestId}`);
+              return true;
+            }
+
+            console.warn(`[202查询失败-Admin] deviceId=${deviceId}, requestId=${existingRequestId}, ${queryRes.message}, 等待后重试`);
+            await delay(2000);
+            continue;
+          }
+
           console.warn(`第 ${attempt} 次返回非200，准备重试`);
-    
-          //最后一次仍非200 → 按原逻辑抛错
+
+          // 最后一次仍非200 → 按原逻辑抛错
           if (attempt >= maxRetries) {
             throw new Error(`服务器响应异常: ${response.data.message || '未知错误'}`);
           }
-    
+
         } catch (err) {
           console.warn(`第 ${attempt} 次请求异常: ${err.message}`);
-    
-          //最后一次失败才走原有错误处理逻辑
+
+          // 最后一次失败才走原有错误处理逻辑
           if (attempt >= maxRetries) {
             if (err.code === 'ECONNABORTED') {
               throw new Error(`连接超时，请检查服务器是否在线`);
@@ -481,9 +579,9 @@ exports.main = async (event, context) => {
             throw new Error(`开柜接口调用失败: ${err.message}`);
           }
         }
-    
-        //等待时间递增：500ms * 2^(attempt-1)
-        const waitTime = 500 * Math.pow(2, attempt - 1);
+
+        // 等待时间递增：500ms * 2^(attempt-1)
+        const waitTime = 200 * Math.pow(2, attempt - 1);
         console.log(`等待 ${waitTime}ms 后进行第 ${attempt + 1} 次尝试...`);
         await delay(waitTime);
       }
