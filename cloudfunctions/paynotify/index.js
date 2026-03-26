@@ -103,13 +103,14 @@ async function handlePayNotify(notifyData) {
       const errMsg = lockerRes.result.errMsg || '';
       console.error(`[回调] 开门返回失败: ${errMsg}`);
 
-      //关键判断：只有服务器明确返回 500 时，才认定为硬伤
+      //关键判断：只有服务器明确返回 500 或设备不在线 时，才认定为硬伤
       // 匹配 openDoor 中的 throw Error(`服务器返回错误: ${err.response.status} ...`)
-      if (errMsg.includes('服务器返回错误: 500')) {
+      // P1优化: 增加”设备不在线”识别
+      if (errMsg.includes('服务器返回错误: 500') || errMsg.includes('设备不在线')) {
          isPassed = false;
          failReason = errMsg; // 记录原因，准备取消订单
       } else {
-         // 其他所有情况（超时、网络波动、404、未知错误等），一律视为“软错误”
+         // 其他所有情况（超时、网络波动、404、未知错误等），一律视为”软错误”
          // 策略：疑罪从无，认为是成功的（防止白嫖）
          isPassed = true;
          console.warn(`[回调] 捕获软错误(${errMsg})，降级处理为【成功】`);

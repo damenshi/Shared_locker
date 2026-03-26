@@ -121,7 +121,7 @@ Page({
             } else {
               wx.showModal({
                 title: '提现失败',
-                content: callRes.result.errMsg || '未知原因，请联系客服',
+                content: `${callRes.result.errMsg || '未知原因'},请拨打客服电话400-832-6132`,
                 showCancel: false,
                 confirmText: '关闭'
               });
@@ -130,7 +130,7 @@ Page({
             wx.hideLoading();
             wx.showModal({
               title: '系统提示',
-              content: '网络异常或服务繁忙，请稍后重试',
+              content: '网络异常或服务繁忙,请拨打客服电话400-832-6132',
               showCancel: false,
               confirmText: '关闭'
             });

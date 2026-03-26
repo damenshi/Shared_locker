@@ -144,7 +144,7 @@ exports.main = async (event, context) => {
       return { success: false, message: '查询超时' };
     };
 
-    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 2) => {
+    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 1) => {
       let attempt = 0;
 
       // 延迟函数
@@ -192,13 +192,19 @@ exports.main = async (event, context) => {
               return true;
             }
 
-            // 查询失败，等待后重试（但用相同的requestId让服务端处理）
-            console.warn(`[202查询失败] deviceId=${deviceId}, requestId=${existingRequestId}, ${queryRes.message}, 等待后重试`);
+            // P1优化: 只有"不存在/已过期"时才重发指令，其他继续轮询
+            if (queryRes.message === '指令不存在或已过期') {
+              console.warn(`[202查询] deviceId=${deviceId}, requestId=${existingRequestId}, 指令已过期，重新发送`);
+              await delay(2000);
+              continue;
+            }
+            // 其他情况（查询超时、指令处理中）继续轮询
+            console.warn(`[202查询] deviceId=${deviceId}, requestId=${existingRequestId}, ${queryRes.message}，继续等待`);
             await delay(2000);
             continue;
           }
 
-          console.warn(`第 ${attempt} 次返回非200，准备重试`);
+          console.warn(`第 ${attempt} 次返回非200, 准备重试`);
 
           // 最后一次仍非200 → 按原逻辑抛错
           if (attempt >= maxRetries) {
@@ -504,7 +510,7 @@ exports.main = async (event, context) => {
       return { success: false, message: '查询超时' };
     };
 
-    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 2) => {
+    const callHardwareOpen = async (deviceId, cabinetNo, doorNo, maxRetries = 1) => {
       let attempt = 0;
 
       // 延迟函数
@@ -551,7 +557,14 @@ exports.main = async (event, context) => {
               return true;
             }
 
-            console.warn(`[202查询失败-Admin] deviceId=${deviceId}, requestId=${existingRequestId}, ${queryRes.message}, 等待后重试`);
+            // P1优化: 只有"不存在/已过期"时才重发指令，其他继续轮询
+            if (queryRes.message === '指令不存在或已过期') {
+              console.warn(`[202查询-Admin] deviceId=${deviceId}, requestId=${existingRequestId}, 指令已过期，重新发送`);
+              await delay(2000);
+              continue;
+            }
+            // 其他情况继续轮询
+            console.warn(`[202查询-Admin] deviceId=${deviceId}, requestId=${existingRequestId}, ${queryRes.message}，继续等待`);
             await delay(2000);
             continue;
           }
