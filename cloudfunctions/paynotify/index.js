@@ -103,10 +103,14 @@ async function handlePayNotify(notifyData) {
       const errMsg = lockerRes.result.errMsg || '';
       console.error(`[回调] 开门返回失败: ${errMsg}`);
 
+      if (errMsg.includes('状态异常') || errMsg.includes('与订单不匹配')) {
+        isPassed = false;
+        failReason = '业务冲突：柜门已被重新分配';
+      }
       //关键判断：只有服务器明确返回 500 或设备不在线 时，才认定为硬伤
       // 匹配 openDoor 中的 throw Error(`服务器返回错误: ${err.response.status} ...`)
       // P1优化: 增加”设备不在线”识别
-      if (errMsg.includes('服务器返回错误: 500') || errMsg.includes('设备不在线')) {
+      else if (errMsg.includes('服务器返回错误: 500') || errMsg.includes('设备不在线')) {
          isPassed = false;
          failReason = errMsg; // 记录原因，准备取消订单
       } else {

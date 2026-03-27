@@ -323,6 +323,21 @@ exports.main = async (event, context) => {
             }
           })
 
+          // 3. 后端强制结束订单，不再依赖前端调用 finishOrder
+          try {
+              await cloud.callFunction({
+                name: 'order',
+                data: {
+                    action: 'finishOrder',
+                    orderId: orderId
+                }
+              });
+              console.log(`订单 ${orderId} 自动结算成功`);
+          } catch(err) {
+              // 即使结算发生异常，也要记录日志，但不能影响用户开门拿走东西
+              console.error(`订单 ${orderId} 自动结算失败，需人工核实:`, err);
+          }
+  
           return { 
             success: true, 
             message: `取包成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`
@@ -680,7 +695,29 @@ exports.main = async (event, context) => {
         const deviceRes = await db.collection('devices').where({ deviceId }).get();
         const screenNo = deviceRes.data[0]?.screenNo || null;
         if (!screenNo) {
-          throw new Error(`未找到设备的 screenNo，无法执行释放操作`)
+          throw new Error(`未找到设备的 screenNo, 无法执行释放操作`)
+        }
+
+        //先找出这台设备上所有身上带有遗留订单的柜门
+        const occupiedLockers = await db.collection('lockers')
+          .where({
+            deviceId,
+            lockerNo: _.neq(screenNo),
+            status: _.neq('broken'),
+            currentOrderId: _.neq(null) // 🎯 只找挂着订单的
+          }).get();
+
+        // 循环遍历，把遗留订单全部终结掉！
+        for (const locker of occupiedLockers.data) {
+          console.warn(`[管理员一键清柜] 设备${deviceId} 柜门${locker.lockerNo}释放，同步结束遗留订单: ${locker.currentOrderId}`);
+          try {
+            await cloud.callFunction({
+              name: 'order',
+              data: { action: 'forceFinish', orderId: locker.currentOrderId }
+            });
+          } catch(e) {
+            console.error(`结束遗留订单 ${locker.currentOrderId} 失败`, e);
+          }
         }
 
         // 释放该设备的所有柜门
@@ -728,6 +765,20 @@ exports.main = async (event, context) => {
         }
 
         const locker = lockerQuery.data[0]
+
+        // 如果强制设为“空闲”或“故障”，必须处理遗留订单！
+        if ((status === 'free' || status === 'broken') && locker.currentOrderId) {
+          console.warn(`[管理员清柜] 柜门${lockerNo}状态变更为${status}，正在同步结束遗留订单: ${locker.currentOrderId}`);
+          try {
+            // 跨云函数调用，强制把这个倒霉的订单结束掉并结算！
+            await cloud.callFunction({
+              name: 'order',
+              data: { action: 'forceFinish', orderId: locker.currentOrderId }
+            });
+          } catch(e) {
+            console.error('强制结束遗留订单失败', e);
+          }
+        }
 
         // 3. 准备更新数据
         let updateData = {

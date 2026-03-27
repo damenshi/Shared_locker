@@ -227,42 +227,167 @@ exports.main = async (event, context) => {
   }
 
   // 2. 创建订单
-  if (action === 'createOrder') {
-    const { password, lockerInfo, userInfo } = event
+  // if (action === 'createOrder') {
+  //   const { password, lockerInfo, userInfo } = event
 
+  //   const validation = validateParams(event, {
+  //     password: { type: 'string' },
+  //   })
+  //   if (!validation.valid) {
+  //     return { ok: false, errMsg: validation.msg }
+  //   }
+
+  //   try {
+  //       // 构建订单数据
+  //       const order = {
+  //         password: password,
+  //         lockerId: lockerInfo._id,
+  //         deviceId: lockerInfo.deviceId,
+  //         internalNo: lockerInfo.internalNo,
+  //         cabinetNo: lockerInfo.cabinetNo,
+  //         doorNo: lockerInfo.doorNo,
+  //         lockerNo: lockerInfo.lockerNo,
+  //         deviceAddress: lockerInfo.deviceAddress,
+  //         userId: userInfo._id,
+  //         openid: userInfo.openid,
+  //         phone: userInfo.phone,
+  //         status: CONSTANTS.ORDER_STATUSES.PENDING_PAY,
+  //         deposit: 0,
+  //         transactionId: '',
+  //         createdAt: db.serverDate(),
+  //         updatedAt: db.serverDate()
+  //       }
+  //       // 创建订单
+  //       const addRes = await db.collection('orders').add({ data: order })
+
+  //       return { success: true, data: addRes._id }
+  //   } catch (err) {
+  //     console.error('创建订单失败', { error: err.message })
+  //     return { success: false, errMsg: err.message }
+  //   }
+  // }
+
+  // 2. 创建订单（已重构：原子锁柜 + 自动重试 + 创单合并）
+  if (action === 'createOrder') {
+    const { password, deviceId, userInfo } = event
+
+    // 基础参数校验
     const validation = validateParams(event, {
       password: { type: 'string' },
+      deviceId: { type: 'string' }
     })
     if (!validation.valid) {
-      return { ok: false, errMsg: validation.msg }
+      return { success: false, errMsg: validation.msg }
     }
 
     try {
-        // 构建订单数据
-        const order = {
-          password: password,
-          lockerId: lockerInfo._id,
-          deviceId: lockerInfo.deviceId,
-          internalNo: lockerInfo.internalNo,
-          cabinetNo: lockerInfo.cabinetNo,
-          doorNo: lockerInfo.doorNo,
-          lockerNo: lockerInfo.lockerNo,
-          deviceAddress: lockerInfo.deviceAddress,
-          userId: userInfo._id,
-          openid: userInfo.openid,
-          phone: userInfo.phone,
-          status: CONSTANTS.ORDER_STATUSES.PENDING_PAY,
-          deposit: 0,
-          transactionId: '',
-          createdAt: db.serverDate(),
-          updatedAt: db.serverDate()
+      // ==========================================
+      // 🛑 1. 拦截从设备存包请求（补回来的核心逻辑）
+      // ==========================================
+      const devRes = await db.collection('devices').where({ deviceId }).get();
+      if (devRes.data.length > 0) {
+        const device = devRes.data[0];
+        // 如果存在 masterId，说明这是取包面（从设备）
+        if (device.masterId) {
+           return { 
+             success: false, 
+             errMsg: '此处为取包口，请前往柜子正面（存包区）进行存包' 
+           };
         }
-        // 创建订单
-        const addRes = await db.collection('orders').add({ data: order })
+      }
 
-        return { success: true, data: addRes._id }
+      // ==========================================
+      // 🔄 2. 寻找空柜子并执行原子锁柜（带自动重试）
+      // ==========================================
+      let targetLocker = null;
+      let newOrderId = null;
+      let lockedSuccessfully = false;
+      const MAX_RETRIES = 3; // 设置最大重试次数
+
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        // 2.1 查询当前设备的空闲柜子
+        const freeLockers = await db.collection('lockers')
+          .where({ 
+            status: 'free', 
+            currentOrderId: _.eq(null), 
+            deviceId: deviceId 
+          })
+          .limit(10)
+          .get();
+        
+        if (freeLockers.data.length === 0) {
+          throw new Error('当前设备柜门已满，请稍后再试');
+        }
+        
+        // 随机选择一个柜门
+        const randomIndex = Math.floor(Math.random() * freeLockers.data.length);
+        targetLocker = freeLockers.data[randomIndex];
+
+        // 2.2 提前生成一个全新的订单号
+        newOrderId = `ORD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`; 
+
+        // 2.3 🛡️ 【核心防御】CAS 原子锁柜！
+        const lockRes = await db.collection('lockers').where({
+           _id: targetLocker._id,
+           status: 'free' // 绝杀防并发锁
+        }).update({
+           data: {
+             status: 'occupied',
+             currentOrderId: newOrderId,
+             currentUserPhone: userInfo.phone,
+             updatedAt: db.serverDate()
+           }
+        });
+
+        // 2.4 判断是否锁柜成功
+        if (lockRes.stats.updated > 0) {
+           lockedSuccessfully = true;
+           break; // 成功后立刻跳出重试循环
+        } else {
+           console.warn(`[防并发] 第 ${attempt} 次分配柜门(${targetLocker.lockerNo})失败，已被抢占，准备重试...`);
+        }
+      }
+
+      if (!lockedSuccessfully) {
+        throw new Error('当前存包人数过多，系统繁忙，请重新扫码试试');
+      }
+
+      // ==========================================
+      // 📝 3. 锁柜成功，向数据库写入真实订单数据
+      // ==========================================
+      const order = {
+        _id: newOrderId, 
+        password: password,
+        lockerId: targetLocker._id,
+        deviceId: targetLocker.deviceId,
+        internalNo: targetLocker.internalNo,
+        cabinetNo: targetLocker.cabinetNo,
+        doorNo: targetLocker.doorNo,
+        lockerNo: targetLocker.lockerNo,
+        deviceAddress: targetLocker.deviceAddress || '',
+        userId: userInfo._id,
+        openid: userInfo.openid,
+        phone: userInfo.phone,
+        status: CONSTANTS.ORDER_STATUSES.PENDING_PAY,
+        deposit: 0,
+        transactionId: '',
+        createdAt: db.serverDate(),
+        updatedAt: db.serverDate()
+      }
+      
+      await db.collection('orders').add({ data: order })
+
+      // 返回数据给前端
+      return { 
+        success: true, 
+        data: { 
+          orderId: newOrderId, 
+          lockerInfo: targetLocker 
+        } 
+      }
+
     } catch (err) {
-      console.error('创建订单失败', { error: err.message })
+      console.error('分配柜门并创建订单失败', { error: err.message })
       return { success: false, errMsg: err.message }
     }
   }
@@ -300,6 +425,15 @@ exports.main = async (event, context) => {
           if (wxRes.data && wxRes.data.trade_state === 'SUCCESS') {
             console.log(`[getOrder] 发现掉单：订单 ${orderId} 微信已支付但数据库为待支付，自动修复。`);
             
+            // 查询对应的柜子现状
+            const lockerRes = await db.collection('lockers').doc(order.lockerId).get();
+            const currentLocker = lockerRes.data;
+            // 如果柜门不是被当前订单占用（被恢复了，或者被别人占了）
+            if (!currentLocker || currentLocker.status !== 'occupied' || currentLocker.currentOrderId !== orderId) {
+              console.warn(`[getOrder] 柜门已被释放或被他人占用！`);    
+              return { success: false, errMsg: '该柜门已超时释放' };
+            }
+
             const amountFen = wxRes.data.amount?.total || 0;
             const amountYuan = amountFen / 100;
 
@@ -384,6 +518,15 @@ exports.main = async (event, context) => {
 
         // 验证订单状态
         const order = orderDoc.data;
+
+        if (order.status === CONSTANTS.ORDER_STATUSES.COMPLETED) {
+          console.log(`[finishOrder] 订单 ${orderId} 已经是已完成状态，触发幂等直接返回成功`);
+          return {
+            success: true, 
+            message: "订单已完成"
+          };
+        }
+
         if (order.status !== CONSTANTS.ORDER_STATUSES.IN_PROGRESS) {
           throw new Error(`订单状态不可完成，当前状态：${order.status}`)
         }

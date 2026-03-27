@@ -358,44 +358,61 @@ Page({
       if (!userRes.result?.success) throw new Error('无相关用户信息');
       const userInfo = userRes.result.data;
 
-      //3.获取可用柜子并占用
-      const freeRes = await wx.cloud.callFunction({
-        name: 'locker',
-        data: {
-          action: 'listFree',
-          deviceId: this.data.deviceId
-        }
-      });
-  
-      if (!freeRes.result?.success) 
-        throw new Error('无空闲柜门');
-      lockerInfo = freeRes.result.data;
+      // //3.获取可用柜子并占用
+      // const freeRes = await wx.cloud.callFunction({
+      //   name: 'locker',
+      //   data: {
+      //     action: 'listFree',
+      //     deviceId: this.data.deviceId
+      //   }
+      // });
+      
+      // if (!freeRes.result?.success) 
+      //   throw new Error('无空闲柜门');
+      // lockerInfo = freeRes.result.data;
 
-      // 4. 创建订单
+      // // 4. 创建订单
+      // const orderRes = await wx.cloud.callFunction({
+      //   name: "order",
+      //   data: {
+      //     action: "createOrder",
+      //     password: this.data.password,
+      //     lockerInfo: lockerInfo,
+      //     userInfo: userInfo
+      //   }
+      // });
+      // if (!orderRes.result?.success) throw new Error('创建订单失败');
+      // orderId = orderRes.result.data;
+
+      // //5.更新柜子相关信息
+      // const updateRes = await wx.cloud.callFunction({
+      //   name: 'locker',
+      //   data: {
+      //     action: 'updateLocker',
+      //     lockerId: lockerInfo._id,
+      //     currentOrderId: orderId,
+      //     currentUserPhone: userInfo.phone
+      //   }
+      // });
+      // if (!updateRes.result?.success) 
+      //   throw new Error('更新柜子当前订单失败');
+
       const orderRes = await wx.cloud.callFunction({
         name: "order",
         data: {
           action: "createOrder",
           password: this.data.password,
-          lockerInfo: lockerInfo,
+          deviceId: this.data.deviceId, // 注意：只需传 deviceId
           userInfo: userInfo
         }
       });
-      if (!orderRes.result?.success) throw new Error('创建订单失败');
-      orderId = orderRes.result.data;
+      
+      if (!orderRes.result?.success) {
+        throw new Error(orderRes.result?.errMsg || '分配柜门失败，请重试');
+      }
 
-      //5.更新柜子相关信息
-      const updateRes = await wx.cloud.callFunction({
-        name: 'locker',
-        data: {
-          action: 'updateLocker',
-          lockerId: lockerInfo._id,
-          currentOrderId: orderId,
-          currentUserPhone: userInfo.phone
-        }
-      });
-      if (!updateRes.result?.success) 
-        throw new Error('更新柜子当前订单失败');
+      orderId = orderRes.result.data.orderId;
+      lockerInfo = orderRes.result.data.lockerInfo;
 
       // 5. 免费or付费
       const deviceConfig = await this.getDeviceDeposit(this.data.deviceId);
