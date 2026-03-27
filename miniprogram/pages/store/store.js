@@ -310,40 +310,58 @@ Page({
           await new Promise((resolve, reject) => {
             wx.showModal({
               title: '提示',
-              content: '检测到您有未完成的订单，是否结算旧订单并继续存包？', 
-              showCancel: true,       // 显示取消按钮
-              cancelText: '取消',     // 左边按钮
-              confirmText: '继续',    // 右边按钮
-              success: (res) => {
+              content: `检测到您在本机还有正在使用的柜门（${orderInfo.lockerNo}号）。是否先取出物品再继续存新包？`, 
+              showCancel: true,
+              cancelText: '取消',
+              confirmText: '开旧柜',
+              success: async (res) => {
                 if (res.confirm) {
-                  // 用户点击“继续”，解决 Promise，代码继续向下执行
-                  resolve();
+                  try {
+                    wx.showLoading({ title: '正在打开旧柜门...' });
+
+                    // 1. 直接调用后端的取件接口（后端会自动开门、释放柜子、结算订单）
+                    const takeRes = await wx.cloud.callFunction({
+                      name: 'locker',
+                      data: {
+                        action: 'openDoor',
+                        deviceId: orderInfo.deviceId,
+                        cabinetNo: orderInfo.cabinetNo,
+                        doorNo: orderInfo.doorNo,
+                        orderId: orderInfo._id, // 注意数据库的主键是 _id
+                        type: 'take'
+                      }
+                    });
+
+                    if (!takeRes.result?.success) {
+                      throw new Error(takeRes.result?.errMsg || '旧柜门打开失败');
+                    }
+
+                    wx.hideLoading();
+
+                    // 2. 旧门开了，给用户一个缓冲时间拿东西，拿完再继续分配新柜子
+                    wx.showModal({
+                      title: '旧柜门已开',
+                      content: `请取出 ${orderInfo.lockerNo} 号柜内的物品并关好门。点击“继续”将立刻为您分配新的空柜子。`,
+                      showCancel: false,
+                      confirmText: '继续',
+                      success: () => {
+                        // 用户点继续，resolve 放行！代码会顺畅地走到下面的 createOrder 去分配新门
+                        resolve();
+                      }
+                    });
+
+                  } catch (err) {
+                    wx.hideLoading();
+                    wx.showToast({ title: err.message, icon: 'none', duration: 3000 });
+                    reject(new Error('旧订单处理失败，已中断存包'));
+                  }
                 } else {
-                  // 用户点击“取消”，拒绝 Promise，触发 catch 流程
-                  reject(new Error('有进行中订单，请先取件结束订单后再存包'));
+                  // 用户点击取消，拒绝执行，中断存包
+                  reject(new Error('已取消操作'));
                 }
-              },
-              fail: () => {
-                // 异常情况也视为取消
-                reject(new Error('操作取消'));
               }
             });
           });
-
-          wx.showLoading({ title: '正在结算旧订单...' });
-          
-          const orderFinishRes = await wx.cloud.callFunction({
-            name: "order",
-            data: {
-              action: "finishOrder",
-              orderId: orderInfo._id
-            }
-          });
-
-          // 3. 检查结算结果
-          if (!orderFinishRes.result?.success) {
-            throw new Error('旧订单结算失败：' + (orderFinishRes.result?.errMsg || '未知错误'));
-          }
         }
       }
 
@@ -359,45 +377,7 @@ Page({
       if (!userRes.result?.success) throw new Error('无相关用户信息');
       const userInfo = userRes.result.data;
 
-      // //3.获取可用柜子并占用
-      // const freeRes = await wx.cloud.callFunction({
-      //   name: 'locker',
-      //   data: {
-      //     action: 'listFree',
-      //     deviceId: this.data.deviceId
-      //   }
-      // });
-      
-      // if (!freeRes.result?.success) 
-      //   throw new Error('无空闲柜门');
-      // lockerInfo = freeRes.result.data;
-
-      // // 4. 创建订单
-      // const orderRes = await wx.cloud.callFunction({
-      //   name: "order",
-      //   data: {
-      //     action: "createOrder",
-      //     password: this.data.password,
-      //     lockerInfo: lockerInfo,
-      //     userInfo: userInfo
-      //   }
-      // });
-      // if (!orderRes.result?.success) throw new Error('创建订单失败');
-      // orderId = orderRes.result.data;
-
-      // //5.更新柜子相关信息
-      // const updateRes = await wx.cloud.callFunction({
-      //   name: 'locker',
-      //   data: {
-      //     action: 'updateLocker',
-      //     lockerId: lockerInfo._id,
-      //     currentOrderId: orderId,
-      //     currentUserPhone: userInfo.phone
-      //   }
-      // });
-      // if (!updateRes.result?.success) 
-      //   throw new Error('更新柜子当前订单失败');
-
+      //占柜+创建订单二合一
       const orderRes = await wx.cloud.callFunction({
         name: "order",
         data: {

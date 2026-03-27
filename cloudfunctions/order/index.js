@@ -673,7 +673,42 @@ exports.main = async (event, context) => {
       }
 
       const order = orderInfo.data[0];
-      console.log(`匹配到订单：ID=${order._id}，柜门=${order.doorNo}`)
+
+      // 去查一下这个订单关联的柜子，现在到底还是不是它的？
+      if (order.lockerId) {
+        const lockerDoc = await db.collection('lockers').doc(order.lockerId).get();
+        const locker = lockerDoc.data;
+        
+        // 如果物理柜子不存在、状态已经是 free、或者 currentOrderId 挂着别人的订单
+        // 说明这是一个因为管理员操作不当或者意外遗留的“幽灵订单”
+        if (!locker || locker.status !== 'occupied' || locker.currentOrderId !== order._id) {
+            console.warn(`[状态自愈] 发现幽灵订单 ${order._id}，物理柜门已被释放或易主，正在自动平账！`);
+            
+            try {
+              // 调用内部的 forceFinish 强行结算这个订单，扣除它该扣的钱，释放押金
+              await cloud.callFunction({
+                name: 'order',
+                data: { action: 'forceFinish', orderId: order._id }
+              });
+            } catch(e) {
+              console.error('[状态自愈] 自动调用 forceFinish 失败，尝试暴力改状态', e);
+              // 极端兜底：如果 forceFinish 失败，直接把订单改成“已强制结束”防止卡死用户
+              await db.collection('orders').doc(order._id).update({
+                data: { 
+                  status: CONSTANTS.ORDER_STATUSES.FORCE_FINISHED, 
+                  updatedAt: db.serverDate(),
+                  note: '系统自愈：物理柜门状态不匹配，强行闭环'
+                }
+              });
+            }
+        
+            // 既然它是个无效的假订单并且被我们治愈了，就抛出错误假装没查到！
+            // 这样前端的小程序就不会跳出拦截弹窗，用户就可以顺畅地接着存包了！
+            throw new Error('拦截并自愈了一个幽灵订单');
+        }
+      }
+
+      console.log(`[queryByOpenid] 匹配到真实有效订单:ID=${order._id}，柜门=${order.doorNo}`);
       return { success: true, data: order }
 
     } catch (err) {

@@ -266,7 +266,7 @@ exports.main = async (event, context) => {
           .get({ readFresh: true })
 
         if (lockerQuery.data.length === 0) {
-          throw new Error(`柜门 ${cabinetNo}${_}${doorNo} 不存在`)
+          throw new Error(`柜门 ${cabinetNo}_${doorNo} 不存在`)
         }
 
         const locker = lockerQuery.data[0]
@@ -312,7 +312,7 @@ exports.main = async (event, context) => {
 
           // 更新柜子状态为空闲
           // 更新的是 dataLockerId (主设备) 的记录
-          await transaction.collection('lockers').doc(lockerId).update({
+          await db.collection('lockers').doc(lockerId).update({
             data: {
               status: 'free',
               currentOrderId: null,
