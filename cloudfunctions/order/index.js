@@ -606,15 +606,23 @@ exports.main = async (event, context) => {
           }
         })
 
-        // 释放柜子
+        //释放柜子前，必须严格校验归属权！
         if (orderDoc.data.lockerId) {
-          await transaction.collection('lockers').doc(orderDoc.data.lockerId).update({
-            data: {
-              status: 'free',
-              currentOrderId: null,
-              updatedAt: db.serverDate()
-            }
-          })
+          const lockerCheck = await transaction.collection('lockers').doc(orderDoc.data.lockerId).get();
+          // 只有这个柜子现在的 currentOrderId 依然是本订单，才允许将其清空
+          if (lockerCheck.data && lockerCheck.data.currentOrderId === orderId) {
+            await transaction.collection('lockers').doc(orderDoc.data.lockerId).update({
+              data: {
+                status: 'free',
+                currentOrderId: null,
+                currentUserPhone: null,
+                updatedAt: db.serverDate()
+              }
+            })
+            console.log(`[forceFinish] 成功释放柜子 ${orderDoc.data.lockerId}`);
+          } else {
+            console.warn(`[forceFinish] 柜子已被他人占用或已释放，跳过清空物理柜操作`);
+          }
         }
 
         return { success: true }
@@ -1015,6 +1023,8 @@ exports.main = async (event, context) => {
          await db.runTransaction(async (transaction) => {
              // 1. [核心] 如果是“进行中”状态，必须立即释放柜子！
              if (order.status === CONSTANTS.ORDER_STATUSES.IN_PROGRESS && order.lockerId) {
+              const lockerCheck = await transaction.collection('lockers').doc(order.lockerId).get();
+              if (lockerCheck.data && lockerCheck.data.currentOrderId === orderId) {
                   await transaction.collection('lockers').doc(order.lockerId).update({
                     data: {
                       status: 'free',
@@ -1023,7 +1033,8 @@ exports.main = async (event, context) => {
                       updatedAt: db.serverDate()
                     }
                   });
-             }
+              }
+            }
 
              // 2. 更新订单为“待提现”
              // 注意：必须把 refundAmount 写入，否则后续提现时金额为0
@@ -1094,14 +1105,17 @@ exports.main = async (event, context) => {
 
         // 3. 释放柜子 (直接退款的情况)
         if (order.status === CONSTANTS.ORDER_STATUSES.IN_PROGRESS && order.lockerId) {
-             await transaction.collection('lockers').doc(order.lockerId).update({
-                data: {
-                  status: 'free',
-                  currentOrderId: null,
-                  currentUserPhone: null,
-                  updatedAt: db.serverDate()
-                }
-              })
+          const lockerCheck = await transaction.collection('lockers').doc(order.lockerId).get();
+          if (lockerCheck.data && lockerCheck.data.currentOrderId === orderId) {
+              await transaction.collection('lockers').doc(order.lockerId).update({
+                 data: {
+                   status: 'free',
+                   currentOrderId: null,
+                   currentUserPhone: null,
+                   updatedAt: db.serverDate()
+                 }
+               });
+          }
         }
       });
 
