@@ -178,7 +178,8 @@ Page({
           action: "recoverLocker",
           deviceId: deviceId,
           doorNo: doorNo,
-          cabinetNo: cabinetNo
+          cabinetNo: cabinetNo,
+          orderId: orderId
         }
       });
       console.log(`柜门 ${deviceId}_${cabinetNo}_${doorNo} 恢复结果：`, res.result);
@@ -525,7 +526,7 @@ Page({
       // 【修改点4】关键：只有在允许回滚时才调用 recover
       if (canRecover) {
         console.warn('触发前端自动回滚逻辑');
-        if (lockerInfo) await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo);
+        if (lockerInfo) await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo, orderId);
         if (orderId) await this.recoverOrder(orderId);
       } else {
         console.warn('支付已提交，跳过前端自动回滚，交由后端兜底');

@@ -391,40 +391,47 @@ exports.main = async (event, context) => {
     }
   }
 
-
   // 4. 恢复柜子状态为空闲
   if (action === 'recoverLocker') {
-    const { deviceId, doorNo, cabinetNo} = event
+    // 修复点：必须接收 orderId
+    const { deviceId, doorNo, cabinetNo, orderId} = event
 
     // 参数校验
     const validation = validateParams(event, {
       deviceId: {type: 'string'},
       doorNo: { type: 'number' },
-      cabinetNo: { type: 'number' } 
+      cabinetNo: { type: 'number' },
+      orderId: { type: 'string' } // 要求必传 orderId
     })
     if (!validation.valid) {
       return { success: false, errMsg: validation.msg }
     }
 
     try {
-      return await db.runTransaction(async transaction => {
-        const locker = await transaction.collection('lockers').where({ deviceId, doorNo, cabinetNo}).get()
-        
-        if (locker.data.length === 0) {
-          throw new Error('未找到柜门${doorNo}的记录');
-        }
-
-        await transaction.collection('lockers').doc(locker.data[0]._id).update({
+      // 修复点：使用单行 CAS 保护，绝不盲目清空柜子！
+      // 只有当前柜子依然属于这个将要废弃的订单时，才允许清空。
+      const res = await db.collection('lockers')
+        .where({ 
+          deviceId, 
+          doorNo, 
+          cabinetNo,
+          currentOrderId: orderId  // 防止清空了别人或自己已经成功的订单
+        })
+        .update({
           data: {
             status: 'free',
             currentOrderId: null,
             currentUserPhone: null,
             updatedAt: db.serverDate()
           }
-        })
-        
-        return { success: true, message: `柜门 ${doorNo} 已恢复为空闲状态` }
-      })
+        });
+
+      if (res.stats.updated === 0) {
+         console.warn(`[恢复柜门拦截] 柜门已属于他人或已恢复，跳过清理`);
+         return { success: false, errMsg: '跳过清理' };
+      }
+
+      return { success: true, message: `柜门 ${doorNo} 已安全恢复为空闲状态` }
     } catch (err) {
       console.error('恢复柜子状态失败', err)
       return { success: false, errMsg: `恢复柜子状态失败：${err.message}` }
@@ -746,69 +753,62 @@ exports.main = async (event, context) => {
   // 5. 管理员强制设置柜门状态（维护/测试模式）
   if (action === 'setLockerStatus') {
     const { internalNo, lockerNo, status } = event
-
-    // 1. 校验状态是否在允许的列表里
     const validStatuses = ['free', 'broken', 'occupied'];
     if (!validStatuses.includes(status)) {
       return { success: false, errMsg: `状态无效，只能设为: ${validStatuses.join(' / ')}` }
     }
 
     try {
-      return await db.runTransaction(async transaction => {
-        // 2. 查询柜子
-        const lockerQuery = await transaction.collection('lockers')
-          .where({ internalNo, lockerNo })
-          .get()
+      // 1. 查询柜子
+      const lockerQuery = await db.collection('lockers')
+        .where({ internalNo, lockerNo })
+        .get()
 
-        if (lockerQuery.data.length === 0) {
-          throw new Error(`设备${internalNo} 柜门${lockerNo}不存在`)
+      if (lockerQuery.data.length === 0) {
+        throw new Error(`设备${internalNo} 柜门${lockerNo}不存在`)
+      }
+
+      const locker = lockerQuery.data[0]
+
+      // 2. 如果强制设为“空闲”或“故障”，必须处理遗留订单！
+      // 必须在这里先处理，此时不占用数据库底层的读写锁
+      if ((status === 'free' || status === 'broken') && locker.currentOrderId) {
+        console.warn(`[管理员清柜] 柜门${lockerNo}状态变更为${status}，正在同步结束遗留订单: ${locker.currentOrderId}`);
+        try {
+          await cloud.callFunction({
+            name: 'order',
+            data: { action: 'forceFinish', orderId: locker.currentOrderId }
+          });
+        } catch(e) {
+          console.error('强制结束遗留订单失败', e);
         }
+      }
 
-        const locker = lockerQuery.data[0]
+      // 3. 准备更新数据
+      let updateData = {
+        status: status,
+        updatedAt: db.serverDate()
+      };
 
-        // 如果强制设为“空闲”或“故障”，必须处理遗留订单！
-        if ((status === 'free' || status === 'broken') && locker.currentOrderId) {
-          console.warn(`[管理员清柜] 柜门${lockerNo}状态变更为${status}，正在同步结束遗留订单: ${locker.currentOrderId}`);
-          try {
-            // 跨云函数调用，强制把这个倒霉的订单结束掉并结算！
-            await cloud.callFunction({
-              name: 'order',
-              data: { action: 'forceFinish', orderId: locker.currentOrderId }
-            });
-          } catch(e) {
-            console.error('强制结束遗留订单失败', e);
-          }
-        }
+      if (status === 'free') {
+        updateData.currentOrderId = null;
+        updateData.currentUserPhone = null;
+      }
 
-        // 3. 准备更新数据
-        let updateData = {
-          status: status,
-          updatedAt: db.serverDate()
-        };
-
-        // 🔥 智能处理：如果强制设为“空闲”，为了保证逻辑正常，应该清除关联的订单信息
-        // 否则如果残留着 currentOrderId，可能导致某些逻辑判定异常
-        if (status === 'free') {
-          updateData.currentOrderId = null;
-          updateData.currentUserPhone = null;
-        }
-
-        // 4. 执行更新
-        await transaction.collection('lockers').doc(locker._id).update({
-          data: updateData
-        })
-
-        // 5. 生成友好的返回文案
-        let statusText = '';
-        switch (status) {
-          case 'free': statusText = '启用(空闲)'; break;
-          case 'broken': statusText = '停用(故障)'; break;
-          case 'occupied': statusText = '占用(保留)'; break;
-          default: statusText = status;
-        }
-
-        return { success: true, message: `柜门 ${lockerNo} 已设为 ${statusText}` }
+      // 4. 执行更新
+      await db.collection('lockers').doc(locker._id).update({
+        data: updateData
       })
+
+      let statusText = '';
+      switch (status) {
+        case 'free': statusText = '启用(空闲)'; break;
+        case 'broken': statusText = '停用(故障)'; break;
+        case 'occupied': statusText = '占用(保留)'; break;
+        default: statusText = status;
+      }
+
+      return { success: true, message: `柜门 ${lockerNo} 已设为 ${statusText}` }
     } catch (err) {
       console.error('设置柜门状态失败', err)
       return { success: false, errMsg: err.message }

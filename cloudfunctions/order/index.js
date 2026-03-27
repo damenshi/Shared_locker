@@ -425,17 +425,29 @@ exports.main = async (event, context) => {
           if (wxRes.data && wxRes.data.trade_state === 'SUCCESS') {
             console.log(`[getOrder] 发现掉单：订单 ${orderId} 微信已支付但数据库为待支付，自动修复。`);
             
+            const amountFen = wxRes.data.amount?.total || 0;
+            const amountYuan = amountFen / 100;
+
             // 查询对应的柜子现状
             const lockerRes = await db.collection('lockers').doc(order.lockerId).get();
             const currentLocker = lockerRes.data;
+
             // 如果柜门不是被当前订单占用（被恢复了，或者被别人占了）
             if (!currentLocker || currentLocker.status !== 'occupied' || currentLocker.currentOrderId !== orderId) {
-              console.warn(`[getOrder] 柜门已被释放或被他人占用！`);    
-              return { success: false, errMsg: '该柜门已超时释放' };
+              console.warn(`[getOrder] 柜门已被他人占用或释放，迟到支付订单转为取消！`);
+              const cancelData = {
+                status: CONSTANTS.ORDER_STATUSES.CANCELLED,
+                transactionId: wxRes.data.transaction_id,
+                deposit: amountYuan,
+                refundAmount: amountYuan, // 记录退款金额
+                payTime: wxRes.data.success_time || db.serverDate(),
+                updatedAt: db.serverDate(),
+                note: '补单拦截：迟到支付，柜门已重新分配'
+              };
+              await db.collection('orders').doc(orderId).update({ data: cancelData });
+              
+              return { success: false, errMsg: '该柜门已超时释放，系统将为您退款' };
             }
-
-            const amountFen = wxRes.data.amount?.total || 0;
-            const amountYuan = amountFen / 100;
 
             // 自动修正数据库状态
             const updateData = {
