@@ -256,9 +256,8 @@ exports.main = async (event, context) => {
       // targetHardwareId: 发指令给哪个设备？(发给用户当前扫码的设备)
       const targetHardwareId = deviceId;
 
-      return await db.runTransaction(async transaction => {
         // 查询柜子信息
-        const lockerQuery = await transaction.collection('lockers')
+        const lockerQuery = await db.collection('lockers')
           .where({ 
                   deviceId: dataLockerId, 
                   doorNo, 
@@ -343,7 +342,7 @@ exports.main = async (event, context) => {
             message: `取包成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`
           }
         }
-      })
+
     } catch (err) {
       console.error('开柜操作失败', {
         deviceId,
@@ -623,9 +622,8 @@ exports.main = async (event, context) => {
     };
 
     try {
-      return await db.runTransaction(async transaction => {
         // 查询柜子信息
-        const lockerQuery = await transaction.collection('lockers')
+        const lockerQuery = await db.collection('lockers')
           .where({ internalNo, lockerNo})
           .get({ readFresh: true })
 
@@ -649,7 +647,6 @@ exports.main = async (event, context) => {
           success: true, 
           message: `开柜成功，柜门 ${deviceId}_${cabinetNo}_${doorNo} 已打开`
         }
-      })
     } catch (err) {
       console.error('开柜操作失败', {
         message: err.message,

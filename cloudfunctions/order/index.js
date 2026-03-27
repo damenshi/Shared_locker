@@ -588,7 +588,7 @@ exports.main = async (event, context) => {
         if (!orderDoc.data) {
           throw new Error('订单不存在')
         }
-        const order = orderRes.data;
+        const order = orderDoc.data;
 
         const bill = await calculateFee(order); 
       
