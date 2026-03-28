@@ -1,4 +1,5 @@
 const app = getApp();
+const plugin = requirePlugin("WechatSI");
 
 Page({
   data: {
@@ -7,6 +8,54 @@ Page({
     openid: '',
     deviceId: null,
     isLoading: false // 加载状态
+  },
+
+  /**
+   * 全局终极版：通用语音播报方法 (跨页面绝对防重叠)
+   * @param {String} text 需要播报的文字 
+   */
+  playVoicePrompt(text) {
+    // 1. 生成全局唯一递增的任务ID，防止跨页面的网络延迟导致“旧语音迟到”
+    app.globalData.ttsTaskId = (app.globalData.ttsTaskId || 0) + 1;
+    const currentTaskId = app.globalData.ttsTaskId;
+
+    // 2. 将播放器挂载到 app.globalData 上，确保整个小程序只有这唯一的一个播放器
+    if (!app.globalData.globalAudioCtx) {
+      // 强制无视手机的“静音键/静音模式”
+      if (wx.setInnerAudioOption) {
+        wx.setInnerAudioOption({ obeyMuteSwitch: false });
+      }
+      app.globalData.globalAudioCtx = wx.createInnerAudioContext();
+      app.globalData.globalAudioCtx.autoplay = true; 
+      
+      app.globalData.globalAudioCtx.onError((err) => {
+        console.error('全局播报错误:', err);
+      });
+    }
+
+    // 3. 不管现在在哪个页面，发起新请求前，立刻强行让全局播放器闭嘴！
+    app.globalData.globalAudioCtx.stop();
+
+    // 4. 发起语音合成网络请求
+    plugin.textToSpeech({
+      lang: "zh_CN",
+      tts: true,
+      content: text,
+      success: (res) => {
+        // 5. 等网络请求回来后，核对全局暗号。如果在这期间用户已经跳转页面并触发了新语音，果断丢弃！
+        if (currentTaskId !== app.globalData.ttsTaskId) {
+          console.log('跨页面拦截并丢弃过期语音:', text);
+          return;
+        }
+
+        console.log('开始全局播报:', text);
+        // 6. 塞入新的音频地址自动播放
+        app.globalData.globalAudioCtx.src = res.filename; 
+      },
+      fail: (err) => {
+        console.error("语音合成失败", err);
+      }
+    });
   },
 
   onLoad(options) {
@@ -162,6 +211,9 @@ Page({
       // 6. 无论订单是否结束都提示柜门打开
       wx.hideLoading();
       this.setData({ isLoading: false });
+
+      this.playVoicePrompt(`${order.lockerNo}号柜门已打开，请取出物品并关好柜门。期待您的再次使用。`);
+  
       this.showSuccess(
         `取件成功，柜门 ${order.lockerNo} 已打开，订单已结束`,
         () => { wx.navigateBack({ delta: 2 }); }
@@ -176,6 +228,8 @@ Page({
       console.error("取件流程异常:", e);
       this.setData({ isLoading: false });
       wx.hideLoading();
+      this.playVoicePrompt("抱歉，取件失败，请重试或联系客服");
+
       const msg = e.message || '取件失败，请重试';
 
       const finalMsg = `${msg}\n\n如有疑问请拨打客服电话400-832-6132`;

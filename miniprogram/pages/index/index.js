@@ -1,5 +1,7 @@
 const db = wx.cloud.database()
-const app = getApp(); 
+const app = getApp();
+const plugin = requirePlugin("WechatSI");
+
 Page({
   data: {
     phone: '',
@@ -14,6 +16,55 @@ Page({
     showConfirmModal: false
   },
   
+  /**
+   * 全局终极版：通用语音播报方法 (跨页面绝对防重叠)
+   * @param {String} text 需要播报的文字 
+   */
+  playVoicePrompt(text) {
+    // 1. 生成全局唯一递增的任务ID，防止跨页面的网络延迟导致“旧语音迟到”
+    app.globalData.ttsTaskId = (app.globalData.ttsTaskId || 0) + 1;
+    const currentTaskId = app.globalData.ttsTaskId;
+
+    // 2. 将播放器挂载到 app.globalData 上，确保整个小程序只有这唯一的一个播放器
+    if (!app.globalData.globalAudioCtx) {
+      // 强制无视手机的“静音键/静音模式”
+      if (wx.setInnerAudioOption) {
+        wx.setInnerAudioOption({ obeyMuteSwitch: false });
+      }
+      app.globalData.globalAudioCtx = wx.createInnerAudioContext();
+      app.globalData.globalAudioCtx.autoplay = true; 
+      
+      app.globalData.globalAudioCtx.onError((err) => {
+        console.error('全局播报错误:', err);
+      });
+    }
+
+    // 3. 不管现在在哪个页面，发起新请求前，立刻强行让全局播放器闭嘴！
+    app.globalData.globalAudioCtx.stop();
+
+    // 4. 发起语音合成网络请求
+    plugin.textToSpeech({
+      lang: "zh_CN",
+      tts: true,
+      content: text,
+      success: (res) => {
+        // 5. 等网络请求回来后，核对全局暗号。如果在这期间用户已经跳转页面并触发了新语音，果断丢弃！
+        if (currentTaskId !== app.globalData.ttsTaskId) {
+          console.log('跨页面拦截并丢弃过期语音:', text);
+          return;
+        }
+
+        console.log('开始全局播报:', text);
+        // 6. 塞入新的音频地址自动播放
+        app.globalData.globalAudioCtx.src = res.filename; 
+      },
+      fail: (err) => {
+        console.error("语音合成失败", err);
+      }
+    });
+  },
+
+
   onLoad(options) {
 
     if (options && options.query && options.query.deviceId) {
@@ -45,6 +96,9 @@ Page({
       };
     }
 
+    setTimeout(() => {
+      this.playVoicePrompt("欢迎使用珊星储物，请输入手机号和取件码");
+    }, 500);
   },
 
   onUnload() {
@@ -261,7 +315,10 @@ Page({
       wx.showToast({ title: '请填写手机号和取件码', icon: 'none' });
       return;
     }
-  
+    
+    //弹出确认框时的防呆语音警告
+    this.playVoicePrompt("请仔细核对手机号和取件码。若填写错误，将无法开柜取件。");
+
     // 显示自定义确认弹窗
     this.setData({ showConfirmModal: true });
   },

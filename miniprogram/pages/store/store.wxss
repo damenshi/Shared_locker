@@ -94,3 +94,19 @@
   from {opacity:0; transform:scale(0.95);}
   to {opacity:1; transform:scale(1);}
 }
+
+/* 协议提示整体样式：小字、置灰、居中、调整间距 */
+.agreement-tips {
+  font-size: 24rpx;
+  color: #999999;
+  text-align: center;
+  margin-top: 15rpx;
+  margin-bottom: 25rpx; /* 与下方按钮保持距离 */
+  padding: 0 20rpx;
+}
+
+/* 可点击协议链接的样式：主题色（这里用了微信绿，可自行改成你的蓝色） */
+.link-text {
+  color: #07c160; 
+  display: inline-block;
+}

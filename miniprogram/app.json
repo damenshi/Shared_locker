@@ -22,5 +22,11 @@
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "cloud": true
+  "cloud": true,
+  "plugins": {
+    "WechatSI": {
+      "version": "0.3.6",
+      "provider": "wx069ba97219f66d99"
+    }
+  }
 }

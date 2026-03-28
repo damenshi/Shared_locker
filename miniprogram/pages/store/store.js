@@ -1,4 +1,5 @@
 const app = getApp();
+const plugin = requirePlugin("WechatSI");
 
 Page({
   data: {
@@ -16,6 +17,54 @@ Page({
     }
   },
 
+  /**
+   * 通用语音播报方法 (跨页面绝对防重叠)
+   * @param {String} text 需要播报的文字 
+   */
+  playVoicePrompt(text) {
+    // 1. 生成全局唯一递增的任务ID，防止跨页面的网络延迟导致“旧语音迟到”
+    app.globalData.ttsTaskId = (app.globalData.ttsTaskId || 0) + 1;
+    const currentTaskId = app.globalData.ttsTaskId;
+
+    // 2. 将播放器挂载到 app.globalData 上，确保整个小程序只有这唯一的一个播放器
+    if (!app.globalData.globalAudioCtx) {
+      // 强制无视手机的“静音键/静音模式”
+      if (wx.setInnerAudioOption) {
+        wx.setInnerAudioOption({ obeyMuteSwitch: false });
+      }
+      app.globalData.globalAudioCtx = wx.createInnerAudioContext();
+      app.globalData.globalAudioCtx.autoplay = true; 
+      
+      app.globalData.globalAudioCtx.onError((err) => {
+        console.error('全局播报错误:', err);
+      });
+    }
+
+    // 3. 不管现在在哪个页面，发起新请求前，立刻强行让全局播放器闭嘴！
+    app.globalData.globalAudioCtx.stop();
+
+    // 4. 发起语音合成网络请求
+    plugin.textToSpeech({
+      lang: "zh_CN",
+      tts: true,
+      content: text,
+      success: (res) => {
+        // 5. 等网络请求回来后，核对全局暗号。如果在这期间用户已经跳转页面并触发了新语音，果断丢弃！
+        if (currentTaskId !== app.globalData.ttsTaskId) {
+          console.log('跨页面拦截并丢弃过期语音:', text);
+          return;
+        }
+
+        console.log('开始全局播报:', text);
+        // 6. 塞入新的音频地址自动播放
+        app.globalData.globalAudioCtx.src = res.filename; 
+      },
+      fail: (err) => {
+        console.error("语音合成失败", err);
+      }
+    });
+  },
+
   onLoad(options) {
     // 接收并验证首页传递的参数
     this.setData({
@@ -25,6 +74,7 @@ Page({
       deviceId: app.globalData.deviceId || '',
     });
     this.handleStoreItem();
+    // 扫码进入页面后播报
   },
 
   /**
@@ -228,6 +278,22 @@ Page({
     });
   },
 
+  // 跳转到用户协议
+  goToAgreement() {
+    wx.navigateTo({
+      // 指向你已经写好的用户协议页面
+      url: '/pages/mine/agreement/userAgreement'
+    });
+  },
+
+  // 跳转到隐私政策
+  goToPrivacy() {
+    // 如果你还没有单独的隐私政策页面，可以暂时让它也跳到用户协议页，或者建个新页面
+    wx.navigateTo({
+      url: '/pages/mine/agreement/userAgreement' 
+    });
+  },
+
   //用户点击确认支付
   confirmPay() {
     if (this.data._resolvePay) {
@@ -394,6 +460,8 @@ Page({
 
       orderId = orderRes.result.data.orderId;
       lockerInfo = orderRes.result.data.lockerInfo;
+      // 分配成功后播报
+      this.playVoicePrompt(`已为您分配 ${lockerInfo.lockerNo} 号柜门`);
 
       // 5. 免费or付费
       const deviceConfig = await this.getDeviceDeposit(this.data.deviceId);
@@ -404,6 +472,8 @@ Page({
       
       if (isFree) {
         //免费模式 ---
+        //开门前提示
+        this.playVoicePrompt("正在为您开门，请稍后");
         wx.showLoading({ title: '正在开门...' });
 
         // 直接将订单状态更新为“进行中”，押金设为 0
@@ -488,6 +558,7 @@ Page({
       }
 
       wx.hideLoading();
+      this.playVoicePrompt(`${lockerInfo.lockerNo}号柜门已打开，请存入物品并关好门`);
       wx.showModal({
         title: '提示',
         content: `柜门 ${lockerInfo.lockerNo} 已打开`,

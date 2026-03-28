@@ -32,6 +32,12 @@
       需支付预付款 <text class="highlight">{{payDeposit}}</text> 元
     </view>
 
+    <view class="agreement-tips">
+      点击确认付款即为同意
+      <text class="link-text" bindtap="goToAgreement">《用户协议》</text>与
+      <text class="link-text" bindtap="goToPrivacy">《隐私政策》</text>
+    </view>
+
     <view class="modal-actions">
       <button class="btn cancel" bindtap="cancelPay">取消</button>
       <button class="btn confirm" bindtap="confirmPay">确认支付</button>
