@@ -1494,10 +1494,10 @@ exports.main = async (event, context) => {
       const todayStr = formatDate(beijingNow); 
       const currentMonthPrefix = todayStr.substring(0, 7); 
       
-      // 生成北京时间的"上月"
-      const lastMonthObj = new Date(beijingNow.getTime());
-      lastMonthObj.setUTCMonth(lastMonthObj.getUTCMonth() - 1);
-      const lastMonthPrefix = formatDate(lastMonthObj).substring(0, 7); 
+      // 生成北京时间的"上月"前缀
+      const lastMonthYear = bjMonth === 0 ? bjYear - 1 : bjYear;
+      const lastMonthNum = bjMonth === 0 ? 12 : bjMonth;
+      const lastMonthPrefix = `${lastMonthYear}-${String(lastMonthNum).padStart(2, '0')}`; 
 
       // 设定混淆分界线：2026年2月
       const START_OBFUSCATION_MONTH = "2026-02"; 
