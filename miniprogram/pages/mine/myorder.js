@@ -85,6 +85,14 @@ Page({
             order.usageDurationFormatted = formatDuration(order.usageDuration);
           }
 
+          // 状态展示映射字典（对外友好呈现）
+          const statusMap = {
+            '已强制结束': '异常结束',
+            '待支付': '未付款'
+            // 已关闭保持原样显示
+          };
+          order.displayStatus = statusMap[order.status] || order.status;
+
           return order;
         });
         this.setData({

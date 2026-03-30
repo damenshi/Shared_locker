@@ -9,11 +9,20 @@ Page({
     isLoading: false,
     deviceId: '',
     showPayModal: false,
-    payDeposit: 0,        
+    payDeposit: 0,
     lockerNo: '',
     constants: {
       ORDER_STATUS_PROCESSING: '进行中',
       NAVIGATE_DELAY: 2000,
+    },
+    currentOrderId: null,  // 当前订单ID，用于取消时释放
+    payTimer: null,        // 支付倒计时定时器
+  },
+
+  onUnload() {
+    // 页面卸载时清理定时器
+    if (this.data.payTimer) {
+      clearTimeout(this.data.payTimer);
     }
   },
 
@@ -273,8 +282,19 @@ Page({
         showPayModal: true,
         payDeposit: deviceDeposit,
         lockerNo: lockerNo,
-        _resolvePay: resolve 
+        _resolvePay: resolve
       });
+
+      // 3分钟不付款，自动销毁弹窗并回滚
+      const timer = setTimeout(() => {
+        if (this.data.showPayModal) {
+          wx.showToast({ title: '支付超时已自动取消', icon: 'none' });
+          // 调用取消逻辑释放柜子（内部会处理 resolve）
+          this.cancelPay(true); // true 表示是超时触发
+        }
+      }, 3 * 60 * 1000);
+
+      this.setData({ payTimer: timer });
     });
   },
 
@@ -296,18 +316,42 @@ Page({
 
   //用户点击确认支付
   confirmPay() {
+    if (this.data.payTimer) {
+      clearTimeout(this.data.payTimer);
+      this.setData({ payTimer: null });
+    }
     if (this.data._resolvePay) {
       this.data._resolvePay(true);
     }
     this.setData({ showPayModal: false, _resolvePay: null });
   },
 
-  //用户点击取消
-  cancelPay() {
+  //用户点击取消（isTimeout=true 表示是超时自动触发）
+  cancelPay(isTimeout = false) {
+    if (this.data.payTimer) {
+      clearTimeout(this.data.payTimer);
+      this.setData({ payTimer: null });
+    }
+
+    // 立即调用 cancelUnpaidOrder 释放柜子
+    if (this.data.currentOrderId) {
+      wx.cloud.callFunction({
+        name: 'order',
+        data: {
+          action: 'cancelUnpaidOrder',
+          orderId: this.data.currentOrderId
+        }
+      }).catch(err => console.error('取消订单失败', err));
+    }
+
     if (this.data._resolvePay) {
       this.data._resolvePay(false);
+      this.setData({ _resolvePay: null }); // 立即清空，防止重复调用
     }
-    this.setData({ showPayModal: false, _resolvePay: null });
+    this.setData({
+      showPayModal: false,
+      currentOrderId: null
+    });
   },
 
   async waitForPayment(orderId) {
@@ -460,6 +504,8 @@ Page({
 
       orderId = orderRes.result.data.orderId;
       lockerInfo = orderRes.result.data.lockerInfo;
+      // 保存订单ID用于取消时释放
+      this.setData({ currentOrderId: orderId });
       // 分配成功后播报
       this.playVoicePrompt(`已为您分配 ${lockerInfo.lockerNo} 号柜门`);
 
@@ -574,13 +620,19 @@ Page({
 
     } catch (e) {
       console.error("存包流程异常", e);
-      // 【修改点4】关键：只有在允许回滚时才调用 recover
-      if (canRecover) {
-        console.warn('触发前端自动回滚逻辑');
-        if (lockerInfo) await this.recoverLocker(lockerInfo.deviceId, lockerInfo.doorNo, lockerInfo.cabinetNo, orderId);
-        if (orderId) await this.recoverOrder(orderId);
-      } else {
-        console.warn('支付已提交，跳过前端自动回滚，交由后端兜底');
+
+      // 使用后端的原子化撤单接口，替代原来的 recoverLocker + recoverOrder
+      if (canRecover && orderId) {
+        wx.cloud.callFunction({
+          name: 'order',
+          data: {
+            action: 'cancelUnpaidOrder',
+            orderId: orderId
+          }
+        }).catch(err => console.error('撤单失败', err));
+      } else if (!canRecover && orderId) {
+        // 支付已提交，但前端异常，记录日志但不回滚
+        console.warn('支付已提交，跳过前端回滚，交由后端兜底');
       }
 
        // 根据错误信息弹窗提示

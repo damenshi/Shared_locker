@@ -15,6 +15,7 @@ const CONSTANTS = {
     COMPLETED: '已完成',
     FORCE_FINISHED: '已强制结束',
     CANCELLED: '已取消',
+    CLOSED: '已关闭',           // 新增：已付款但开门失败
     REFUNDED: '已退款'
   },
   VALID_STATUSES_FOR_QUERY: ['进行中']
@@ -297,6 +298,61 @@ exports.main = async (event, context) => {
       }
 
       // ==========================================
+      // 【被动清理】释放本设备上超时(>5分钟)未支付的遗留订单
+      // ==========================================
+      try {
+        const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const timeoutOrders = await db.collection('orders').where({
+           deviceId: deviceId,
+           status: CONSTANTS.ORDER_STATUSES.PENDING_PAY,
+           createdAt: _.lt(fiveMinsAgo)
+        }).get();
+
+        if (timeoutOrders.data.length > 0) {
+          console.log(`[被动清理] 发现 ${timeoutOrders.data.length} 个超时未支付订单，开始清理...`);
+          for (const tOrder of timeoutOrders.data) {
+            try {
+              await db.runTransaction(async transaction => {
+                const orderDoc = await transaction.collection('orders').doc(tOrder._id).get();
+                if (!orderDoc.data) return;
+                const order = orderDoc.data;
+                if (order.status !== CONSTANTS.ORDER_STATUSES.PENDING_PAY) return;
+
+                // 1. 取消订单
+                await transaction.collection('orders').doc(tOrder._id).update({
+                  data: {
+                    status: CONSTANTS.ORDER_STATUSES.CANCELLED,
+                    note: '超时未支付自动取消',
+                    updatedAt: db.serverDate()
+                  }
+                });
+
+                // 2. 释放柜子
+                if (order.lockerId) {
+                  const lockerCheck = await transaction.collection('lockers').doc(order.lockerId).get();
+                  if (lockerCheck.data && lockerCheck.data.currentOrderId === tOrder._id) {
+                    await transaction.collection('lockers').doc(order.lockerId).update({
+                      data: {
+                        status: 'free',
+                        currentOrderId: null,
+                        currentUserPhone: null,
+                        updatedAt: db.serverDate()
+                      }
+                    });
+                  }
+                }
+              });
+              console.log(`[被动清理] 订单 ${tOrder._id} 已取消，柜子已释放`);
+            } catch (cleanErr) {
+              console.error(`[被动清理] 订单 ${tOrder._id} 清理失败:`, cleanErr);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[被动清理] 查询超时订单失败:', e);
+      }
+
+      // ==========================================
       // 🔄 2. 寻找空柜子并执行原子锁柜（带自动重试）
       // ==========================================
       let targetLocker = null;
@@ -434,18 +490,18 @@ exports.main = async (event, context) => {
 
             // 如果柜门不是被当前订单占用（被恢复了，或者被别人占了）
             if (!currentLocker || currentLocker.status !== 'occupied' || currentLocker.currentOrderId !== orderId) {
-              console.warn(`[getOrder] 柜门已被他人占用或释放，迟到支付订单转为取消！`);
+              console.warn(`[getOrder] 柜门已被他人占用或释放，迟到支付订单转为关闭！`);
               const cancelData = {
-                status: CONSTANTS.ORDER_STATUSES.CANCELLED,
+                status: CONSTANTS.ORDER_STATUSES.CLOSED, // 修改：已付款但无法使用，标记为已关闭
                 transactionId: wxRes.data.transaction_id,
                 deposit: amountYuan,
                 refundAmount: amountYuan, // 记录退款金额
                 payTime: wxRes.data.success_time || db.serverDate(),
                 updatedAt: db.serverDate(),
-                note: '补单拦截：迟到支付，柜门已重新分配'
+                note: '补单拦截：迟到支付，柜门已重新分配，可全额退款'
               };
               await db.collection('orders').doc(orderId).update({ data: cancelData });
-              
+
               return { success: false, errMsg: '该柜门已超时释放，系统将为您退款' };
             }
 
@@ -987,13 +1043,22 @@ exports.main = async (event, context) => {
       // 2. 统一状态校验
       // ============================================================
       const validStatuses = [
-        CONSTANTS.ORDER_STATUSES.COMPLETED, 
-        CONSTANTS.ORDER_STATUSES.CANCELLED,
-        CONSTANTS.ORDER_STATUSES.IN_PROGRESS 
+        CONSTANTS.ORDER_STATUSES.COMPLETED,
+        CONSTANTS.ORDER_STATUSES.CLOSED,    // 新增：允许异常未开门的单子退款
+        CONSTANTS.ORDER_STATUSES.CANCELLED, // 保留：兼容存量已付款但标记为CANCELLED的订单
+        CONSTANTS.ORDER_STATUSES.IN_PROGRESS
       ];
 
       if (force) {
         validStatuses.push('待提现');
+      }
+
+      // 新增：CANCELLED 状态额外判断：只有 deposit>0 的才允许退款（兼容存量数据）
+      if (order.status === CONSTANTS.ORDER_STATUSES.CANCELLED) {
+        const depositValue = parseFloat(order.deposit) || 0;
+        if (depositValue <= 0) {
+          return { success: false, errMsg: '该订单未付款，无需退款' };
+        }
       }
 
       if (!validStatuses.includes(order.status)) {
@@ -1556,6 +1621,54 @@ exports.main = async (event, context) => {
       return { success: true, data: statsMap };
     } catch (err) {
       console.error('统计失败：', err);
+      return { success: false, errMsg: err.message };
+    }
+  }
+
+  // 新增：取消超时/主动放弃的未支付订单
+  if (action === 'cancelUnpaidOrder') {
+    const { orderId } = event;
+    const validation = validateParams(event, { orderId: { type: 'string' } });
+    if (!validation.valid) return { success: false, errMsg: validation.msg };
+
+    try {
+      return await db.runTransaction(async transaction => {
+        const orderDoc = await transaction.collection('orders').doc(orderId).get();
+        if (!orderDoc.data) throw new Error('订单不存在');
+        const order = orderDoc.data;
+
+        // 严格校验：只允许取消待支付订单
+        if (order.status !== CONSTANTS.ORDER_STATUSES.PENDING_PAY) {
+          return { success: false, errMsg: '非待支付状态，跳过取消' };
+        }
+
+        // 1. 订单状态改为已取消
+        await transaction.collection('orders').doc(orderId).update({
+          data: {
+            status: CONSTANTS.ORDER_STATUSES.CANCELLED,
+            note: '超时未支付或用户主动放弃',
+            updatedAt: db.serverDate()
+          }
+        });
+
+        // 2. 安全释放物理柜门
+        if (order.lockerId) {
+          const lockerCheck = await transaction.collection('lockers').doc(order.lockerId).get();
+          if (lockerCheck.data && lockerCheck.data.currentOrderId === orderId) {
+            await transaction.collection('lockers').doc(order.lockerId).update({
+              data: {
+                status: 'free',
+                currentOrderId: null,
+                currentUserPhone: null,
+                updatedAt: db.serverDate()
+              }
+            });
+          }
+        }
+        return { success: true, message: '未支付订单已安全取消' };
+      });
+    } catch (err) {
+      console.error('取消未支付订单失败', err);
       return { success: false, errMsg: err.message };
     }
   }

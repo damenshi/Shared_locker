@@ -10,6 +10,7 @@ const CONSTANTS = {
     COMPLETED: '已完成',
     FORCE_FINISHED: '已强制结束',
     CANCELLED: '已取消',
+    CLOSED: '已关闭',           // 新增：已付款但开门失败
     REFUNDED: '已退款'
   },
   VALID_STATUSES_FOR_QUERY: ['进行中']
@@ -60,9 +61,10 @@ async function handlePayNotify(notifyData) {
   const orderRes = await db.collection('orders').doc(orderId).get();
   const order = orderRes.data;
 
-  // 拦截终态
-  if ([CONSTANTS.ORDER_STATUSES.CANCELLED, 
-       CONSTANTS.ORDER_STATUSES.COMPLETED, 
+  // 拦截终态（新增 CLOSED：已关闭订单无需再处理）
+  if ([CONSTANTS.ORDER_STATUSES.CANCELLED,
+       CONSTANTS.ORDER_STATUSES.CLOSED,
+       CONSTANTS.ORDER_STATUSES.COMPLETED,
        CONSTANTS.ORDER_STATUSES.REFUNDED].includes(order.status)) {
     console.log(`[回调] 订单 ${orderId} 处于终态，跳过`);
     return;
@@ -142,17 +144,17 @@ async function handlePayNotify(notifyData) {
     });
     console.log(`[回调] 订单 ${orderId} 已设为【进行中】`);
   } else {
-    //失败（明确的 500 硬伤） -> 取消订单 + 释放柜子
-    console.warn(`[回调] 订单 ${orderId} 判定为硬伤(${failReason})，执行取消`);
+    //失败（明确的 500 硬伤） -> 订单改为"已关闭" + 释放柜子
+    console.warn(`[回调] 订单 ${orderId} 判定为硬伤(${failReason})，执行关闭`);
     await db.collection('orders').doc(orderId).update({
       data: {
-        status: CONSTANTS.ORDER_STATUSES.CANCELLED,
-        transactionId: transactionId,               
-        deposit: amountYuan,                        
-        refundAmount: amountYuan,
+        status: CONSTANTS.ORDER_STATUSES.CLOSED, // 修改：从 CANCELLED 改为 CLOSED
+        transactionId: transactionId,
+        deposit: amountYuan,
+        refundAmount: amountYuan, // 记录全额可退
         payTime: db.serverDate(),
         updatedAt: db.serverDate(),
-        note: `自动取消：${failReason}`
+        note: `开柜异常：${failReason}`
       }
     });
 
