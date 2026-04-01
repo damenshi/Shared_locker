@@ -87,6 +87,10 @@
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
 }
 
+.icon-clear {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+}
+
 .icon-device {
   background: linear-gradient(135deg, #fef3f2 0%, #fee2e2 100%);
 }
@@ -97,6 +101,30 @@
 
 .icon-list {
   background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.icon-devices {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.icon-devices .icon-text {
+  font-size: 36rpx;
+}
+
+/* 设备列表卡片 - 更显眼 */
+.card-device-list {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #3b82f6;
+  border-width: 3rpx;
+}
+
+.card-device-list .card-title {
+  color: #1d4ed8;
+  font-size: 36rpx;
+}
+
+.card-device-list .card-desc {
+  color: #3b82f6;
 }
 
 .icon-free {

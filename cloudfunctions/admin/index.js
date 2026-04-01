@@ -263,6 +263,83 @@ exports.main = async (event, context) => {
     return await initSecondMerchant();
   }
 
+  // 清空所有设备的柜门（优化版：直接操作数据库）
+  if (action === 'clearAllLockers') {
+    try {
+      // 1. 获取所有设备信息
+      const devices = await db.collection('devices').field({
+        deviceId: true,
+        screenNo: true
+      }).get();
+
+      if (devices.data.length === 0) {
+        return { success: true, message: '没有设备，无需清柜' };
+      }
+
+      let totalCleared = 0;
+      let totalOrders = 0;
+
+      // 2. 遍历所有设备
+      for (const device of devices.data) {
+        const deviceId = device.deviceId;
+        const screenNo = device.screenNo;
+
+        // 找出所有非 free、非 broken 的柜门（排除屏幕柜）
+        const occupiedLockers = await db.collection('lockers')
+          .where({
+            deviceId,
+            status: _.nin(['free', 'broken']),
+            lockerNo: screenNo ? _.neq(screenNo) : _.exists(true)
+          })
+          .get();
+
+        if (occupiedLockers.data.length > 0) {
+          // 收集订单ID并批量结束
+          const orderIds = occupiedLockers.data
+            .map(l => l.currentOrderId)
+            .filter(id => id && id !== null);
+
+          if (orderIds.length > 0) {
+            await db.collection('orders')
+              .where({ _id: _.in(orderIds) })
+              .update({
+                data: {
+                  status: '已强制结束',
+                  endAt: db.serverDate(),
+                  updatedAt: db.serverDate(),
+                  note: '管理员一键清柜强制结束'
+                }
+              });
+            totalOrders += orderIds.length;
+          }
+
+          // 批量释放柜门
+          const lockerIds = occupiedLockers.data.map(l => l._id);
+          await db.collection('lockers')
+            .where({ _id: _.in(lockerIds) })
+            .update({
+              data: {
+                status: 'free',
+                currentOrderId: null,
+                currentUserPhone: null,
+                updatedAt: db.serverDate()
+              }
+            });
+
+          totalCleared += occupiedLockers.data.length;
+        }
+      }
+
+      return {
+        success: true,
+        message: `清柜完成：释放 ${totalCleared} 个柜门，结束 ${totalOrders} 个订单`
+      };
+    } catch (e) {
+      console.error('清空所有柜门失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
   // 验证管理员权限
   console.log("OPENID:", OPENID);
   const isAdmin = ADMIN_OPENIDS.includes(OPENID)

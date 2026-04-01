@@ -252,6 +252,41 @@ Page({
 
   goMyDeviceList() { wx.navigateTo({ url: '/pages/admin/mydevice' }); },
 
+  // 一键清空所有柜门
+  async clearAllLockers() {
+    wx.showModal({
+      title: '确认清空所有柜门',
+      content: '确定要清空所有设备上的占用柜门吗？这将强制结束所有进行中的订单，请谨慎操作！',
+      success: async (res) => {
+        if (res.confirm) {
+          this.showLoading('正在清柜...');
+          try {
+            const result = await wx.cloud.callFunction({
+              name: 'admin',
+              data: { action: 'clearAllLockers' }
+            });
+            this.hideLoading();
+            if (result.result.success) {
+              wx.showToast({
+                title: result.result.message || '清柜成功',
+                icon: 'success'
+              });
+            } else {
+              wx.showToast({
+                title: result.result.errMsg || '清柜失败',
+                icon: 'none'
+              });
+            }
+          } catch (err) {
+            this.hideLoading();
+            console.error('清柜失败:', err);
+            wx.showToast({ title: '清柜失败', icon: 'none' });
+          }
+        }
+      }
+    });
+  },
+
   // 获取商户配置列表
   async fetchMerchantConfigs() {
     try {

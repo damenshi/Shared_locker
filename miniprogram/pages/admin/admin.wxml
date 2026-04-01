@@ -79,6 +79,20 @@
     <view class="section-line"></view>
   </view>
 
+  <!-- 设备列表（更显眼） -->
+  <view class="card card-device-list" bindtap="goMyDeviceList">
+    <view class="card-header-row">
+      <view class="card-icon icon-devices">
+        <text class="icon-text">📋</text>
+      </view>
+      <view class="card-info">
+        <view class="card-title">设备列表</view>
+        <view class="card-desc">查看和管理所有储物柜设备</view>
+      </view>
+      <view class="card-arrow">›</view>
+    </view>
+  </view>
+
   <!-- 柜门控制 -->
   <view class="card card-door">
     <view class="card-header-row">
@@ -113,17 +127,19 @@
     </view>
   </view>
 
-  <!-- 设备列表 -->
-  <view class="card card-list" bindtap="goMyDeviceList">
+  <!-- 一键清柜 -->
+  <view class="card card-clear">
     <view class="card-header-row">
-      <view class="card-icon icon-list">
-        <text class="icon-text">📱</text>
+      <view class="card-icon icon-clear">
+        <text class="icon-text">🧹</text>
       </view>
       <view class="card-info">
-        <view class="card-title">设备列表</view>
-        <view class="card-desc">查看和管理所有储物柜设备</view>
+        <view class="card-title">一键清柜</view>
+        <view class="card-desc">清空所有设备上的占用柜门</view>
       </view>
-      <view class="card-arrow">›</view>
+    </view>
+    <view class="btn-row">
+      <button bindtap="clearAllLockers" class="action-btn btn-danger">清空所有柜门</button>
     </view>
   </view>
 
