@@ -108,31 +108,42 @@ async function getAllMerchantConfigs() {
   }
 }
 
-function getClient() {
-  try {    
-    // 1. 读取商户私钥
-    const privateKey = fs.readFileSync(CONFIG.privateKeyPath, 'utf8');
-    const wechatPayPublicKey = fs.readFileSync(CONFIG.wechatPayPublicKeyPath, 'utf8');
-    const publicKey = fs.readFileSync(CONFIG.publicKeyPath, 'utf8');
+// 获取商户支付客户端
+async function getClient(merchantConfig) {
+  try {
+    // 如果没有传入配置，获取当前激活的
+    const config = merchantConfig || await getActiveMerchantConfig();
 
-    if (!privateKey) {
-      throw new Error('商户私钥读取失败');
+    // 如果数据库没有配置，使用默认硬编码配置（兼容）
+    if (!config) {
+      const privateKey = fs.readFileSync(CONFIG.privateKeyPath, 'utf8');
+      const wechatPayPublicKey = fs.readFileSync(CONFIG.wechatPayPublicKeyPath, 'utf8');
+      const publicKey = fs.readFileSync(CONFIG.publicKeyPath, 'utf8');
+
+      return new Pay({
+        mchid: CONFIG.mchid,
+        appid: CONFIG.appid,
+        serial_no: CONFIG.merchantSerialNo,
+        publicKey: publicKey,
+        privateKey: privateKey
+      });
     }
 
-    // 2. 初始化客户端
-    const client = new Pay({
-      mchid: CONFIG.mchid,
-      appid: CONFIG.appid,
-      serial_no: CONFIG.merchantSerialNo, // 商户证书序列号
-      publicKey: publicKey,
-      privateKey: privateKey      // 商户私钥
-    });
+    // 使用数据库配置
+    const privateKey = config.privateKey || fs.readFileSync(CONFIG.privateKeyPath, 'utf8');
+    const publicKey = config.publicCert || fs.readFileSync(CONFIG.publicKeyPath, 'utf8');
 
-    return client;
+    return new Pay({
+      mchid: config.mchid,
+      appid: CONFIG.appid,
+      serial_no: config.merchantSerialNo,
+      publicKey: publicKey,
+      privateKey: privateKey
+    });
 
   } catch (err) {
     console.error('初始化支付客户端失败:', err);
-    throw err; // 抛出错误让上层处理
+    throw err;
   }
 }
 
