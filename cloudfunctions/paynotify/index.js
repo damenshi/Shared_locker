@@ -16,40 +16,131 @@ const CONSTANTS = {
   VALID_STATUSES_FOR_QUERY: ['进行中']
 }
 
+// 默认配置（兼容旧逻辑）
 const CONFIG = {
   apiv3Key: process.env.WX_API_V3_KEY_YH
 };
 
-// 解密回调报文
-function decryptNotify(resource) {
-  const { associated_data, nonce, ciphertext } = resource
+// ==========================================
+// 商户配置获取函数
+// ==========================================
+
+// 获取当前激活的商户配置
+async function getActiveMerchantConfig() {
+  try {
+    const res = await db.collection('merchant_configs')
+      .where({ isActive: true })
+      .limit(1)
+      .get();
+    return res.data.length > 0 ? res.data[0] : null;
+  } catch (e) {
+    console.error('获取激活商户配置失败:', e);
+    return null;
+  }
+}
+
+// 根据商户ID获取配置
+async function getMerchantConfigById(merchantId) {
+  if (!merchantId) return null;
+  try {
+    const res = await db.collection('merchant_configs').doc(merchantId).get();
+    return res.data && Object.keys(res.data).length > 0 ? res.data : null;
+  } catch (e) {
+    console.error('获取商户配置失败:', e);
+    return null;
+  }
+}
+
+// 获取所有商户配置
+async function getAllMerchantConfigs() {
+  try {
+    const res = await db.collection('merchant_configs')
+      .orderBy('order', 'asc')
+      .get();
+    return res.data;
+  } catch (e) {
+    console.error('获取所有商户配置失败:', e);
+    return [];
+  }
+}
+
+// 尝试用指定 apiv3Key 解密
+function tryDecrypt(resource, apiv3Key) {
+  const { associated_data, nonce, ciphertext } = resource;
 
   // 1. Base64 解码 ciphertext
-  const cipherBuffer = Buffer.from(ciphertext, 'base64')
+  const cipherBuffer = Buffer.from(ciphertext, 'base64');
 
   // 2. 分离 authTag（最后16字节）和真实密文
-  const authTag = cipherBuffer.slice(cipherBuffer.length - 16)
-  const dataBuffer = cipherBuffer.slice(0, cipherBuffer.length - 16)
+  const authTag = cipherBuffer.slice(cipherBuffer.length - 16);
+  const dataBuffer = cipherBuffer.slice(0, cipherBuffer.length - 16);
 
   // 3. 创建 decipher
   const decipher = crypto.createDecipheriv(
     'aes-256-gcm',
-    Buffer.from(CONFIG.apiv3Key, 'utf8'), // 确保是 Buffer
+    Buffer.from(apiv3Key, 'utf8'),
     Buffer.from(nonce, 'utf8')
-  )
-  decipher.setAuthTag(authTag)
-  decipher.setAAD(Buffer.from(associated_data, 'utf8'))
+  );
+  decipher.setAuthTag(authTag);
+  decipher.setAAD(Buffer.from(associated_data, 'utf8'));
 
   // 4. 解密
   const decrypted = Buffer.concat([
     decipher.update(dataBuffer),
     decipher.final()
-  ])
-  return JSON.parse(decrypted.toString('utf8'))
+  ]);
+  return JSON.parse(decrypted.toString('utf8'));
+}
+
+// 解密回调报文（带轮询兜底 + 旧配置兜底）
+async function decryptNotifyWithFallback(resource) {
+  // 1. 优先尝试当前激活商户
+  try {
+    const activeMerchant = await getActiveMerchantConfig();
+    if (activeMerchant && activeMerchant.apiv3Key) {
+      const result = tryDecrypt(resource, activeMerchant.apiv3Key);
+      console.log('[解密] 使用激活商户解密成功:', activeMerchant._id);
+      return { data: result, merchant: activeMerchant };
+    }
+  } catch (e) {
+    console.log('[解密] 当前激活商户解密失败，尝试所有商户...');
+  }
+
+  // 2. 兜底：轮询尝试所有商户
+  const allMerchants = await getAllMerchantConfigs();
+  for (const merchant of allMerchants) {
+    if (!merchant.apiv3Key) continue;
+    try {
+      const result = tryDecrypt(resource, merchant.apiv3Key);
+      console.log('[解密] 使用商户', merchant._id, '解密成功');
+      return { data: result, merchant: merchant };
+    } catch (e) {
+      continue;
+    }
+  }
+
+  // 3. 最终兜底：使用旧版硬编码配置
+  if (CONFIG.apiv3Key) {
+    console.log('[解密] 数据库无商户配置，使用旧版配置...');
+    try {
+      const result = tryDecrypt(resource, CONFIG.apiv3Key);
+      console.log('[解密] 使用旧版配置解密成功');
+      return { data: result, merchant: null };
+    } catch (e) {
+      console.error('[解密] 旧版配置解密也失败:', e.message);
+    }
+  }
+
+  throw new Error('无法使用任何商户配置解密回调');
+}
+
+// 兼容旧接口
+function decryptNotify(resource) {
+  return tryDecrypt(resource, CONFIG.apiv3Key);
 }
 
 
-async function handlePayNotify(notifyData) {
+async function handlePayNotify(notifyData, merchant) {
   const orderId = notifyData.out_trade_no;
   const transactionId = notifyData.transaction_id;
   const amountFen = notifyData.amount?.total || 0;
@@ -133,30 +224,39 @@ async function handlePayNotify(notifyData) {
   // === 3. 根据最终决定执行数据库更新 ===
   if (isPassed) {
     //成功（或软错误强制成功） -> 进行中
-    await db.collection('orders').doc(orderId).update({
-      data: {
-        status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
-        transactionId: transactionId,
-        deposit: amountYuan,
-        payTime: db.serverDate(),
-        updatedAt: db.serverDate()
-      }
-    });
+    const updateData = {
+      status: CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
+      transactionId: transactionId,
+      deposit: amountYuan,
+      payTime: db.serverDate(),
+      updatedAt: db.serverDate()
+    };
+    // 记录商户信息
+    if (merchant) {
+      updateData.mchid = merchant.mchid;
+      updateData.merchantId = merchant._id;
+      console.log(`[回调] 记录商户信息: ${merchant.mchid}`);
+    }
+    await db.collection('orders').doc(orderId).update({ data: updateData });
     console.log(`[回调] 订单 ${orderId} 已设为【进行中】`);
   } else {
     //失败（明确的 500 硬伤） -> 订单改为"已关闭" + 释放柜子
     console.warn(`[回调] 订单 ${orderId} 判定为硬伤(${failReason})，执行关闭`);
-    await db.collection('orders').doc(orderId).update({
-      data: {
-        status: CONSTANTS.ORDER_STATUSES.CLOSED, // 修改：从 CANCELLED 改为 CLOSED
-        transactionId: transactionId,
-        deposit: amountYuan,
-        refundAmount: amountYuan, // 记录全额可退
-        payTime: db.serverDate(),
-        updatedAt: db.serverDate(),
-        note: `开柜异常：${failReason}`
-      }
-    });
+    const closeUpdateData = {
+      status: CONSTANTS.ORDER_STATUSES.CLOSED,
+      transactionId: transactionId,
+      deposit: amountYuan,
+      refundAmount: amountYuan,
+      payTime: db.serverDate(),
+      updatedAt: db.serverDate(),
+      note: `开柜异常：${failReason}`
+    };
+    // 记录商户信息
+    if (merchant) {
+      closeUpdateData.mchid = merchant.mchid;
+      closeUpdateData.merchantId = merchant._id;
+    }
+    await db.collection('orders').doc(orderId).update({ data: closeUpdateData });
 
     try {
       await cloud.callFunction({
@@ -268,9 +368,9 @@ exports.main = async (event) => {
   }
 
   try {
-    // Step2: 解密通知数据
-    const notifyData = decryptNotify(body.resource)
-    console.log('通知解密后数据:', notifyData)
+    // Step2: 解密通知数据（带商户轮询兜底 + 旧配置兜底）
+    const { data: notifyData, merchant } = await decryptNotifyWithFallback(body.resource);
+    console.log('通知解密后数据:', notifyData);
     const eventType = body.event_type;
 
     if (eventType === "REFUND.SUCCESS" || eventType === "REFUND.FAIL") {
@@ -278,7 +378,7 @@ exports.main = async (event) => {
       await handleRefundNotify(notifyData);
     } else if (eventType === 'TRANSACTION.SUCCESS') {
       console.log('处理支付回调，订单号:', notifyData.out_trade_no);
-      await handlePayNotify(notifyData);
+      await handlePayNotify(notifyData, merchant);
     } else {
       throw new Error('无法识别的通知类型');
     }

@@ -1358,6 +1358,9 @@ exports.main = async (event, context) => {
   //余额提现 (真正的退款) ===
   if (action === 'withdrawRefund') {
     const { orderId } = event;
+    if (!orderId) {
+      return { success: false, errMsg: 'orderId 参数缺失' };
+    }
     try {
       const orderDoc = await db.collection('orders').doc(orderId).get();
       if (!orderDoc.data) {
@@ -1371,6 +1374,9 @@ exports.main = async (event, context) => {
       }
 
       // 2. 延时12小时退款
+      if (!order.refundApplyTime) {
+        throw new Error('订单缺少退款申请时间记录，请联系客服');
+      }
       const now = Date.now();
       const applyTime = new Date(order.refundApplyTime).getTime();
       const delayHours = 12; //12 小时

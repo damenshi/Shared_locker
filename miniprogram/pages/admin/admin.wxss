@@ -83,6 +83,10 @@
   background: linear-gradient(135deg, #e8f4fd 0%, #dbeafe 100%);
 }
 
+.icon-merchant {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
 .icon-device {
   background: linear-gradient(135deg, #fef3f2 0%, #fee2e2 100%);
 }
@@ -372,4 +376,69 @@
 /* 底部安全区 */
 .safe-bottom {
   height: 60rpx;
+}
+
+/* 商户管理卡片 */
+.card-merchant {
+  border-color: #fde68a;
+}
+
+.merchant-list {
+  margin-top: 12rpx;
+}
+
+.merchant-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 28rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  border: 2rpx solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.merchant-item:last-child {
+  margin-bottom: 0;
+}
+
+.merchant-item.active {
+  background: linear-gradient(135deg, #fef3c7 0%, #fff 100%);
+  border-color: #f59e0b;
+}
+
+.merchant-item:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+.merchant-info {
+  flex: 1;
+}
+
+.merchant-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6rpx;
+}
+
+.merchant-mchid {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.merchant-status {
+  font-size: 26rpx;
+  margin-left: 20rpx;
+}
+
+.status-active {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.status-inactive {
+  color: #9ca3af;
 }

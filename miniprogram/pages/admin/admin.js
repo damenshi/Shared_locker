@@ -26,7 +26,10 @@ Page({
     loading: false,
 
     // 免费模式状态
-    isFreeMode: false
+    isFreeMode: false,
+
+    // 商户列表
+    merchantList: []
   },
 
   // 输入框变化处理
@@ -156,6 +159,8 @@ Page({
 
       // 获取当前免费模式状态
       this.fetchFreeModeStatus();
+      // 获取商户配置列表
+      this.fetchMerchantConfigs();
     } catch (err) {
       console.error('管理员权限验证失败：', err);
       wx.showToast({ title: '验证失败', icon: 'none' });
@@ -245,6 +250,70 @@ Page({
     });
   },
 
-  goMyDeviceList() { wx.navigateTo({ url: '/pages/admin/mydevice' }); }
+  goMyDeviceList() { wx.navigateTo({ url: '/pages/admin/mydevice' }); },
+
+  // 获取商户配置列表
+  async fetchMerchantConfigs() {
+    try {
+      const result = await wx.cloud.callFunction({
+        name: 'admin',
+        data: { action: 'getMerchantConfigs' }
+      });
+      if (result.result.success && result.result.data) {
+        this.setData({ merchantList: result.result.data });
+      }
+    } catch (err) {
+      console.error('获取商户配置失败:', err);
+    }
+  },
+
+  // 切换商户
+  async switchMerchant(e) {
+    const merchantId = e.currentTarget.dataset.id;
+    const currentMerchant = this.data.merchantList.find(m => m._id === merchantId);
+
+    // 如果点击的是当前激活的商户，不处理
+    if (currentMerchant && currentMerchant.isActive) {
+      return;
+    }
+
+    const merchantName = currentMerchant ? currentMerchant.name : '该商户';
+    wx.showModal({
+      title: '确认切换商户',
+      content: `确定要切换到「${merchantName}」吗？新订单将使用该商户支付。`,
+      success: async (res) => {
+        if (res.confirm) {
+          this.showLoading('切换中...');
+          try {
+            const result = await wx.cloud.callFunction({
+              name: 'admin',
+              data: {
+                action: 'switchMerchant',
+                merchantId: merchantId
+              }
+            });
+            this.hideLoading();
+            if (result.result.success) {
+              wx.showToast({
+                title: result.result.message || '切换成功',
+                icon: 'success'
+              });
+              // 刷新商户列表
+              this.fetchMerchantConfigs();
+            } else {
+              wx.showToast({
+                title: result.result.errMsg || '切换失败',
+                icon: 'none'
+              });
+            }
+          } catch (err) {
+            this.hideLoading();
+            console.error('切换商户失败:', err);
+            wx.showToast({ title: '切换失败', icon: 'none' });
+          }
+        }
+      }
+    });
+  }
 
 })

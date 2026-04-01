@@ -2,18 +2,19 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
+const fs = require('fs');
 
 const ADMIN_OPENIDS = (process.env.ADMIN_OPENIDS || '').split(',').filter(Boolean);
 
 
 const batchCreateLockers = async (event) => {
   const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefund, screenNo,cabinetCount, lockersPerCabinet } = event
-  
+
   // 验证参数
   if (!internalNo || !deviceAddress || deviceDeposit === undefined || unitPrice === undefined || !screenNo || !cabinetCount || !lockersPerCabinet) {
-    return { 
-      success: false, 
-      errMsg: '请指定设备ID、设备地址、设备收费标准、收费策略、屏幕编号、锁板数量和每个锁板的锁数量' 
+    return {
+      success: false,
+      errMsg: '请指定设备ID、设备地址、设备收费标准、收费策略、屏幕编号、锁板数量和每个锁板的锁数量'
     }
   }
 
@@ -22,9 +23,9 @@ const batchCreateLockers = async (event) => {
     .where({ internalNo: internalNo })
     .get()
   if (deviceCheck.data.length === 0) {
-    return { 
-      success: false, 
-      errMsg: `设备 ${internalNo} 不存在，请先创建设备` 
+    return {
+      success: false,
+      errMsg: `设备 ${internalNo} 不存在，请先创建设备`
     }
   }else{
     await db.collection('devices')
@@ -100,9 +101,167 @@ const batchCreateLockers = async (event) => {
   }
 }
 
+// ==========================================
+// 内部函数：初始化商户配置
+// ==========================================
+async function initMerchantConfig() {
+  try {
+    // 检查是否已存在
+    const existing = await db.collection('merchant_configs').where({ _id: 'yh' }).get();
+
+    // 读取私钥文件（从云函数目录）
+    let privateKey = '';
+    let publicCert = '';
+    try {
+      const privateKeyPath = './private/apiclient_key_yh.pem';
+      const publicCertPath = './private/apiclient_cert_yh.pem';
+      if (fs.existsSync(privateKeyPath)) {
+        privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+        console.log('[初始化] 成功读取私钥文件，长度:', privateKey.length);
+      }
+      if (fs.existsSync(publicCertPath)) {
+        publicCert = fs.readFileSync(publicCertPath, 'utf8');
+        console.log('[初始化] 成功读取证书文件，长度:', publicCert.length);
+      }
+      if (!privateKey || !publicCert) {
+        console.log('[初始化] 证书文件为空，可能未上传到云函数目录');
+      }
+    } catch (e) {
+      console.log('[初始化] 读取证书文件失败:', e.message);
+    }
+
+    if (existing.data.length > 0) {
+      // 已存在，更新证书内容
+      const updateData = {
+        updatedAt: db.serverDate()
+      };
+      // 如果数据库中的值为空，但文件存在，则更新
+      if (!existing.data[0].privateKey && privateKey) {
+        updateData.privateKey = privateKey;
+      }
+      if (!existing.data[0].publicCert && publicCert) {
+        updateData.publicCert = publicCert;
+      }
+      // 如果环境变量有值，更新配置
+      if (process.env.MCHID_YH && process.env.MCHID_YH !== existing.data[0].mchid) {
+        updateData.mchid = process.env.MCHID_YH;
+      }
+      if (process.env.MERCHANT_SERIAL_NO_YH && process.env.MERCHANT_SERIAL_NO_YH !== existing.data[0].merchantSerialNo) {
+        updateData.merchantSerialNo = process.env.MERCHANT_SERIAL_NO_YH;
+      }
+      if (process.env.WX_API_V3_KEY_YH && process.env.WX_API_V3_KEY_YH !== existing.data[0].apiv3Key) {
+        updateData.apiv3Key = process.env.WX_API_V3_KEY_YH;
+      }
+
+      if (Object.keys(updateData).length > 1) {
+        await db.collection('merchant_configs').doc('yh').update({ data: updateData });
+        return { success: true, message: '商户配置已更新' };
+      }
+      return { success: true, message: '商户配置已存在且无需更新' };
+    }
+
+    // 插入默认商户配置
+    await db.collection('merchant_configs').add({
+      data: {
+        _id: 'yh',
+        name: '珊星设备',
+        mchid: process.env.MCHID_YH || '',
+        merchantSerialNo: process.env.MERCHANT_SERIAL_NO_YH || '',
+        apiv3Key: process.env.WX_API_V3_KEY_YH || '',
+        privateKey: privateKey,
+        publicCert: publicCert,
+        isActive: true,
+        order: 1,
+        createdAt: db.serverDate(),
+        updatedAt: db.serverDate()
+      }
+    });
+
+    return { success: true, message: '商户配置初始化成功' };
+  } catch (e) {
+    console.error('初始化商户配置失败:', e);
+    return { success: false, errMsg: e.message };
+  }
+}
+
+// ==========================================
+// 内部函数：初始化第二个商户配置
+// ==========================================
+async function initSecondMerchant() {
+  try {
+    const existing = await db.collection('merchant_configs').where({ _id: 'xyh' }).get();
+
+    // 读取第二个商户的证书文件
+    let privateKey = '';
+    let publicCert = '';
+    try {
+      const privateKeyPath = './private/apiclient_key_xyh.pem';
+      const publicCertPath = './private/apiclient_cert_xyh.pem';
+      if (fs.existsSync(privateKeyPath)) {
+        privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+        console.log('[初始化XYH] 成功读取私钥文件');
+      }
+      if (fs.existsSync(publicCertPath)) {
+        publicCert = fs.readFileSync(publicCertPath, 'utf8');
+        console.log('[初始化XYH] 成功读取证书文件');
+      }
+    } catch (e) {
+      console.log('[初始化XYH] 读取证书文件失败:', e.message);
+    }
+
+    if (existing.data.length > 0) {
+      // 已存在，更新
+      const updateData = { updatedAt: db.serverDate() };
+      if (!existing.data[0].privateKey && privateKey) updateData.privateKey = privateKey;
+      if (!existing.data[0].publicCert && publicCert) updateData.publicCert = publicCert;
+      if (process.env.MCHID_XYH) updateData.mchid = process.env.MCHID_XYH;
+      if (process.env.MERCHANT_SERIAL_NO_XYH) updateData.merchantSerialNo = process.env.MERCHANT_SERIAL_NO_XYH;
+      if (process.env.WX_API_V3_KEY_XYH) updateData.apiv3Key = process.env.WX_API_V3_KEY_XYH;
+
+      if (Object.keys(updateData).length > 1) {
+        await db.collection('merchant_configs').doc('xyh').update({ data: updateData });
+        return { success: true, message: '第二个商户配置已更新' };
+      }
+      return { success: true, message: '第二个商户配置已存在且无需更新' };
+    }
+
+    // 插入第二个商户配置
+    await db.collection('merchant_configs').add({
+      data: {
+        _id: 'xyh',
+        name: '珊星智能存储',
+        mchid: process.env.MCHID_XYH || '',
+        merchantSerialNo: process.env.MERCHANT_SERIAL_NO_XYH || '',
+        apiv3Key: process.env.WX_API_V3_KEY_XYH || '',
+        privateKey: privateKey,
+        publicCert: publicCert,
+        isActive: false,
+        order: 2,
+        createdAt: db.serverDate(),
+        updatedAt: db.serverDate()
+      }
+    });
+
+    return { success: true, message: '第二个商户配置初始化成功' };
+  } catch (e) {
+    console.error('初始化第二个商户配置失败:', e);
+    return { success: false, errMsg: e.message };
+  }
+}
+
 exports.main = async (event, context) => {
   const { action } = event
   const { OPENID } = cloud.getWXContext()
+
+  // 初始化商户配置不需要管理员权限
+  if (action === 'initMerchantConfig') {
+    return await initMerchantConfig();
+  }
+
+  // 初始化第二个商户配置（XYH珊星智能存储）
+  if (action === 'initSecondMerchant') {
+    return await initSecondMerchant();
+  }
 
   // 验证管理员权限
   console.log("OPENID:", OPENID);
