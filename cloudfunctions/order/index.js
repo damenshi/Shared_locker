@@ -45,15 +45,63 @@ const validateParams = (params, rules) => {
 
 // 以下配置请使用环境变量或云函数的安全配置
 const CONFIG = {
-  mchid: process.env.MCHID_XYH,
+  mchid: process.env.MCHID_YH,
   appid: process.env.APPID,
   notify_url: 'https://cloudbase-3gnr17whd71a5b45-1379469522.ap-shanghai.app.tcloudbase.com/paynotify',
-  privateKeyPath: './private/apiclient_key_xyh.pem',
-  wechatPayPublicKeyPath: './private/pub_key_xyh.pem',
-  publicKeyPath: './private/apiclient_cert_xyh.pem',
-  merchantSerialNo: process.env.MERCHANT_SERIAL_NO_XYH, // 商户证书序列号
-  apiv3Key: process.env.WX_API_V3_KEY_XYH
+  privateKeyPath: './private/apiclient_key_yh.pem',
+  wechatPayPublicKeyPath: './private/pub_key_yh.pem',
+  publicKeyPath: './private/apiclient_cert_yh.pem',
+  merchantSerialNo: process.env.MERCHANT_SERIAL_NO_YH, // 商户证书序列号
+  apiv3Key: process.env.WX_API_V3_KEY_YH
 };
+
+// ==========================================
+// 商户配置获取函数
+// ==========================================
+
+// 获取当前激活的商户配置
+async function getActiveMerchantConfig() {
+  try {
+    const res = await db.collection('merchant_configs')
+      .where({ isActive: true })
+      .limit(1)
+      .get();
+    if (res.data.length === 0) {
+      // 返回 null，让调用方使用默认 CONFIG
+      return null;
+    }
+    return res.data[0];
+  } catch (e) {
+    console.error('获取激活商户配置失败:', e);
+    return null;
+  }
+}
+
+// 根据商户ID获取配置
+async function getMerchantConfigById(merchantId) {
+  try {
+    const res = await db.collection('merchant_configs')
+      .doc(merchantId)
+      .get();
+    return res.data;
+  } catch (e) {
+    console.error('获取商户配置失败:', e);
+    return null;
+  }
+}
+
+// 获取所有商户配置
+async function getAllMerchantConfigs() {
+  try {
+    const res = await db.collection('merchant_configs')
+      .orderBy('order', 'asc')
+      .get();
+    return res.data;
+  } catch (e) {
+    console.error('获取所有商户配置失败:', e);
+    return [];
+  }
+}
 
 function getClient() {
   try {    
