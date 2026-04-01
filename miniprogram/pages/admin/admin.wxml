@@ -1,190 +1,265 @@
 <view class="container">
-  <!-- 顶部标题 -->
-  <!-- <view class="header">
-    <text class="title">储物柜系统管理</text>
-  </view> -->
+  <!-- 顶部欢迎语 -->
+  <view class="welcome-header">
+    <text class="welcome-title">管理后台</text>
+    <text class="welcome-subtitle">珊星储物柜管理系统</text>
+  </view>
+
+  <!-- 分组标题：订单管理 -->
+  <view class="section-header">
+    <view class="section-line"></view>
+    <text class="section-title">订单管理</text>
+    <view class="section-line"></view>
+  </view>
 
   <!-- 用户订单管理 -->
-  <view class="card">
-    <view class="card-title">📦 用户订单管理</view>
-    <view class="input-item">
-      <text>手机号：</text>
-      <input 
-        type="text" 
-        value="{{userPhone}}" 
+  <view class="card card-order">
+    <view class="card-header-row">
+      <view class="card-icon icon-order">
+        <text class="icon-text">📦</text>
+      </view>
+      <view class="card-info">
+        <view class="card-title">用户订单查询</view>
+        <view class="card-desc">输入手机号查询用户的所有订单</view>
+      </view>
+    </view>
+    <view class="input-row">
+      <input
+        type="text"
+        value="{{userPhone}}"
         data-field="userPhone"
         bindinput="onInputChange"
-        placeholder="请输入用户手机号"
+        placeholder="请输入手机号"
+        class="input-field"
       />
     </view>
-    <button 
-      bindtap="goUserOrders" 
-      class="primary-btn"
-    >获取订单</button>
+    <view class="btn-row">
+      <button bindtap="goUserOrders" class="action-btn">查询订单</button>
+    </view>
   </view>
 
-   <!-- 设备订单管理 -->
-   <view class="card">
-    <view class="card-title">🗄️ 设备订单管理（显示最近20单）</view>
-    <view class="input-item">
-      <text>设备编号：</text>
-      <input 
-        type="text" 
-        value="{{internalNo_ord}}" 
+  <!-- 设备订单管理 -->
+  <view class="card card-device">
+    <view class="card-header-row">
+      <view class="card-icon icon-device">
+        <text class="icon-text">📋</text>
+      </view>
+      <view class="card-info">
+        <view class="card-title">设备订单查询</view>
+        <view class="card-desc">按设备编号和柜门号查询订单</view>
+      </view>
+    </view>
+    <view class="input-row two-col">
+      <input
+        type="text"
+        value="{{internalNo_ord}}"
         data-field="internalNo_ord"
         bindinput="onInputChange"
-        placeholder="如L0001"
+        placeholder="设备编号"
+        class="input-field"
       />
-    </view>
-    <view class="input-item">
-      <text>柜门编号：</text>
-      <input 
-        type="number" 
-        value="{{lockerNo_ord}}" 
+      <input
+        type="number"
+        value="{{lockerNo_ord}}"
         data-field="lockerNo_ord"
         bindinput="onInputChange"
-        placeholder="如1"
+        placeholder="柜门号"
+        class="input-field"
       />
     </view>
-    <button 
-      bindtap="goDevOrders" 
-      class="primary-btn"
-    >获取订单</button>
+    <view class="btn-row">
+      <button bindtap="goDevOrders" class="action-btn">查询订单</button>
+    </view>
   </view>
 
-  <!-- 设备列表 -->
-  <view class="card">
-    <view class="card-title">🧭 设备列表</view>
-    <button 
-      bindtap="goMyDeviceList" 
-      class="primary-btn"
-    >获取设备列表</button>
-  </view>
-
-  <!-- 设备配置 -->
-  <view class="card">
-    <view class="card-title">⚙️ 设备配置</view>
-
-    <view class="input-item">
-      <text>设备编号：</text>
-      <input 
-        type="text" 
-        value="{{internalNo}}" 
-        data-field="internalNo"
-        bindinput="onInputChange"
-        placeholder="如 L0001"
-      />
-    </view>
-
-    <view class="input-item">
-      <text>安装地址：</text>
-      <input 
-        type="text" 
-        value="{{deviceAddress}}" 
-        data-field="deviceAddress"
-        bindinput="onInputChange"
-        placeholder="请输入设备地址"
-      />
-    </view>
-
-    <view class="input-item">
-      <text>收费标准：</text>
-      <input 
-        type="text" 
-        value="{{deviceDeposit}}" 
-        data-field="deviceDeposit"
-        bindinput="onInputChange"
-        placeholder="请输入押金金额"
-      />
-    </view>
-
-    <view class="input-item">
-      <text>收费策略：</text>
-      <input 
-        type="text" 
-        value="{{unitPrice}}" 
-        data-field="unitPrice"
-        bindinput="onInputChange"
-        placeholder="请输入每小时费用"
-      />
-    </view>
-
-    <view class="input-item">
-      <text>延迟退款：</text>
-      <input 
-        type="text" 
-        value="{{delayedRefundInput}}" 
-        data-field="delayedRefundInput"
-        bindinput="onInputChange"
-        placeholder="输入“是”开启，否则关闭"
-      />
-    </view>
-
-    <view class="input-item">
-      <text>屏幕编号：</text>
-      <input 
-        type="text" 
-        value="{{screenNo}}" 
-        data-field="screenNo"
-        bindinput="onInputChange"
-        placeholder="请输入屏幕编号"
-      />
-    </view>
-
-    <view class="input-item">
-      <text>锁板数量：</text>
-      <input 
-        type="number" 
-        value="{{cabinetCount}}" 
-        data-field="cabinetCount"
-        bindinput="onInputChange"
-        placeholder="请输入锁板数量"
-      />
-    </view>
-
-    <view class="input-item">
-      <text>每板锁数：</text>
-      <input 
-        type="number" 
-        value="{{lockersPerCabinet}}" 
-        data-field="lockersPerCabinet"
-        bindinput="onInputChange"
-        placeholder="请输入每块锁板的锁数量"
-      />
-    </view>
-
-    <button 
-      bindtap="batchCreateLockersByDevice" 
-      class="primary-btn"
-    >配置设备</button>
+  <!-- 分组标题：设备控制 -->
+  <view class="section-header">
+    <view class="section-line"></view>
+    <text class="section-title">设备控制</text>
+    <view class="section-line"></view>
   </view>
 
   <!-- 柜门控制 -->
-  <view class="card">
-    <view class="card-title">🔓 柜门控制</view>
-    <view class="input-item">
-      <text>设备编号：</text>
-      <input 
-        type="text" 
-        value="{{internalNo_ctl}}" 
+  <view class="card card-door">
+    <view class="card-header-row">
+      <view class="card-icon icon-door">
+        <text class="icon-text">🔓</text>
+      </view>
+      <view class="card-info">
+        <view class="card-title">柜门控制</view>
+        <view class="card-desc">远程控制柜门开关</view>
+      </view>
+    </view>
+    <view class="input-row two-col">
+      <input
+        type="text"
+        value="{{internalNo_ctl}}"
         data-field="internalNo_ctl"
         bindinput="onInputChange"
-        placeholder="如 L0001"
+        placeholder="设备编号"
+        class="input-field"
       />
-    </view>
-    <view class="input-item">
-      <text>柜门编号：</text>
-      <input 
-        type="number" 
-        value="{{lockerNo}}" 
+      <input
+        type="number"
+        value="{{lockerNo}}"
         data-field="lockerNo"
         bindinput="onInputChange"
-        placeholder="请输入柜门号"
+        placeholder="柜门号"
+        class="input-field"
       />
     </view>
-    <button 
-      bindtap="openAnyDoor" 
-      class="primary-btn"
-    >远程开门</button>
+    <view class="btn-row">
+      <button bindtap="openAnyDoor" class="action-btn btn-danger">远程开门</button>
+    </view>
   </view>
+
+  <!-- 设备列表 -->
+  <view class="card card-list" bindtap="goMyDeviceList">
+    <view class="card-header-row">
+      <view class="card-icon icon-list">
+        <text class="icon-text">📱</text>
+      </view>
+      <view class="card-info">
+        <view class="card-title">设备列表</view>
+        <view class="card-desc">查看和管理所有储物柜设备</view>
+      </view>
+      <view class="card-arrow">›</view>
+    </view>
+  </view>
+
+  <!-- 分组标题：系统设置 -->
+  <view class="section-header">
+    <view class="section-line"></view>
+    <text class="section-title">系统设置</text>
+    <view class="section-line"></view>
+  </view>
+
+  <!-- 全局免费设置 -->
+  <view class="card card-free">
+    <view class="card-header-row">
+      <view class="card-icon icon-free">
+        <text class="icon-text">🆓</text>
+      </view>
+      <view class="card-info">
+        <view class="card-title">全局免费模式</view>
+        <view class="card-desc">开启后所有储物柜将免费使用</view>
+      </view>
+    </view>
+    <view class="toggle-row" bindtap="toggleFreeMode">
+      <text class="toggle-label">{{isFreeMode ? '已开启免费模式' : '点击开启免费模式'}}</text>
+      <view class="toggle {{isFreeMode ? 'on' : ''}}">
+        <view class="toggle-thumb"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 设备配置 -->
+  <view class="card card-config">
+    <view class="card-header-row">
+      <view class="card-icon icon-config">
+        <text class="icon-text">⚙️</text>
+      </view>
+      <view class="card-info">
+        <view class="card-title">设备配置</view>
+        <view class="card-desc">配置设备参数和储物柜信息</view>
+      </view>
+    </view>
+    <view class="config-form">
+      <view class="form-row">
+        <view class="form-label">设备编号</view>
+        <input
+          type="text"
+          value="{{internalNo}}"
+          data-field="internalNo"
+          bindinput="onInputChange"
+          placeholder="如 L0001"
+          class="form-input"
+        />
+      </view>
+      <view class="form-row">
+        <view class="form-label">安装地址</view>
+        <input
+          type="text"
+          value="{{deviceAddress}}"
+          data-field="deviceAddress"
+          bindinput="onInputChange"
+          placeholder="设备安装地址"
+          class="form-input"
+        />
+      </view>
+      <view class="form-row-group">
+        <view class="form-col">
+          <view class="form-label">押金(元)</view>
+          <input
+            type="number"
+            value="{{deviceDeposit}}"
+            data-field="deviceDeposit"
+            bindinput="onInputChange"
+            placeholder="0"
+            class="form-input"
+          />
+        </view>
+        <view class="form-col">
+          <view class="form-label">时价(元/时)</view>
+          <input
+            type="number"
+            value="{{unitPrice}}"
+            data-field="unitPrice"
+            bindinput="onInputChange"
+            placeholder="0"
+            class="form-input"
+          />
+        </view>
+      </view>
+      <view class="form-row-group">
+        <view class="form-col">
+          <view class="form-label">锁板数量</view>
+          <input
+            type="number"
+            value="{{cabinetCount}}"
+            data-field="cabinetCount"
+            bindinput="onInputChange"
+            placeholder="0"
+            class="form-input"
+          />
+        </view>
+        <view class="form-col">
+          <view class="form-label">每板锁数</view>
+          <input
+            type="number"
+            value="{{lockersPerCabinet}}"
+            data-field="lockersPerCabinet"
+            bindinput="onInputChange"
+            placeholder="0"
+            class="form-input"
+          />
+        </view>
+      </view>
+      <view class="form-row-group">
+        <view class="form-col">
+          <view class="form-label">屏幕编号</view>
+          <input
+            type="number"
+            value="{{screenNo}}"
+            data-field="screenNo"
+            bindinput="onInputChange"
+            placeholder="0"
+            class="form-input"
+          />
+        </view>
+        <view class="form-col">
+          <view class="form-label">延迟退款</view>
+          <picker bindchange="onDelayedRefundChange" value="{{delayedRefundIndex}}" range="{{delayedRefundOptions}}">
+            <view class="form-input picker-value">{{delayedRefundOptions[delayedRefundIndex] || '请选择'}}</view>
+          </picker>
+        </view>
+      </view>
+    </view>
+    <view class="btn-row">
+      <button bindtap="batchCreateLockersByDevice" class="action-btn btn-primary">配置设备</button>
+    </view>
+  </view>
+
+  <!-- 底部安全区 -->
+  <view class="safe-bottom"></view>
 </view>

@@ -17,7 +17,7 @@ const CONSTANTS = {
 }
 
 const CONFIG = {
-  apiv3Key: process.env.WX_API_V3_KEY_XYH
+  apiv3Key: process.env.WX_API_V3_KEY_YH
 };
 
 // 解密回调报文

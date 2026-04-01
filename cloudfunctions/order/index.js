@@ -301,50 +301,56 @@ exports.main = async (event, context) => {
       // 【被动清理】释放本设备上超时(>5分钟)未支付的遗留订单
       // ==========================================
       try {
-        const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
-        const timeoutOrders = await db.collection('orders').where({
-           deviceId: deviceId,
-           status: CONSTANTS.ORDER_STATUSES.PENDING_PAY,
-           createdAt: _.lt(fiveMinsAgo)
-        }).get();
+        // 先检查设备是否为免费模式，免费设备的订单不在这里清理
+        const devRes = await db.collection('devices').where({ deviceId }).get();
+        if (devRes.data.length > 0 && devRes.data[0].isFree) {
+          console.log('[被动清理] 设备为免费模式，跳过清理');
+        } else {
+          const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
+          const timeoutOrders = await db.collection('orders').where({
+             deviceId: deviceId,
+             status: CONSTANTS.ORDER_STATUSES.PENDING_PAY,
+             createdAt: _.lt(fiveMinsAgo)
+          }).get();
 
-        if (timeoutOrders.data.length > 0) {
-          console.log(`[被动清理] 发现 ${timeoutOrders.data.length} 个超时未支付订单，开始清理...`);
-          for (const tOrder of timeoutOrders.data) {
-            try {
-              await db.runTransaction(async transaction => {
-                const orderDoc = await transaction.collection('orders').doc(tOrder._id).get();
-                if (!orderDoc.data) return;
-                const order = orderDoc.data;
-                if (order.status !== CONSTANTS.ORDER_STATUSES.PENDING_PAY) return;
+          if (timeoutOrders.data.length > 0) {
+            console.log(`[被动清理] 发现 ${timeoutOrders.data.length} 个超时未支付订单，开始清理...`);
+            for (const tOrder of timeoutOrders.data) {
+              try {
+                await db.runTransaction(async transaction => {
+                  const orderDoc = await transaction.collection('orders').doc(tOrder._id).get();
+                  if (!orderDoc.data) return;
+                  const order = orderDoc.data;
+                  if (order.status !== CONSTANTS.ORDER_STATUSES.PENDING_PAY) return;
 
-                // 1. 取消订单
-                await transaction.collection('orders').doc(tOrder._id).update({
-                  data: {
-                    status: CONSTANTS.ORDER_STATUSES.CANCELLED,
-                    note: '超时未支付自动取消',
-                    updatedAt: db.serverDate()
+                  // 1. 取消订单
+                  await transaction.collection('orders').doc(tOrder._id).update({
+                    data: {
+                      status: CONSTANTS.ORDER_STATUSES.CANCELLED,
+                      note: '超时未支付自动取消',
+                      updatedAt: db.serverDate()
+                    }
+                  });
+
+                  // 2. 释放柜子
+                  if (order.lockerId) {
+                    const lockerCheck = await transaction.collection('lockers').doc(order.lockerId).get();
+                    if (lockerCheck.data && lockerCheck.data.currentOrderId === tOrder._id) {
+                      await transaction.collection('lockers').doc(order.lockerId).update({
+                        data: {
+                          status: 'free',
+                          currentOrderId: null,
+                          currentUserPhone: null,
+                          updatedAt: db.serverDate()
+                        }
+                      });
+                    }
                   }
                 });
-
-                // 2. 释放柜子
-                if (order.lockerId) {
-                  const lockerCheck = await transaction.collection('lockers').doc(order.lockerId).get();
-                  if (lockerCheck.data && lockerCheck.data.currentOrderId === tOrder._id) {
-                    await transaction.collection('lockers').doc(order.lockerId).update({
-                      data: {
-                        status: 'free',
-                        currentOrderId: null,
-                        currentUserPhone: null,
-                        updatedAt: db.serverDate()
-                      }
-                    });
-                  }
-                }
-              });
-              console.log(`[被动清理] 订单 ${tOrder._id} 已取消，柜子已释放`);
-            } catch (cleanErr) {
-              console.error(`[被动清理] 订单 ${tOrder._id} 清理失败:`, cleanErr);
+                console.log(`[被动清理] 订单 ${tOrder._id} 已取消，柜子已释放`);
+              } catch (cleanErr) {
+                console.error(`[被动清理] 订单 ${tOrder._id} 清理失败:`, cleanErr);
+              }
             }
           }
         }

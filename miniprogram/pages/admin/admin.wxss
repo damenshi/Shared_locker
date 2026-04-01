@@ -1,104 +1,375 @@
 /* 页面整体布局 */
 .container {
-  padding: 30rpx;
-  background-color: #f8f9fb;
+  padding: 24rpx 32rpx 40rpx;
+  background: #f5f6f8;
   min-height: 100vh;
 }
 
-/* 顶部标题 */
-.header {
-  text-align: center;
-  margin-bottom: 40rpx;
+/* 欢迎标题 */
+.welcome-header {
+  padding: 16rpx 0 32rpx;
 }
 
-.title {
+.welcome-title {
   display: block;
-  font-size: 42rpx;
+  font-size: 52rpx;
   font-weight: 700;
-  color: #111;
-  margin-bottom: 8rpx;
+  color: #1a1a2e;
+  letter-spacing: 2rpx;
 }
 
-.subtitle {
-  font-size: 26rpx;
-  color: #888;
+.welcome-subtitle {
+  display: block;
+  font-size: 28rpx;
+  color: #90909a;
+  margin-top: 8rpx;
 }
 
-/* 卡片布局 */
-.card {
-  background-color: #fff;
-  border-radius: 28rpx;
-  padding: 32rpx 28rpx;
-  margin-bottom: 32rpx;
-  box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s ease;
-}
-
-.card:active {
-  transform: scale(0.98);
-}
-
-/* 卡片标题 */
-.card-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #222;
-  margin-bottom: 24rpx;
-  padding-bottom: 12rpx;
-  border-bottom: 1px solid #f1f1f1;
-}
-
-/* 输入行样式 */
-.input-item {
+/* 分组标题 */
+.section-header {
   display: flex;
   align-items: center;
+  margin: 36rpx 0 24rpx;
+}
+
+.section-title {
+  font-size: 26rpx;
+  color: #90909a;
+  font-weight: 500;
+  padding: 0 20rpx;
+  white-space: nowrap;
+}
+
+.section-line {
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+/* 通用卡片 */
+.card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  border: 1px solid #f0f0f0;
+}
+
+/* 卡片头部行 */
+.card-header-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 28rpx;
+}
+
+.card-icon {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.icon-text {
+  font-size: 42rpx;
+}
+
+/* 图标背景色 */
+.icon-order {
+  background: linear-gradient(135deg, #e8f4fd 0%, #dbeafe 100%);
+}
+
+.icon-device {
+  background: linear-gradient(135deg, #fef3f2 0%, #fee2e2 100%);
+}
+
+.icon-door {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+}
+
+.icon-list {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.icon-free {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+}
+
+.icon-config {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+}
+
+.card-info {
+  flex: 1;
+}
+
+.card-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6rpx;
+}
+
+.card-desc {
+  font-size: 25rpx;
+  color: #90909a;
+  line-height: 1.4;
+}
+
+.card-arrow {
+  font-size: 52rpx;
+  color: #d1d1d6;
+  font-weight: 300;
+  margin-left: 16rpx;
+}
+
+/* 输入框 */
+.input-row {
   margin-bottom: 24rpx;
 }
 
-.input-item text {
-  width: 160rpx;
-  font-size: 28rpx;
-  color: #555;
+.input-row.two-col {
+  display: flex;
+  gap: 20rpx;
 }
 
-.input-item input {
+.input-row.two-col .input-field {
   flex: 1;
-  height: 72rpx;
-  background: #f9f9f9;
-  border-radius: 16rpx;
-  border: 1px solid #e0e0e0;
-  padding: 0 20rpx;
-  font-size: 28rpx;
-  color: #333;
+}
+
+.input-field {
+  width: 100%;
+  height: 88rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 0 28rpx;
+  font-size: 30rpx;
+  color: #1a1a2e;
+  box-sizing: border-box;
+  border: 3rpx solid #e8e8e8;
   transition: all 0.2s;
 }
 
-.input-item input:focus {
-  border-color: #007aff;
+.input-field:focus {
+  border-color: #667eea;
   background: #fff;
-  box-shadow: 0 0 10rpx rgba(0, 122, 255, 0.2);
+  box-shadow: 0 0 0 6rpx rgba(102, 126, 234, 0.1);
 }
 
-/* 按钮样式 - iOS 风格 */
-/* 按钮样式 - iOS 风格，字体垂直居中 */
-.primary-btn {
-  width: 100%;
-  height: 80rpx;
-  border-radius: 18rpx;
-  background: linear-gradient(135deg, #007aff, #005ecc);
-  color: #fff;
-  font-size: 30rpx;
+.input-field::placeholder {
+  color: #c0c0c8;
+}
+
+/* 按钮行 */
+.btn-row {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 8rpx;
+}
+
+/* 操作按钮 */
+.action-btn {
+  flex: 1;
+  height: 100rpx;
+  border-radius: 20rpx;
+  font-size: 32rpx;
   font-weight: 600;
   display: flex;
-  justify-content: center; /* 水平居中 */
-  align-items: center;     /* 垂直居中 */
-  margin-top: 10rpx;
-  transition: all 0.15s ease;
-  box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.25);
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  transition: all 0.2s ease;
+  background: #fff;
+  color: #667eea;
+  border: 3rpx solid #667eea;
+  box-shadow: 0 4rpx 12rpx rgba(102, 126, 234, 0.15);
 }
 
-.primary-btn:active {
-  opacity: 0.85;
+.action-btn:active {
   transform: scale(0.97);
+  opacity: 0.9;
 }
 
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(102, 126, 234, 0.35);
+}
+
+.btn-primary:active {
+  box-shadow: 0 4rpx 12rpx rgba(102, 126, 234, 0.25);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+  color: #fff;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(238, 90, 90, 0.35);
+}
+
+.btn-danger:active {
+  box-shadow: 0 4rpx 12rpx rgba(238, 90, 90, 0.25);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  color: #fff;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(16, 185, 129, 0.35);
+}
+
+/* 设备列表卡片 - 可点击样式 */
+.card-list {
+  padding: 28rpx 32rpx;
+  transition: all 0.2s;
+}
+
+.card-list:active {
+  background: #fafafa;
+  transform: scale(0.99);
+}
+
+/* 免费模式卡片 */
+.card-free {
+  background: linear-gradient(135deg, #ecfdf5 0%, #fff 100%);
+  border-color: #a7f3d0;
+}
+
+.card-free .card-title {
+  color: #059669;
+}
+
+.card-free .card-desc {
+  color: #6b7280;
+}
+
+/* 开关 */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f0fdf4;
+  border-radius: 24rpx;
+  padding: 24rpx 28rpx;
+  margin-top: 8rpx;
+  border: 2rpx solid #d1fae5;
+}
+
+.toggle-label {
+  font-size: 30rpx;
+  color: #374151;
+  font-weight: 500;
+}
+
+.toggle {
+  width: 108rpx;
+  height: 56rpx;
+  border-radius: 28rpx;
+  background: #d1d5db;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.toggle.on {
+  background: #10b981;
+}
+
+.toggle-thumb {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  transition: all 0.3s ease;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
+}
+
+.toggle.on .toggle-thumb {
+  left: 56rpx;
+}
+
+/* 设备配置卡片 */
+.card-config {
+  border-color: #e9e4ff;
+}
+
+.config-form {
+  background: #fafafa;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.form-row {
+  margin-bottom: 20rpx;
+}
+
+.form-row:last-child {
+  margin-bottom: 0;
+}
+
+.form-row-group {
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.form-row-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-col {
+  flex: 1;
+}
+
+.form-label {
+  font-size: 24rpx;
+  color: #6b7280;
+  margin-bottom: 10rpx;
+}
+
+.form-input {
+  width: 100%;
+  height: 76rpx;
+  background: #fff;
+  border-radius: 14rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+  color: #1a1a2e;
+  box-sizing: border-box;
+  border: 2rpx solid #e5e5ea;
+}
+
+.form-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 4rpx rgba(102, 126, 234, 0.1);
+}
+
+.form-input::placeholder {
+  color: #b8b8bf;
+}
+
+.form-input.picker-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #6b7280;
+}
+
+.form-input.picker-value::after {
+  content: '∨';
+  font-size: 24rpx;
+  color: #90909a;
+}
+
+/* 底部安全区 */
+.safe-bottom {
+  height: 60rpx;
+}

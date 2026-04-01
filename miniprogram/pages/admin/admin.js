@@ -2,7 +2,7 @@ Page({
   data: {
     // 用户订单管理相关
     userPhone: '',
-    
+
     // 设备订单管理相关
     internalNo_ord: '',
     lockerNo_ord: '',
@@ -10,25 +10,36 @@ Page({
     // 柜门控制相关
     internalNo_ctl: '',
     lockerNo: '',
-  
+
     // 批量生成储物柜相关
     internalNo: '',
-    cabinetCount: '', //每个设备的锁板数量
-    lockersPerCabinet: '', // 每个锁板的锁数量
+    cabinetCount: '',
+    lockersPerCabinet: '',
     unitPrice: '',
-    delayedRefundInput: '',
     screenNo: '',
     deviceAddress: '',
     deviceDeposit: '',
+    delayedRefundOptions: ['否', '是'],
+    delayedRefundIndex: 0,
 
     // 加载状态
-    loading: false
+    loading: false,
+
+    // 免费模式状态
+    isFreeMode: false
   },
 
   // 输入框变化处理
   onInputChange(e) {
     const { field } = e.currentTarget.dataset;
     this.setData({ [field]: e.detail.value });
+  },
+
+  // 延迟退款选项变化
+  onDelayedRefundChange(e) {
+    this.setData({
+      delayedRefundIndex: e.detail.value
+    });
   },
 
   // 显示加载提示
@@ -78,17 +89,17 @@ Page({
   
   //配置设备
   async batchCreateLockersByDevice() {
-    const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefundInput,screenNo, cabinetCount, lockersPerCabinet } = this.data;
-    
+    const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefundIndex, screenNo, cabinetCount, lockersPerCabinet } = this.data;
+
     if (!deviceAddress || !internalNo || cabinetCount <= 0 || lockersPerCabinet <= 0) {
-      return wx.showToast({ 
-        title: '请选择设备并输入有效的锁板/锁数量', 
-        icon: 'none' 
+      return wx.showToast({
+        title: '请填写完整的设备配置信息',
+        icon: 'none'
       });
     }
 
-    const delayedRefund = (delayedRefundInput === '是');
-    this.showLoading('生成锁具中...');
+    const delayedRefund = delayedRefundIndex === 1;
+    this.showLoading('配置设备中...');
     
     try {
       const result = await wx.cloud.callFunction({
@@ -127,20 +138,24 @@ Page({
     }
   },
 
-  // 页面加载时验证管理员权限
+  // 页面加载时验证管理员权限并获取免费模式状态
   async onLoad() {
     try {
       const res = await wx.cloud.callFunction({
         name: 'admin',
         data: { action: 'amIAdmin' }
       });
-      
+
       if (!res.result.isAdmin) {
         wx.showToast({ title: '无管理员权限', icon: 'none' });
         setTimeout(() => {
           wx.navigateBack();
         }, 1500);
+        return;
       }
+
+      // 获取当前免费模式状态
+      this.fetchFreeModeStatus();
     } catch (err) {
       console.error('管理员权限验证失败：', err);
       wx.showToast({ title: '验证失败', icon: 'none' });
@@ -148,6 +163,61 @@ Page({
         wx.navigateBack();
       }, 1500);
     }
+  },
+
+  // 获取当前免费模式状态
+  async fetchFreeModeStatus() {
+    try {
+      const result = await wx.cloud.callFunction({
+        name: 'device',
+        data: { action: 'getDevices' }
+      });
+      if (result.result.success && result.result.data.length > 0) {
+        // 检查第一个设备的免费状态
+        const isFree = result.result.data[0].isFree || false;
+        this.setData({ isFreeMode: isFree });
+      }
+    } catch (err) {
+      console.error('获取免费模式状态失败:', err);
+    }
+  },
+
+  // 切换免费模式
+  async toggleFreeMode() {
+    const newState = !this.data.isFreeMode;
+    const actionText = newState ? '开启' : '关闭';
+
+    wx.showModal({
+      title: `确认${actionText}免费模式`,
+      content: newState
+        ? '确定要将所有储物柜设置为免费使用吗？用户将无需支付押金即可使用。'
+        : '确定要将所有储物柜恢复为收费模式吗？',
+      success: async (res) => {
+        if (res.confirm) {
+          this.showLoading('设置中...');
+          try {
+            const result = await wx.cloud.callFunction({
+              name: 'adminops',
+              data: { isFree: newState }
+            });
+            this.hideLoading();
+            if (result.result.stats && result.result.stats.updated >= 0) {
+              this.setData({ isFreeMode: newState });
+              wx.showToast({
+                title: `已${actionText}免费模式`,
+                icon: 'success'
+              });
+            } else {
+              wx.showToast({ title: '设置失败', icon: 'none' });
+            }
+          } catch (err) {
+            this.hideLoading();
+            console.error('设置免费模式失败:', err);
+            wx.showToast({ title: '网络错误', icon: 'none' });
+          }
+        }
+      }
+    });
   },
 
   goUserOrders() {
@@ -175,6 +245,6 @@ Page({
     });
   },
 
-  goMyDeviceList() { wx.navigateTo({ url: '/pages/admin/mydevice' }); },
+  goMyDeviceList() { wx.navigateTo({ url: '/pages/admin/mydevice' }); }
 
 })
