@@ -481,9 +481,20 @@ exports.main = async (event, context) => {
       // ==========================================
       // 📝 3. 锁柜成功，向数据库写入真实订单数据
       // ==========================================
+      // 获取当前激活的商户配置
+      let activeMerchant;
+      try {
+        activeMerchant = await getActiveMerchantConfig();
+      } catch (e) {
+        console.error('获取商户配置失败，使用默认配置');
+      }
+
       const order = {
-        _id: newOrderId, 
+        _id: newOrderId,
         password: password,
+        // 新增：记录商户信息
+        mchid: activeMerchant ? activeMerchant.mchid : (CONFIG.mchid || ''),
+        merchantId: activeMerchant ? activeMerchant._id : 'default',
         lockerId: targetLocker._id,
         deviceId: targetLocker.deviceId,
         internalNo: targetLocker.internalNo,
