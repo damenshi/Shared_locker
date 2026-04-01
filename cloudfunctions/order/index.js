@@ -253,7 +253,7 @@ exports.main = async (event, context) => {
   if (action === 'createPrepay') {
     const { orderId, amount, openid } = event
 
-    // 参数校验 
+    // 参数校验
     const validation = validateParams(event, {
       orderId: { type: 'string' },
       openid: { type: 'string' },
@@ -264,13 +264,25 @@ exports.main = async (event, context) => {
     }
 
     try {
-      const client = await getClient();
+      // 获取商户配置
+      let activeMerchant;
+      try {
+        activeMerchant = await getActiveMerchantConfig();
+      } catch (e) {
+        console.error('获取商户配置失败，使用默认配置');
+      }
+
+      // 获取支付客户端
+      const client = await getClient(activeMerchant);
+
+      // 使用对应商户的配置
+      const merchantConfig = activeMerchant || CONFIG;
 
       const orderParams = {
-        mchid: CONFIG.mchid,
+        mchid: merchantConfig.mchid || CONFIG.mchid,
         out_trade_no: orderId,
         description: '珊星智能存储 - 付款',
-        notify_url: CONFIG.notify_url,
+        notify_url: merchantConfig.notify_url || CONFIG.notify_url,
         amount: { total: amount, currency: 'CNY' },
         payer: { openid }
       };
@@ -281,8 +293,26 @@ exports.main = async (event, context) => {
       if (!prepayId) {
         throw new Error('下单失败: prepay_id 缺失');
       }
-      console.log("getPayParams");
-      const payParams = getPayParams(prepayId);
+
+      // 直接生成支付签名参数，使用对应商户的私钥
+      const privateKey = merchantConfig.privateKey || fs.readFileSync(CONFIG.privateKeyPath, 'utf8');
+      const timeStamp = Math.floor(Date.now() / 1000).toString();
+      const nonceStr = crypto.randomBytes(16).toString('hex');
+      const packageStr = `prepay_id=${prepayId}`;
+
+      const payParams = {
+        appId: CONFIG.appid,
+        timeStamp,
+        nonceStr,
+        package: packageStr,
+        signType: 'RSA'
+      };
+
+      // 使用商户私钥生成 paySign
+      const message = `${payParams.appId}\n${payParams.timeStamp}\n${payParams.nonceStr}\n${payParams.package}\n`;
+      const sign = crypto.createSign('RSA-SHA256');
+      sign.update(message);
+      payParams.paySign = sign.sign(privateKey, 'base64');
 
       return { success: true, data: payParams };
     } catch (err) {
