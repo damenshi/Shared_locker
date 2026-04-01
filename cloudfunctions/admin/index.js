@@ -163,7 +163,7 @@ exports.main = async (event, context) => {
     try {
       // 验证目标商户是否存在
       const targetMerchant = await db.collection('merchant_configs').doc(merchantId).get();
-      if (!targetMerchant.data) {
+      if (!targetMerchant.data || targetMerchant.data.length === 0) {
         return { success: false, errMsg: '商户不存在' };
       }
 
