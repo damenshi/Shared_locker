@@ -134,5 +134,63 @@ exports.main = async (event, context) => {
         allowedDevices: info.allowedDevices || []
       };
   }
+
+  // 获取所有商户配置
+  if (action === 'getMerchantConfigs') {
+    try {
+      const merchants = await db.collection('merchant_configs')
+        .orderBy('order', 'asc')
+        .field({
+          privateKey: false,  // 不返回私钥
+          publicCert: false   // 不返回证书
+        })
+        .get();
+      return { success: true, data: merchants.data };
+    } catch (e) {
+      console.error('获取商户配置失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 切换激活商户
+  if (action === 'switchMerchant') {
+    const { merchantId } = event;
+
+    if (!merchantId) {
+      return { success: false, errMsg: '缺少商户ID' };
+    }
+
+    try {
+      // 验证目标商户是否存在
+      const targetMerchant = await db.collection('merchant_configs').doc(merchantId).get();
+      if (!targetMerchant.data) {
+        return { success: false, errMsg: '商户不存在' };
+      }
+
+      // 事务：取消所有商户激活状态，设置目标商户为激活
+      await db.runTransaction(async (transaction) => {
+        // 1. 取消所有商户的激活状态
+        await transaction.collection('merchant_configs')
+          .where({ isActive: true })
+          .update({ data: { isActive: false } });
+
+        // 2. 设置目标商户为激活
+        await transaction.collection('merchant_configs')
+          .doc(merchantId)
+          .update({
+            data: {
+              isActive: true,
+              updatedAt: db.serverDate()
+            }
+          });
+      });
+
+      return { success: true, message: `已切换到商户: ${targetMerchant.data.name}` };
+    } catch (e) {
+      console.error('切换商户失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
   return { error: 'unknown action' }
 }
