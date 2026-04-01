@@ -1397,8 +1397,13 @@ exports.main = async (event, context) => {
         throw new Error('提现过于频繁，请15分钟后再试');
       }
 
-      // 3. 发起微信退款
-      const client = await getClient();
+      // 3. 获取商户配置
+      let merchantConfig = order.merchantId
+        ? await getMerchantConfigById(order.merchantId)
+        : await getActiveMerchantConfig().catch(() => null);
+
+      // 4. 发起微信退款
+      const client = await getClient(merchantConfig);
       const generatedRefundNo = `refund_withdraw_${Date.now()}`;
       const refundParams = {
         out_trade_no: order.outTradeNo || order._id,
@@ -1424,17 +1429,26 @@ exports.main = async (event, context) => {
         throw new Error(`退款失败: ${refundRes.data?.message || refundRes.data?.status || '未知错误'}`);
       }
 
-      // 4. 更新数据库
+      // 5. 更新数据库
+        // 构建订单更新数据
+        const orderUpdate = {
+          status: CONSTANTS.ORDER_STATUSES.REFUNDED,
+          refundTime: new Date(),
+          refundTransactionId: refundRes.id,
+          refundNo: generatedRefundNo
+        };
+
+        // 如果订单之前没有记录商户信息，现在记录
+        if (!order.merchantId && merchantConfig) {
+          orderUpdate.mchid = merchantConfig.mchid;
+          orderUpdate.merchantId = merchantConfig._id;
+        }
+
         await db.runTransaction(async (transaction) => {
           // 更新订单状态为已退款
         await transaction.collection('orders').doc(orderId)
           .update({
-            data: {
-              status: CONSTANTS.ORDER_STATUSES.REFUNDED,
-              refundTime: new Date(),
-              refundTransactionId: refundRes.id,
-              refundNo: generatedRefundNo
-            }
+            data: orderUpdate
           });
           
           // 扣减用户押金余额
