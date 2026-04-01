@@ -1136,10 +1136,13 @@ exports.main = async (event, context) => {
     
     try {
       const orderDoc = await db.collection('orders').doc(orderId).get()
-      const order = orderDoc.data
-      
+      if (!orderDoc.data) {
+        return { success: false, errMsg: '订单不存在' };
+      }
+      const order = orderDoc.data;
+
       // ============================================================
-      // 1. 判断是否走“延迟退款”流程
+      // 1. 判断是否走”延迟退款”流程
       // ============================================================
       let isDelayed = false;
       // 只有非强制退款时，才检查设备配置
@@ -1357,6 +1360,9 @@ exports.main = async (event, context) => {
     const { orderId } = event;
     try {
       const orderDoc = await db.collection('orders').doc(orderId).get();
+      if (!orderDoc.data) {
+        return { success: false, errMsg: '订单不存在' };
+      }
       const order = orderDoc.data;
 
       // 1. 校验状态
