@@ -24,7 +24,7 @@ const batchCreateLockers = async (event) => {
   if (deviceCheck.data.length === 0) {
     return { 
       success: false, 
-      errMsg: `设备 ${deviceId} 不存在，请先创建设备` 
+      errMsg: `设备 ${internalNo} 不存在，请先创建设备` 
     }
   }else{
     await db.collection('devices')
