@@ -1230,7 +1230,28 @@ exports.main = async (event, context) => {
       // ============================================================
       // 4. 分支处理：直接微信退款逻辑 (保持不变，但使用了上面计算好的refundFee)
       // ============================================================
-      const client = await getClient();
+      // 获取退款用的商户配置
+      let merchantConfig = null;
+
+      // 新订单：有 merchantId，优先使用对应配置
+      if (order.merchantId) {
+        merchantConfig = await getMerchantConfigById(order.merchantId);
+        if (merchantConfig) {
+          console.log(`[退款] 使用订单指定的商户配置: ${merchantConfig.name}`);
+        }
+      }
+
+      // 旧订单：尝试获取当前激活的商户
+      if (!merchantConfig) {
+        try {
+          merchantConfig = await getActiveMerchantConfig();
+          console.log(`[退款] 旧订单，使用当前激活商户: ${merchantConfig.name}`);
+        } catch (e) {
+          console.log('[退款] 获取激活商户配置失败');
+        }
+      }
+
+      const client = await getClient(merchantConfig);
       const generatedRefundNo = `refund_withdraw_${Date.now()}`;
       const refundParams = {
         out_trade_no: order.outTradeNo || order._id,
@@ -1269,14 +1290,21 @@ exports.main = async (event, context) => {
           });
 
         // 2. 更新订单状态为已退款
+        const orderUpdateData = {
+          status: CONSTANTS.ORDER_STATUSES.REFUNDED,
+          refundTime: new Date(),
+          refundTransactionId: refundRes.id,
+          refundNo: generatedRefundNo
+        };
+        // 如果订单之前没有记录商户信息，现在记录
+        if (!order.merchantId && merchantConfig) {
+          orderUpdateData.mchid = merchantConfig.mchid;
+          orderUpdateData.merchantId = merchantConfig._id;
+          console.log(`[退款] 已为订单 ${orderId} 记录商户信息: ${merchantConfig.mchid}`);
+        }
         await transaction.collection('orders').doc(orderId)
           .update({
-            data: {
-              status: CONSTANTS.ORDER_STATUSES.REFUNDED,
-              refundTime: new Date(),
-              refundTransactionId: refundRes.id,
-              refundNo: generatedRefundNo
-            }
+            data: orderUpdateData
           });
 
         // 3. 释放柜子 (直接退款的情况)
