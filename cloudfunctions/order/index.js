@@ -79,11 +79,16 @@ async function getActiveMerchantConfig() {
 
 // 根据商户ID获取配置
 async function getMerchantConfigById(merchantId) {
+  if (!merchantId) {
+    console.error('商户ID不能为空');
+    return null;
+  }
+
   try {
     const res = await db.collection('merchant_configs')
       .doc(merchantId)
       .get();
-    return res.data;
+    return res.data && Object.keys(res.data).length > 0 ? res.data : null;
   } catch (e) {
     console.error('获取商户配置失败:', e);
     return null;
