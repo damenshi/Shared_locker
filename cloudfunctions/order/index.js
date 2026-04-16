@@ -129,9 +129,15 @@ async function getClient(merchantConfig) {
       });
     }
 
-    // 使用数据库配置
-    const privateKey = config.privateKey || fs.readFileSync(CONFIG.privateKeyPath, 'utf8');
-    const publicKey = config.publicCert || fs.readFileSync(CONFIG.publicKeyPath, 'utf8');
+    // 根据商户ID确定证书文件路径
+    const merchantId = config._id || 'yh';
+    const isXyhMerchant = merchantId === 'xyh';
+    const privateKeyPath = isXyhMerchant ? './private/apiclient_key_xyh.pem' : CONFIG.privateKeyPath;
+    const publicCertPath = isXyhMerchant ? './private/apiclient_cert_xyh.pem' : CONFIG.publicKeyPath;
+
+    // 使用数据库配置，如果数据库中没有证书内容则从文件读取
+    const privateKey = config.privateKey || fs.readFileSync(privateKeyPath, 'utf8');
+    const publicKey = config.publicCert || fs.readFileSync(publicCertPath, 'utf8');
 
     return new Pay({
       mchid: config.mchid,
@@ -1160,7 +1166,8 @@ exports.main = async (event, context) => {
         CONSTANTS.ORDER_STATUSES.COMPLETED,
         CONSTANTS.ORDER_STATUSES.CLOSED,    // 新增：允许异常未开门的单子退款
         CONSTANTS.ORDER_STATUSES.CANCELLED, // 保留：兼容存量已付款但标记为CANCELLED的订单
-        CONSTANTS.ORDER_STATUSES.IN_PROGRESS
+        CONSTANTS.ORDER_STATUSES.IN_PROGRESS,
+        CONSTANTS.ORDER_STATUSES.FORCE_FINISHED // 允许强制结束的订单退款
       ];
 
       if (force) {
@@ -1231,10 +1238,12 @@ exports.main = async (event, context) => {
       }
 
       // ============================================================
-      // 4. 分支处理：直接微信退款逻辑 (保持不变，但使用了上面计算好的refundFee)
+      // 4. 分支处理：直接微信退款逻辑
       // ============================================================
       // 获取退款用的商户配置
       let merchantConfig = null;
+      let refundRes = null;
+      let refundExecuted = false; // 标志：退款是否已在polling中执行
 
       // 新订单：有 merchantId，优先使用对应配置
       if (order.merchantId) {
@@ -1244,41 +1253,77 @@ exports.main = async (event, context) => {
         }
       }
 
-      // 旧订单：尝试获取当前激活的商户
+      // 轮询尝试所有商户（适用于旧订单 或 merchantId配置获取失败的情况）
       if (!merchantConfig) {
-        try {
-          merchantConfig = await getActiveMerchantConfig();
-          console.log(`[退款] 旧订单，使用当前激活商户: ${merchantConfig.name}`);
-        } catch (e) {
-          console.log('[退款] 获取激活商户配置失败');
+        console.log('[退款] 开始轮询所有商户尝试退款...');
+        const allMerchants = await getAllMerchantConfigs();
+
+        for (const merchant of allMerchants) {
+          try {
+            console.log(`[退款] 尝试商户 ${merchant.name}...`);
+            const client = await getClient(merchant);
+            const outRefundNo = `refund_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+            const refundParams = {
+              out_trade_no: order.outTradeNo || order._id,
+              transaction_id: order.transactionId,
+              out_refund_no: outRefundNo,
+              amount: {
+                refund: Math.round(refundFee * 100),
+                total: Math.round(order.deposit * 100),
+                currency: 'CNY'
+              },
+              notify_url: CONFIG.notify_url
+            };
+
+            refundRes = await client.refunds(refundParams);
+            console.log(`[退款] 商户 ${merchant.name} 退款结果:`, refundRes?.status);
+
+            // 检查是否成功
+            if (refundRes && refundRes.status === 200 &&
+                (!refundRes.data || refundRes.data.status === 'SUCCESS' || refundRes.data.status === 'PROCESSING')) {
+              merchantConfig = merchant;
+              refundRes.outRefundNo = outRefundNo;
+              refundExecuted = true;
+              console.log(`[退款] 商户 ${merchant.name} 退款成功`);
+              break;
+            }
+          } catch (e) {
+            console.log(`[退款] 商户 ${merchant.name} 退款失败: ${e.message}`);
+            continue;
+          }
+        }
+
+        if (!merchantConfig) {
+          throw new Error('无法找到可用的商户配置处理此订单退款');
         }
       }
 
-      const client = await getClient(merchantConfig);
-      const generatedRefundNo = `refund_withdraw_${Date.now()}`;
-      const refundParams = {
-        out_trade_no: order.outTradeNo || order._id,
-        transaction_id: order.transactionId,
-        out_refund_no: `refund_${Date.now()}`,
-        amount: {
-          refund: Math.round(refundFee * 100),
-          total: Math.round(order.deposit * 100),
-          currency: 'CNY'
-        },
-        notify_url: CONFIG.notify_url
-      };
+      // 新订单且已有 merchantId，配置获取成功，且未在polling中执行退款
+      if (order.merchantId && merchantConfig && !refundExecuted) {
+        const client = await getClient(merchantConfig);
+        const outRefundNo = `refund_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+        const refundParams = {
+          out_trade_no: order.outTradeNo || order._id,
+          transaction_id: order.transactionId,
+          out_refund_no: outRefundNo,
+          amount: {
+            refund: Math.round(refundFee * 100),
+            total: Math.round(order.deposit * 100),
+            currency: 'CNY'
+          },
+          notify_url: CONFIG.notify_url
+        };
 
-      const refundRes = await client.refunds(refundParams);
-      console.log('退款结果：', refundRes)
+        refundRes = await client.refunds(refundParams);
+        refundRes.outRefundNo = outRefundNo;
+        console.log('退款结果：', refundRes);
 
-      // 检查退款是否真正成功
-      if (!refundRes || refundRes.status !== 200) {
-        throw new Error(`退款请求失败: ${refundRes?.message || '未知错误'}`);
-      }
-
-      // 检查微信返回的业务状态
-      if (refundRes.data && refundRes.data.status !== 'SUCCESS' && refundRes.data.status !== 'PROCESSING') {
-        throw new Error(`退款失败: ${refundRes.data?.message || refundRes.data?.status || '未知错误'}`);
+        if (!refundRes || refundRes.status !== 200) {
+          throw new Error(`退款请求失败: ${refundRes?.message || '未知错误'}`);
+        }
+        if (refundRes.data && refundRes.data.status !== 'SUCCESS' && refundRes.data.status !== 'PROCESSING') {
+          throw new Error(`退款失败: ${refundRes.data?.message || refundRes.data?.status || '未知错误'}`);
+        }
       }
 
       await db.runTransaction(async (transaction) => {
@@ -1296,8 +1341,8 @@ exports.main = async (event, context) => {
         const orderUpdateData = {
           status: CONSTANTS.ORDER_STATUSES.REFUNDED,
           refundTime: new Date(),
-          refundTransactionId: refundRes.id,
-          refundNo: generatedRefundNo
+          refundTransactionId: refundRes?.data?.refund_id || refundRes?.id || '',
+          refundNo: refundRes?.outRefundNo || ''
         };
         // 如果订单之前没有记录商户信息，现在记录
         if (!order.merchantId && merchantConfig) {
@@ -1403,36 +1448,90 @@ exports.main = async (event, context) => {
         throw new Error('提现过于频繁，请15分钟后再试');
       }
 
-      // 3. 获取商户配置
-      let merchantConfig = order.merchantId
-        ? await getMerchantConfigById(order.merchantId)
-        : await getActiveMerchantConfig().catch(() => null);
+      // 3. 获取商户配置并发起退款
+      let merchantConfig = null;
+      let refundRes = null;
+      let refundExecuted = false; // 标志：退款是否已在polling中执行
 
-      // 4. 发起微信退款
-      const client = await getClient(merchantConfig);
-      const generatedRefundNo = `refund_withdraw_${Date.now()}`;
-      const refundParams = {
-        out_trade_no: order.outTradeNo || order._id,
-        transaction_id: order.transactionId,
-        out_refund_no: `refund_withdraw_${Date.now()}`,
-        amount: {
-          refund: Math.round(order.refundAmount * 100),
-          total: Math.round(order.deposit * 100),
-          currency: 'CNY'
-        },
-        notify_url: CONFIG.notify_url
-      };
-
-      const refundRes = await client.refunds(refundParams);
-
-      // 检查退款是否真正成功
-      if (!refundRes || refundRes.status !== 200) {
-        throw new Error(`退款请求失败: ${refundRes?.message || '未知错误'}`);
+      // 新订单：有 merchantId，优先使用对应配置
+      if (order.merchantId) {
+        merchantConfig = await getMerchantConfigById(order.merchantId);
+        if (merchantConfig) {
+          console.log(`[提现] 使用订单指定的商户配置: ${merchantConfig.name}`);
+        }
       }
 
-      // 检查微信返回的业务状态
-      if (refundRes.data && refundRes.data.status !== 'SUCCESS' && refundRes.data.status !== 'PROCESSING') {
-        throw new Error(`退款失败: ${refundRes.data?.message || refundRes.data?.status || '未知错误'}`);
+      // 轮询尝试所有商户（适用于旧订单 或 merchantId配置获取失败的情况）
+      if (!merchantConfig) {
+        console.log('[提现] 开始轮询所有商户尝试退款...');
+        const allMerchants = await getAllMerchantConfigs();
+
+        for (const merchant of allMerchants) {
+          try {
+            console.log(`[提现] 尝试商户 ${merchant.name}...`);
+            const client = await getClient(merchant);
+            const outRefundNo = `refund_withdraw_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+            const refundParams = {
+              out_trade_no: order.outTradeNo || order._id,
+              transaction_id: order.transactionId,
+              out_refund_no: outRefundNo,
+              amount: {
+                refund: Math.round(order.refundAmount * 100),
+                total: Math.round(order.deposit * 100),
+                currency: 'CNY'
+              },
+              notify_url: CONFIG.notify_url
+            };
+
+            refundRes = await client.refunds(refundParams);
+            console.log(`[提现] 商户 ${merchant.name} 退款结果:`, refundRes?.status);
+
+            // 检查是否成功
+            if (refundRes && refundRes.status === 200 &&
+                (!refundRes.data || refundRes.data.status === 'SUCCESS' || refundRes.data.status === 'PROCESSING')) {
+              merchantConfig = merchant;
+              refundRes.outRefundNo = outRefundNo;
+              refundExecuted = true;
+              console.log(`[提现] 商户 ${merchant.name} 退款成功`);
+              break;
+            }
+          } catch (e) {
+            console.log(`[提现] 商户 ${merchant.name} 退款失败: ${e.message}`);
+            continue;
+          }
+        }
+
+        if (!merchantConfig) {
+          throw new Error('无法找到可用的商户配置处理此订单退款');
+        }
+      }
+
+      // 新订单且已有 merchantId，配置获取成功，且未在polling中执行退款
+      if (order.merchantId && merchantConfig && !refundExecuted) {
+        const client = await getClient(merchantConfig);
+        const outRefundNo = `refund_withdraw_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+        const refundParams = {
+          out_trade_no: order.outTradeNo || order._id,
+          transaction_id: order.transactionId,
+          out_refund_no: outRefundNo,
+          amount: {
+            refund: Math.round(order.refundAmount * 100),
+            total: Math.round(order.deposit * 100),
+            currency: 'CNY'
+          },
+          notify_url: CONFIG.notify_url
+        };
+
+        refundRes = await client.refunds(refundParams);
+        refundRes.outRefundNo = outRefundNo;
+        console.log('提现退款结果：', refundRes);
+
+        if (!refundRes || refundRes.status !== 200) {
+          throw new Error(`退款请求失败: ${refundRes?.message || '未知错误'}`);
+        }
+        if (refundRes.data && refundRes.data.status !== 'SUCCESS' && refundRes.data.status !== 'PROCESSING') {
+          throw new Error(`退款失败: ${refundRes.data?.message || refundRes.data?.status || '未知错误'}`);
+        }
       }
 
       // 5. 更新数据库
@@ -1440,8 +1539,8 @@ exports.main = async (event, context) => {
         const orderUpdate = {
           status: CONSTANTS.ORDER_STATUSES.REFUNDED,
           refundTime: new Date(),
-          refundTransactionId: refundRes.id,
-          refundNo: generatedRefundNo
+          refundTransactionId: refundRes?.data?.refund_id || refundRes?.id || '',
+          refundNo: refundRes?.outRefundNo || ''
         };
 
         // 如果订单之前没有记录商户信息，现在记录

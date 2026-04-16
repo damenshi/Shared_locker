@@ -4,8 +4,6 @@ const db = cloud.database()
 const _ = db.command
 const fs = require('fs');
 
-const ADMIN_OPENIDS = (process.env.ADMIN_OPENIDS || '').split(',').filter(Boolean);
-
 
 const batchCreateLockers = async (event) => {
   const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefund, screenNo,cabinetCount, lockersPerCabinet } = event
@@ -102,6 +100,103 @@ const batchCreateLockers = async (event) => {
 }
 
 // ==========================================
+// 内部函数：添加商户配置
+// ==========================================
+async function addMerchant(event) {
+  const { name, mchid, merchantSerialNo, apiv3Key, appid, certSuffix, order = 99 } = event;
+
+  if (!name || !mchid) {
+    return { success: false, errMsg: '请提供商户名称和mchid' };
+  }
+
+  // 如果有 certSuffix，用 certSuffix 作为 _id；否则用 merchant_mchid
+  const merchantId = certSuffix || `merchant_${mchid}`;
+
+  try {
+    // 检查是否已存在（用where查询，不用doc）
+    const existing = await db.collection('merchant_configs').where({ _id: merchantId }).get();
+    if (existing.data && existing.data.length > 0) {
+      return { success: false, errMsg: `商户ID ${merchantId} 已存在` };
+    }
+
+    // 读取证书文件（优先用 certSuffix 指定，否则尝试多种命名格式）
+    let privateKey = '';
+    let publicCert = '';
+
+    try {
+      const certFiles = [];
+
+      // 优先使用指定的 certSuffix
+      if (certSuffix) {
+        certFiles.push(
+          { key: `./private/apiclient_key_${certSuffix}.pem`, cert: `./private/apiclient_cert_${certSuffix}.pem` },
+          { key: `./private/pub_key_${certSuffix}.pem`, cert: `./private/apiclient_cert_${certSuffix}.pem` }
+        );
+      }
+
+      // 添加默认的证书文件名格式
+      certFiles.push(
+        { key: `./private/apiclient_key_${merchantId.replace('merchant_', '')}.pem`, cert: `./private/apiclient_cert_${merchantId.replace('merchant_', '')}.pem` },
+        { key: `./private/apiclient_key.pem`, cert: `./private/apiclient_cert.pem` },
+        { key: `./private/apiclient_key_yh.pem`, cert: `./private/apiclient_cert_yh.pem` },
+        { key: `./private/apiclient_key_xyh.pem`, cert: `./private/apiclient_cert_xyh.pem` },
+        { key: `./private/apiclient_key_sxkj.pem`, cert: `./private/apiclient_cert_sxkj.pem` }
+      );
+
+      for (const files of certFiles) {
+        try {
+          if (fs.existsSync(files.key)) {
+            privateKey = fs.readFileSync(files.key, 'utf8');
+            console.log(`[添加商户] 找到私钥: ${files.key}`);
+          }
+          if (fs.existsSync(files.cert)) {
+            publicCert = fs.readFileSync(files.cert, 'utf8');
+            console.log(`[添加商户] 找到证书: ${files.cert}`);
+          }
+          if (privateKey && publicCert) break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!privateKey || !publicCert) {
+        console.log('[添加商户] 未找到证书文件，请在部署后手动上传');
+      }
+    } catch (e) {
+      console.log('[添加商户] 读取证书失败:', e.message);
+    }
+
+    // 插入新商户配置
+    const result = await db.collection('merchant_configs').add({
+      data: {
+        _id: merchantId,
+        name: name,
+        mchid: mchid,
+        merchantSerialNo: merchantSerialNo || '',
+        apiv3Key: apiv3Key || '',
+        appid: appid || '',  // 新增：商户关联的appid
+        privateKey: privateKey,
+        publicCert: publicCert,
+        isActive: false,
+        order: order,
+        createdAt: db.serverDate(),
+        updatedAt: db.serverDate()
+      }
+    });
+
+    return {
+      success: true,
+      message: `商户 ${name} 添加成功`,
+      merchantId: result._id,
+      hasCert: !!(privateKey && publicCert)
+    };
+  } catch (e) {
+    console.error('添加商户失败:', e);
+    return { success: false, errMsg: e.message };
+  }
+}
+
+// ==========================================
 // 内部函数：初始化商户配置
 // ==========================================
 async function initMerchantConfig() {
@@ -131,15 +226,15 @@ async function initMerchantConfig() {
     }
 
     if (existing.data.length > 0) {
-      // 已存在，更新证书内容
+      // 已存在，强制更新证书内容
       const updateData = {
         updatedAt: db.serverDate()
       };
-      // 如果数据库中的值为空，但文件存在，则更新
-      if (!existing.data[0].privateKey && privateKey) {
+      // 强制更新证书（无论是否已有值）
+      if (privateKey) {
         updateData.privateKey = privateKey;
       }
-      if (!existing.data[0].publicCert && publicCert) {
+      if (publicCert) {
         updateData.publicCert = publicCert;
       }
       // 如果环境变量有值，更新配置
@@ -155,6 +250,7 @@ async function initMerchantConfig() {
 
       if (Object.keys(updateData).length > 1) {
         await db.collection('merchant_configs').doc('yh').update({ data: updateData });
+        console.log('[初始化] 证书已更新，长度:', privateKey?.length, publicCert?.length);
         return { success: true, message: '商户配置已更新' };
       }
       return { success: true, message: '商户配置已存在且无需更新' };
@@ -210,16 +306,17 @@ async function initSecondMerchant() {
     }
 
     if (existing.data.length > 0) {
-      // 已存在，更新
+      // 已存在，强制更新证书（无论是否已有值）
       const updateData = { updatedAt: db.serverDate() };
-      if (!existing.data[0].privateKey && privateKey) updateData.privateKey = privateKey;
-      if (!existing.data[0].publicCert && publicCert) updateData.publicCert = publicCert;
+      if (privateKey) updateData.privateKey = privateKey;
+      if (publicCert) updateData.publicCert = publicCert;
       if (process.env.MCHID_XYH) updateData.mchid = process.env.MCHID_XYH;
       if (process.env.MERCHANT_SERIAL_NO_XYH) updateData.merchantSerialNo = process.env.MERCHANT_SERIAL_NO_XYH;
       if (process.env.WX_API_V3_KEY_XYH) updateData.apiv3Key = process.env.WX_API_V3_KEY_XYH;
 
       if (Object.keys(updateData).length > 1) {
         await db.collection('merchant_configs').doc('xyh').update({ data: updateData });
+        console.log('[初始化XYH] 证书已更新，长度:', privateKey?.length, publicCert?.length);
         return { success: true, message: '第二个商户配置已更新' };
       }
       return { success: true, message: '第二个商户配置已存在且无需更新' };
@@ -249,6 +346,76 @@ async function initSecondMerchant() {
   }
 }
 
+// ==========================================
+// 内部函数：更新商户证书
+// ==========================================
+async function updateMerchantCert(event) {
+  const { merchantId } = event;
+
+  if (!merchantId) {
+    return { success: false, errMsg: '请提供商户ID' };
+  }
+
+  try {
+    const merchant = await db.collection('merchant_configs').doc(merchantId).get();
+    if (!merchant.data || merchant.data.length === 0) {
+      return { success: false, errMsg: '商户不存在' };
+    }
+
+    const merchantName = merchant.data[0].name;
+
+    // 读取证书文件
+    let privateKey = '';
+    let publicCert = '';
+    const certSuffix = merchantId.replace('merchant_', '');
+
+    const certFiles = [
+      { key: `./private/apiclient_key_${certSuffix}.pem`, cert: `./private/apiclient_cert_${certSuffix}.pem` },
+      { key: `./private/apiclient_key.pem`, cert: `./private/apiclient_cert.pem` },
+      { key: `./private/apiclient_key_yh.pem`, cert: `./private/apiclient_cert_yh.pem` },
+      { key: `./private/apiclient_key_xyh.pem`, cert: `./private/apiclient_cert_xyh.pem` },
+    ];
+
+    for (const files of certFiles) {
+      try {
+        if (fs.existsSync(files.key)) {
+          privateKey = fs.readFileSync(files.key, 'utf8');
+          console.log(`[更新证书] 找到私钥: ${files.key}`);
+        }
+        if (fs.existsSync(files.cert)) {
+          publicCert = fs.readFileSync(files.cert, 'utf8');
+          console.log(`[更新证书] 找到证书: ${files.cert}`);
+        }
+        if (privateKey && publicCert) break;
+      } catch (e) {
+        continue;
+      }
+    }
+
+    if (!privateKey || !publicCert) {
+      return { success: false, errMsg: '未找到证书文件，请确保证书已放在 admin/private/ 目录下' };
+    }
+
+    await db.collection('merchant_configs').doc(merchantId).update({
+      data: {
+        privateKey: privateKey,
+        publicCert: publicCert,
+        updatedAt: db.serverDate()
+      }
+    });
+
+    return {
+      success: true,
+      message: `商户 ${merchantName} 证书已更新`,
+      privateKeyLength: privateKey.length,
+      publicCertLength: publicCert.length
+    };
+  } catch (e) {
+    console.error('更新商户证书失败:', e);
+    return { success: false, errMsg: e.message };
+  }
+}
+
 exports.main = async (event, context) => {
   const { action } = event
   const { OPENID } = cloud.getWXContext()
@@ -261,6 +428,16 @@ exports.main = async (event, context) => {
   // 初始化第二个商户配置（XYH珊星智能存储）
   if (action === 'initSecondMerchant') {
     return await initSecondMerchant();
+  }
+
+  // 添加商户配置
+  if (action === 'addMerchant') {
+    return await addMerchant(event);
+  }
+
+  // 更新商户证书
+  if (action === 'updateMerchantCert') {
+    return await updateMerchantCert(event);
   }
 
   // 清空所有设备的柜门（优化版：直接操作数据库）
@@ -340,35 +517,51 @@ exports.main = async (event, context) => {
     }
   }
 
-  // 验证管理员权限
-  console.log("OPENID:", OPENID);
-  const isAdmin = ADMIN_OPENIDS.includes(OPENID)
-  if (!isAdmin) {
-    return { success: false, errMsg: '没有管理员权限' }
+  // 调试日志
+  console.log('[admin] action:', action, 'OPENID:', OPENID);
+
+  // 管理员权限验证接口（查询数据库，super和device都能进入后台）
+  if (action === 'amIAdmin') {
+    const res = await db.collection('admin_permission').where({
+      openid: OPENID
+    }).get();
+    if (res.data.length === 0) {
+      return { isAdmin: false };
+    }
+    const info = res.data[0];
+    return {
+      isAdmin: true,
+      role: info.type,
+      allowedDevices: info.allowedDevices || []
+    };
   }
 
-  // 管理员权限验证接口
-  if (action === 'amIAdmin') {
-    return { isAdmin: true }
+  // adminPermission 查询（不需要超级管理员，super和device都可以）
+  if (action === 'adminPermission') {
+    const res = await db.collection('admin_permission').where({ openid: OPENID }).get();
+    if (!res.data.length) {
+      return { isAdmin: false };
+    }
+    const info = res.data[0];
+    return {
+      isAdmin: true,
+      role: info.type,
+      allowedDevices: info.allowedDevices || []
+    };
+  }
+
+  // 验证超级管理员权限（以上两个action之后的操作需要超级管理员）
+  const adminRes = await db.collection('admin_permission').where({
+    openid: OPENID,
+    type: 'super'
+  }).get();
+  if (adminRes.data.length === 0) {
+    return { success: false, errMsg: '没有管理员权限' }
   }
 
   // 批量创建储物柜
   if (action === 'batchCreateLockers') {
     return await batchCreateLockers(event)
-  }
-
-  if (action === 'adminPermission'){
-    const res = await db.collection('admin_permission').where({ openid: OPENID }).get();
-      if (!res.data.length) {
-        return { isAdmin: false };
-      }
-
-      const info = res.data[0];
-      return {
-        isAdmin: true,
-        role: info.type,
-        allowedDevices: info.allowedDevices || []
-      };
   }
 
   // 获取所有商户配置
