@@ -16,17 +16,45 @@ Page({
   data: {
     devices: [],
     loading: true,
-    expandedDeviceId: null, 
+    expandedDeviceId: null,
     showOpenLocker: false,
     currentDeviceId: null,
     currentInternalNo: null,
     lockerNo: '',
     showStatusModal: false,
     statusLockerNo: '',
+    // 小程序列表
+    miniPrograms: [],
+    appidOptions: [],
+    appidValues: [],
+    // 修改归属弹窗
+    showAppidModal: false,
+    currentChangeDeviceId: null,
+    currentChangeDeviceName: '',
   },
 
   onLoad() {
+    this.getMiniPrograms();
     this.getDevices();
+  },
+
+  // 获取小程序列表
+  async getMiniPrograms() {
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'admin',
+        data: { action: 'getMiniPrograms' }
+      });
+      if (res.result.success && res.result.data) {
+        this.setData({
+          miniPrograms: res.result.data,
+          appidOptions: res.result.data.map(p => p.miniName || p.name),
+          appidValues: res.result.data.map(p => p.appid)
+        });
+      }
+    } catch (err) {
+      console.error('获取小程序列表失败:', err);
+    }
   },
 
   async getDevices() {
@@ -326,6 +354,68 @@ Page({
   // 2. 关闭弹窗
   closeStatusModal() {
     this.setData({ showStatusModal: false });
+  },
+
+  // === 修改设备归属小程序 ===
+  showAppidModal(e) {
+    const deviceId = e.currentTarget.dataset.deviceid;
+    const internalNo = e.currentTarget.dataset.internalno;
+    this.setData({
+      showAppidModal: true,
+      currentChangeDeviceId: deviceId,
+      currentChangeDeviceName: internalNo
+    });
+  },
+
+  closeAppidModal() {
+    this.setData({
+      showAppidModal: false,
+      currentChangeDeviceId: null,
+      currentChangeDeviceName: ''
+    });
+  },
+
+  // 选择小程序
+  onAppidChange(e) {
+    const index = e.detail.value;
+    this.setData({
+      selectedAppidIndex: index,
+      selectedAppid: this.data.appidValues[index]
+    });
+  },
+
+  // 确认修改归属
+  async confirmChangeAppid() {
+    const { currentChangeDeviceId, selectedAppid, appidOptions, selectedAppidIndex } = this.data;
+    if (selectedAppidIndex === undefined) {
+      wx.showToast({ title: '请选择小程序', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: '修改中...' });
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'admin',
+        data: {
+          action: 'updateDeviceAppid',
+          deviceId: currentChangeDeviceId,
+          appid: selectedAppid
+        }
+      });
+
+      wx.hideLoading();
+      if (res.result.success) {
+        wx.showToast({ title: `已设置为${appidOptions[selectedAppidIndex]}`, icon: 'success' });
+        this.closeAppidModal();
+        this.getDevices(); // 刷新列表
+      } else {
+        wx.showToast({ title: res.result.errMsg || '修改失败', icon: 'none' });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      console.error('修改设备归属失败:', err);
+      wx.showToast({ title: '修改失败', icon: 'none' });
+    }
   },
 
   // 3. 监听柜号输入

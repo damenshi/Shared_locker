@@ -77,6 +77,28 @@ async function getActiveMerchantConfig() {
   }
 }
 
+// 根据 appid 获取激活的商户配置
+async function getMerchantConfigByAppid(appid) {
+  if (!appid) {
+    return await getActiveMerchantConfig();
+  }
+  try {
+    const res = await db.collection('merchant_configs')
+      .where({ appid: appid, isActive: true })
+      .limit(1)
+      .get();
+    if (res.data.length === 0) {
+      // 如果该 appid 没有激活的商户，兜底使用全局激活的商户
+      console.log(`[getMerchantConfigByAppid] appid=${appid} 没有激活商户，兜底使用全局激活商户`);
+      return await getActiveMerchantConfig();
+    }
+    return res.data[0];
+  } catch (e) {
+    console.error('获取商户配置失败:', e);
+    return await getActiveMerchantConfig();
+  }
+}
+
 // 根据商户ID获取配置
 async function getMerchantConfigById(merchantId) {
   if (!merchantId) {
@@ -270,10 +292,17 @@ exports.main = async (event, context) => {
     }
 
     try {
-      // 获取商户配置
+      // 先查询订单，获取设备的 appid
+      let deviceAppid = '';
+      const orderRes = await db.collection('orders').where({ _id: orderId }).get();
+      if (orderRes.data.length > 0 && orderRes.data[0].appid) {
+        deviceAppid = orderRes.data[0].appid;
+      }
+
+      // 根据设备 appid 获取对应的商户配置
       let activeMerchant;
       try {
-        activeMerchant = await getActiveMerchantConfig();
+        activeMerchant = await getMerchantConfigByAppid(deviceAppid);
       } catch (e) {
         console.error('获取商户配置失败，使用默认配置');
       }
@@ -307,7 +336,7 @@ exports.main = async (event, context) => {
       const packageStr = `prepay_id=${prepayId}`;
 
       const payParams = {
-        appId: CONFIG.appid,
+        appId: merchantConfig.appid || CONFIG.appid,
         timeStamp,
         nonceStr,
         package: packageStr,
@@ -517,10 +546,17 @@ exports.main = async (event, context) => {
       // ==========================================
       // 📝 3. 锁柜成功，向数据库写入真实订单数据
       // ==========================================
-      // 获取当前激活的商户配置
+      // 获取设备信息（包含 appid）
+      let deviceAppid = '';
+      const deviceInfoRes = await db.collection('devices').where({ deviceId }).get();
+      if (deviceInfoRes.data.length > 0) {
+        deviceAppid = deviceInfoRes.data[0].appid || '';
+      }
+
+      // 根据设备 appid 获取对应的商户配置
       let activeMerchant;
       try {
-        activeMerchant = await getActiveMerchantConfig();
+        activeMerchant = await getMerchantConfigByAppid(deviceAppid);
       } catch (e) {
         console.error('获取商户配置失败，使用默认配置');
       }
@@ -528,7 +564,8 @@ exports.main = async (event, context) => {
       const order = {
         _id: newOrderId,
         password: password,
-        // 新增：记录商户信息
+        // 新增：记录商户信息和 appid
+        appid: deviceAppid,
         mchid: activeMerchant ? activeMerchant.mchid : (CONFIG.mchid || ''),
         merchantId: activeMerchant ? activeMerchant._id : 'default',
         lockerId: targetLocker._id,

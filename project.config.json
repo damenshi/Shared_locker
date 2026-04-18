@@ -28,14 +28,14 @@
   },
   "appid": "wxc447a8e66f5f8294",
   "projectname": "LockerShare",
-  "libVersion": "3.6.8",
+  "libVersion": "3.9.3",
   "condition": {
     "miniprogram": {
       "list": [
         {
           "id": 0,
-          "name": "从index进入",             
-          "pathName": "pages/index/index",   
+          "name": "从index进入",
+          "pathName": "pages/index/index",
           "query": ""
         }
       ]

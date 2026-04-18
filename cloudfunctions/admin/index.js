@@ -418,7 +418,8 @@ async function updateMerchantCert(event) {
 
 exports.main = async (event, context) => {
   const { action } = event
-  const { OPENID } = cloud.getWXContext()
+  const wxContext = cloud.getWXContext()
+  const { OPENID } = wxContext
 
   // 初始化商户配置不需要管理员权限
   if (action === 'initMerchantConfig') {
@@ -567,13 +568,23 @@ exports.main = async (event, context) => {
   // 获取所有商户配置
   if (action === 'getMerchantConfigs') {
     try {
+      const userAppid = wxContext.APPID;
+      console.log('[getMerchantConfigs] userAppid:', userAppid);
+      const query = {};
+      // 按当前小程序的 appid 过滤（超级管理员也按此过滤）
+      if (userAppid) {
+        query.appid = userAppid;
+      }
+      console.log('[getMerchantConfigs] query:', query);
       const merchants = await db.collection('merchant_configs')
+        .where(query)
         .orderBy('order', 'asc')
         .field({
           privateKey: false,  // 不返回私钥
           publicCert: false   // 不返回证书
         })
         .get();
+      console.log('[getMerchantConfigs] found:', merchants.data.length);
       return { success: true, data: merchants.data };
     } catch (e) {
       console.error('获取商户配置失败:', e);
@@ -584,6 +595,7 @@ exports.main = async (event, context) => {
   // 切换激活商户
   if (action === 'switchMerchant') {
     const { merchantId } = event;
+    const userAppid = wxContext.APPID;
 
     if (!merchantId) {
       return { success: false, errMsg: '缺少商户ID' };
@@ -596,11 +608,16 @@ exports.main = async (event, context) => {
         return { success: false, errMsg: '商户不存在' };
       }
 
-      // 事务：取消所有商户激活状态，设置目标商户为激活
+      // 验证目标商户是否属于当前小程序
+      if (userAppid && targetMerchant.data[0].appid !== userAppid) {
+        return { success: false, errMsg: '无权切换其他小程序的商户' };
+      }
+
+      // 事务：取消当前小程序的所有商户激活状态，设置目标商户为激活
       await db.runTransaction(async (transaction) => {
-        // 1. 取消所有商户的激活状态
+        // 1. 取消当前小程序所有商户的激活状态
         await transaction.collection('merchant_configs')
-          .where({ isActive: true })
+          .where({ appid: targetMerchant.data[0].appid, isActive: true })
           .update({ data: { isActive: false } });
 
         // 2. 设置目标商户为激活
@@ -614,9 +631,72 @@ exports.main = async (event, context) => {
           });
       });
 
-      return { success: true, message: `已切换到商户: ${targetMerchant.data.name}` };
+      return { success: true, message: `已切换到商户: ${targetMerchant.data[0].name}` };
     } catch (e) {
       console.error('切换商户失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 更新设备归属小程序
+  if (action === 'updateDeviceAppid') {
+    const { deviceId, appid } = event;
+
+    if (!deviceId || !appid) {
+      return { success: false, errMsg: '缺少设备ID或appid' };
+    }
+
+    try {
+      // 验证设备是否存在
+      const device = await db.collection('devices').where({ deviceId }).get();
+      if (!device.data || device.data.length === 0) {
+        return { success: false, errMsg: '设备不存在' };
+      }
+
+      // 验证 appid 是否有效
+      const merchant = await db.collection('merchant_configs').where({ appid }).get();
+      if (!merchant.data || merchant.data.length === 0) {
+        return { success: false, errMsg: '无效的小程序appid' };
+      }
+
+      const miniName = merchant.data[0].miniName || merchant.data[0].name;
+
+      // 更新设备归属
+      await db.collection('devices').where({ deviceId }).update({
+        data: {
+          appid: appid,
+          miniName: miniName,
+          updatedAt: db.serverDate()
+        }
+      });
+
+      return { success: true, message: `已将设备归属改为: ${miniName}` };
+    } catch (e) {
+      console.error('更新设备归属失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 获取小程序列表（从 merchant_configs，按 appid 去重）
+  if (action === 'getMiniPrograms') {
+    try {
+      const res = await db.collection('merchant_configs')
+        .where({ appid: _.neq(null) })
+        .field({ appid: true, miniName: true, name: true })
+        .orderBy('order', 'asc')
+        .get();
+
+      // 按 appid 去重
+      const seen = new Set();
+      const uniqueData = res.data.filter(item => {
+        if (seen.has(item.appid)) return false;
+        seen.add(item.appid);
+        return true;
+      });
+
+      return { success: true, data: uniqueData };
+    } catch (e) {
+      console.error('获取小程序列表失败:', e);
       return { success: false, errMsg: e.message };
     }
   }

@@ -5,6 +5,7 @@ const axios = require('axios')
 // 数据库引用
 const db = cloud.database();
 const devicesCollection = db.collection('devices');
+const miniProgramsCollection = db.collection('mini_programs');
 const _ = db.command;
 
 const CONFIG = {
@@ -14,7 +15,13 @@ const CONFIG = {
 
 // 云函数主入口
 exports.main = async (event, context) => {
-    const body = event.body ? JSON.parse(event.body) : {};
+    let body;
+    try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : (event.body || {});
+    } catch (e) {
+        console.error('解析 body 失败:', e.message);
+        return { code: 400, message: 'Invalid body format' };
+    }
     const { type, deviceId, data} = body;
     console.log(`收到WebSocket转发消息:`, event);
 
@@ -61,28 +68,61 @@ exports.main = async (event, context) => {
  * 1. 处理设备登录请求
 **/
 
-let cachedToken = null;
-let tokenExpireTime = 0;
+// 按 appid 缓存 token
+const tokenCache = new Map();
+
+/**
+ * 从 mini_programs 获取小程序配置
+ * @param {string} appid - 小程序 appid
+ * @returns {Promise<object|null>} 小程序配置
+ */
+async function getMiniProgramConfig(appid) {
+    try {
+        const res = await miniProgramsCollection
+            .where({ appid: appid })
+            .limit(1)
+            .get();
+        return res.data.length > 0 ? res.data[0] : null;
+    } catch (e) {
+        console.error(`[获取小程序配置] appid=${appid} 失败:`, e.message);
+        return null;
+    }
+}
+
 /**
  * 获取微信小程序 access_token
+ * @param {string} appid - 小程序 appid
  * @returns {Promise<string>} access_token
  */
-async function getAccessToken() {
+async function getAccessToken(appid) {
     const now = Date.now();
+    const targetAppid = appid || CONFIG.appid;
 
     // 如果缓存的 token 仍然有效，直接返回
-    if (cachedToken && now < tokenExpireTime) {
-        return cachedToken;
+    const cached = tokenCache.get(targetAppid);
+    if (cached && now < cached.expireTime) {
+        console.log(`[微信access_token] 使用缓存 appid=${targetAppid}`);
+        return cached.token;
     }
 
-    const APPID = CONFIG.appid;
-    const APPSECRET = CONFIG.appsecret;
+    // 从 mini_programs 获取 appsecret
+    let APPSECRET = CONFIG.appsecret; // 默认值
+    const miniProgram = await getMiniProgramConfig(targetAppid);
+    if (miniProgram && miniProgram.appsecret) {
+        APPSECRET = miniProgram.appsecret;
+        console.log(`[微信access_token] 从 mini_programs 获取 appid=${targetAppid} 的 appsecret`);
+    } else if (targetAppid === CONFIG.appid) {
+        // 如果是默认 appid，使用环境变量
+        APPSECRET = CONFIG.appsecret;
+    } else {
+        throw new Error(`缺少 appid=${targetAppid} 的 appsecret，请检查 mini_programs 配置`);
+    }
 
     try {
         const res = await axios.get('https://api.weixin.qq.com/cgi-bin/token', {
             params: {
                 grant_type: 'client_credential',
-                appid: APPID,
+                appid: targetAppid,
                 secret: APPSECRET
             }
         });
@@ -94,19 +134,21 @@ async function getAccessToken() {
         }
 
         // 缓存 token，并提前1分钟刷新
-        cachedToken = data.access_token;
-        tokenExpireTime = now + (data.expires_in - 60) * 1000;
+        tokenCache.set(targetAppid, {
+            token: data.access_token,
+            expireTime: now + (data.expires_in - 60) * 1000
+        });
 
-        console.log('[微信access_token] 获取成功', cachedToken);
-        return cachedToken;
+        console.log(`[微信access_token] 获取成功 appid=${targetAppid}`);
+        return data.access_token;
     } catch (err) {
-        console.error('[微信access_token] 获取失败', err.message);
+        console.error(`[微信access_token] 获取失败 appid=${targetAppid}`, err.message);
         throw err;
     }
 }
 
-async function generateUrlLink(deviceId) {
-  const accessToken = await getAccessToken(); // 获取微信 access_token
+async function generateUrlLink(deviceId, appid) {
+  const accessToken = await getAccessToken(appid); // 使用设备对应的 appid 获取 access_token
 
   // 生成 URL Link 请求
   const res = await axios.post(
@@ -122,9 +164,10 @@ async function generateUrlLink(deviceId) {
   );
 
   if (res.data.url_link) {
+    console.log(`[URL Link] 生成成功 deviceId=${deviceId}, appid=${appid}`);
     return res.data.url_link;
   } else {
-    console.error('生成 URL Link 失败:', res.data);
+    console.error('[URL Link] 生成失败:', res.data);
     throw new Error(res.data.errmsg || 'generateUrlLink failed');
   }
 }
@@ -179,17 +222,28 @@ async function handleDeviceLogin(deviceId) {
     console.log('deviceRes:',deviceRes);
 
     let internalNo;
-    //每次登录重新生成urllink，防止30天过期
-    let urlLink = await generateUrlLink(deviceId);
-    console.log('urlLink:', urlLink);
+    let deviceAppid = process.env.APPID;  // 默认 appid
 
     if (deviceRes.data.length === 0) {
         // 设备未注册
         internalNo = await generateInternalNumber();
+    } else {
+      // 获取设备已设置的 appid
+      internalNo = deviceRes.data[0].internalNo;
+      deviceAppid = deviceRes.data[0].appid || deviceAppid;
+    }
+
+    // 每次登录重新生成 urllink，用设备的 appid 生成对应小程序的 URL Link
+    let urlLink = await generateUrlLink(deviceId, deviceAppid);
+    console.log('urlLink:', urlLink, 'appid:', deviceAppid);
+
+    if (deviceRes.data.length === 0) {
+        // 设备未注册
         await devicesCollection.add({
           data: {
               deviceId: deviceId,       // 终端提供的设备ID
               internalNo: internalNo,
+              appid: deviceAppid,        // 关联小程序 appid
               cabinetCount: 0,
               doorCount: 0,
               deviceAddress:null,
@@ -204,9 +258,8 @@ async function handleDeviceLogin(deviceId) {
           }
       });
       console.log(`设备 ${deviceId}已自动完成注册`);
-    }else{
+    } else {
       // 更新设备在线状态
-      internalNo = deviceRes.data[0].internalNo;
       await devicesCollection
       .where({ deviceId })
       .update({
@@ -219,12 +272,14 @@ async function handleDeviceLogin(deviceId) {
       });
     }
     console.log('internalNo:', internalNo);
+    console.log('deviceAppid:', deviceAppid);
     // 返回设备二维码
     return {
         code: 200,
         data: {
           number: internalNo,
-          url: urlLink
+          url: urlLink,
+          appid: deviceAppid
         }
     };
 }

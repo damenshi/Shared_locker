@@ -39,6 +39,21 @@ async function getActiveMerchantConfig() {
   }
 }
 
+// 根据 appid 获取激活的商户配置
+async function getMerchantConfigByAppid(appid) {
+  if (!appid) return null;
+  try {
+    const res = await db.collection('merchant_configs')
+      .where({ appid: appid, isActive: true })
+      .limit(1)
+      .get();
+    return res.data.length > 0 ? res.data[0] : null;
+  } catch (e) {
+    console.error('获取商户配置失败:', e);
+    return null;
+  }
+}
+
 // 根据商户ID获取配置
 async function getMerchantConfigById(merchantId) {
   if (!merchantId) return null;
@@ -93,7 +108,21 @@ function tryDecrypt(resource, apiv3Key) {
 }
 
 // 解密回调报文（带轮询兜底 + 旧配置兜底）
-async function decryptNotifyWithFallback(resource) {
+async function decryptNotifyWithFallback(resource, orderAppid) {
+  // 0. 如果有订单 appid，优先尝试该 appid 对应的商户
+  if (orderAppid) {
+    try {
+      const appidMerchant = await getMerchantConfigByAppid(orderAppid);
+      if (appidMerchant && appidMerchant.apiv3Key) {
+        const result = tryDecrypt(resource, appidMerchant.apiv3Key);
+        console.log('[解密] 使用订单appid对应商户解密成功:', appidMerchant._id);
+        return { data: result, merchant: appidMerchant };
+      }
+    } catch (e) {
+      console.log('[解密] 订单appid对应商户解密失败，尝试其他方式...');
+    }
+  }
+
   // 1. 优先尝试当前激活商户
   try {
     const activeMerchant = await getActiveMerchantConfig();
@@ -368,8 +397,28 @@ exports.main = async (event) => {
   }
 
   try {
-    // Step2: 解密通知数据（带商户轮询兜底 + 旧配置兜底）
-    const { data: notifyData, merchant } = await decryptNotifyWithFallback(body.resource);
+    // 从回调报文中提取订单号
+    // 需要先尝试解密获取订单号，或者从 out_trade_no 字段获取（部分回调直接带）
+    let orderAppid = '';
+    let orderId = '';
+
+    // 尝试从报文中获取 out_trade_no（支付回调可能直接带）
+    if (body.out_trade_no) {
+      orderId = body.out_trade_no;
+      // 查询订单获取 appid
+      try {
+        const orderRes = await db.collection('orders').doc(orderId).get();
+        if (orderRes.data && orderRes.data.appid) {
+          orderAppid = orderRes.data.appid;
+          console.log('[回调] 获取到订单appid:', orderAppid);
+        }
+      } catch (e) {
+        console.warn('[回调] 查询订单获取appid失败:', e.message);
+      }
+    }
+
+    // Step2: 解密通知数据（带订单appid优先解密 + 轮询兜底）
+    const { data: notifyData, merchant } = await decryptNotifyWithFallback(body.resource, orderAppid);
     console.log('通知解密后数据:', notifyData);
     const eventType = body.event_type;
 

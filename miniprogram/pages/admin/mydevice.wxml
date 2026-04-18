@@ -76,6 +76,13 @@
               </view>
 
               <view class="row">
+                <text class="label">设备归属</text>
+                <text class="value {{item.appid ? 'green-text' : 'red-text'}}">
+                  {{item.miniName || '未设置'}}
+                </text>
+              </view>
+
+              <view class="row">
                 <text class="label">设备锁板数量</text>
                 <text class="value">{{item.cabinetCount}}</text>
               </view>
@@ -120,20 +127,25 @@
 
             <!-- ✅ 新增操作按钮 -->
             <view class="action-buttons">
-              <button class="ios-btn blue" 
+              <button class="ios-btn blue"
               data-deviceId="{{item.deviceId}}"
-              data-internalNo="{{item.internalNo}}"  
+              data-internalNo="{{item.internalNo}}"
               bindtap="showOpenLockerModal">开柜</button>
               <button class="ios-btn orange" data-deviceId="{{item.deviceId}}" bindtap="confirmClearLockers">清柜</button>
-              <button class="ios-btn red" 
+              <button class="ios-btn red"
               data-internalNo="{{item.internalNo}}"
               data-cabinetCount="{{item.cabinetCount}}"
               data-doorCount="{{item.doorCount}}"
               bindtap="confirmOpenAllLockers">全开</button>
 
-              <button class="ios-btn purple" 
+              <button class="ios-btn purple"
               data-internalNo="{{item.internalNo}}"
               bindtap="showStatusModal">柜门状态</button>
+
+              <button class="ios-btn green"
+              data-deviceid="{{item.deviceId}}"
+              data-internalno="{{item.internalNo}}"
+              bindtap="showAppidModal">归属设置</button>
             </view>
           </view>
 
@@ -195,6 +207,25 @@
 
       <view class="modal-buttons" style="margin-top: 20rpx;">
         <button class="cancel-btn" catchtap="closeStatusModal" style="width: 100%;">取消关闭</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 修改设备归属弹窗 -->
+  <view class="modal-mask" wx:if="{{showAppidModal}}" bindtap="closeAppidModal">
+    <view class="modal" catchtap="true">
+      <view class="modal-title">设置设备归属</view>
+      <view class="modal-content-body">
+        <view class="device-tip">当前设备：{{currentChangeDeviceName}}</view>
+        <picker mode="selector" range="{{appidOptions}}" bindchange="onAppidChange">
+          <view class="modal-input picker-value">
+            {{selectedAppidIndex !== undefined ? appidOptions[selectedAppidIndex] : '请选择小程序'}}
+          </view>
+        </picker>
+      </view>
+      <view class="modal-buttons" style="margin-top: 20rpx;">
+        <button class="cancel-btn" catchtap="closeAppidModal">取消</button>
+        <button class="confirm-btn" catchtap="confirmChangeAppid">确定</button>
       </view>
     </view>
   </view>

@@ -173,3 +173,49 @@ When `device.delayedRefund = true`:
 - **Hardware timeout**: Socket server has 15s timeout; retry logic with exponential backoff in `locker.openDoor`
 - **Transaction conflicts**: `server.generateInternalNumber` has retry logic for concurrent device registrations
 - **Payment status sync**: `order.getOrder` proactively queries WeChat API if local status is "待支付" to catch missed callbacks
+
+## Multi-Instance Deployment (多小程序实例部署)
+
+This codebase supports multiple WeChat Mini Programs sharing the same source code.
+
+### Instance Configuration Files
+
+Each instance needs to configure:
+
+| File | Fields to Modify |
+|------|-----------------|
+| `miniprogram/config.js` | `envId`, `appid` |
+| `project.config.json` | `appid`, `projectname` |
+
+See `miniprogram/config.example.js` for a configuration template.
+
+### Deployment Steps for New Instance
+
+1. Clone this repository to a new directory
+2. Copy `config.example.js` to `config.js` and modify:
+   ```javascript
+   module.exports = {
+     envId: 'your-cloud-environment-id',
+     appid: 'your-miniprogram-appid'
+   }
+   ```
+3. Update `project.config.json`:
+   ```json
+   {
+     "appid": "your-miniprogram-appid",
+     "projectname": "YourProjectName"
+   }
+   ```
+4. Deploy cloud functions to your cloud environment via WeChat Developer Tools
+5. Create required database collections in your cloud environment
+
+### Required Database Collections
+
+- `devices` - Device registration and status
+- `lockers` - Locker door status
+- `orders` - Order records
+- `users` - User accounts
+- `counters` - Auto-increment counters
+- `merchant_configs` - Payment merchant configuration
+- `mini_programs` - Mini program configuration
+- `admin_permission` - Admin role assignments
