@@ -60,20 +60,21 @@ Page({
   async getDevices() {
     try {
       this.setData({ loading: true });
-  
+
+      // 使用 admin.getDevices 获取带归属信息的设备列表
       const res = await wx.cloud.callFunction({
-        name: 'device',
+        name: 'admin',
         data: { action: 'getDevices' }
       });
-  
+
       if (!res.result.success) {
         wx.showToast({ title: res.result.errMsg || '暂无设备', icon: 'none' });
         this.setData({ loading: false });
         return;
       }
-  
+
       let devices = res.result.data || [];
-  
+
       // 格式化时间
       devices = devices.map(device => ({
         ...device,
@@ -88,34 +89,35 @@ Page({
         lastMonthPaid: 0,
         lastMonthRefunded: 0,
       }));
-  
-      // 先展示基本信息
-      // this.setData({ devices });
-      
-      const deviceIds = devices.map(d => d.deviceId);
 
-      const statRes = await wx.cloud.callFunction({
-        name: 'order',
-        data: {
-          action: 'getDeviceOrderStats',
-          deviceIds,
-        },
-      });
+      const deviceIds = devices.filter(d => d.isLocal).map(d => d.deviceId);
 
-      if (statRes.result.success) {
-        const statsMap = statRes.result.data;
-        // 合并统计数据
-        devices = devices.map(d => ({
-          ...d,
-          ...(statsMap[d.deviceId] || {})
-        }));
+      // 只查询当前小程序设备的订单统计
+      if (deviceIds.length > 0) {
+        const statRes = await wx.cloud.callFunction({
+          name: 'order',
+          data: {
+            action: 'getDeviceOrderStats',
+            deviceIds,
+          },
+        });
+
+        if (statRes.result.success) {
+          const statsMap = statRes.result.data;
+          // 合并统计数据（只合并当前小程序的设备）
+          devices = devices.map(d => ({
+            ...d,
+            ...(d.isLocal && statsMap[d.deviceId] ? statsMap[d.deviceId] : {})
+          }));
+        }
       }
+
       // 更新视图
       this.setData({
         devices,
         loading: false
       });
-  
+
     } catch (err) {
       console.error('获取设备列表失败：', err);
       wx.showToast({ title: '获取设备列表失败，请重试', icon: 'none' });
@@ -392,29 +394,30 @@ Page({
       return;
     }
 
-    wx.showLoading({ title: '修改中...' });
+    wx.showLoading({ title: '切换中...' });
     try {
+      // 使用 switchDeviceAppid 调用 locker_server 进行切换
       const res = await wx.cloud.callFunction({
         name: 'admin',
         data: {
-          action: 'updateDeviceAppid',
+          action: 'switchDeviceAppid',
           deviceId: currentChangeDeviceId,
-          appid: selectedAppid
+          targetAppid: selectedAppid
         }
       });
 
       wx.hideLoading();
       if (res.result.success) {
-        wx.showToast({ title: `已设置为${appidOptions[selectedAppidIndex]}`, icon: 'success' });
+        wx.showToast({ title: '切换成功', icon: 'success' });
         this.closeAppidModal();
         this.getDevices(); // 刷新列表
       } else {
-        wx.showToast({ title: res.result.errMsg || '修改失败', icon: 'none' });
+        wx.showToast({ title: res.result.errMsg || '切换失败', icon: 'none' });
       }
     } catch (err) {
       wx.hideLoading();
-      console.error('修改设备归属失败:', err);
-      wx.showToast({ title: '修改失败', icon: 'none' });
+      console.error('切换设备归属失败:', err);
+      wx.showToast({ title: '切换失败', icon: 'none' });
     }
   },
 

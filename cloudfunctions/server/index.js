@@ -13,6 +13,46 @@ const CONFIG = {
   appid: process.env.APPID,
 };
 
+// locker_server 地址
+const LOCKER_SERVER_URL = process.env.LOCKER_SERVER_URL || 'http://1.116.109.239:3000';
+
+// 从 locker_server 获取全局唯一编号
+async function getInternalNoFromServer() {
+    try {
+        const res = await axios.get(`${LOCKER_SERVER_URL}/generateInternalNo`, { timeout: 5000 });
+        if (res.data?.code === 200 && res.data?.data?.internalNo) {
+            console.log('[编号生成] 从 locker_server 获取:', res.data.data.internalNo);
+            return res.data.data.internalNo;
+        }
+        throw new Error('locker_server 返回无效数据');
+    } catch (err) {
+        console.error('[编号生成] 从 locker_server 获取失败:', err.message);
+        // 降级：使用本地计数器（备用方案）
+        throw err;
+    }
+}
+
+// 获取当前最大编号（供 locker_server 初始化用）
+async function getMaxInternalNo() {
+    try {
+        const res = await devicesCollection
+            .orderBy('internalNo', 'desc')
+            .limit(1)
+            .get();
+
+        if (res.data.length > 0 && res.data[0].internalNo) {
+            // 解析 L0001 -> 1
+            const match = res.data[0].internalNo.match(/L(\d+)/);
+            if (match) {
+                return parseInt(match[1]);
+            }
+        }
+    } catch (e) {
+        console.error('[getMaxInternalNo] 查询失败:', e);
+    }
+    return 0;
+}
+
 // 云函数主入口
 exports.main = async (event, context) => {
     let body;
@@ -22,7 +62,7 @@ exports.main = async (event, context) => {
         console.error('解析 body 失败:', e.message);
         return { code: 400, message: 'Invalid body format' };
     }
-    const { type, deviceId, data} = body;
+    const { type, deviceId, data, targetAppid } = body;
     console.log(`收到WebSocket转发消息:`, event);
 
     try {
@@ -30,22 +70,32 @@ exports.main = async (event, context) => {
         switch (type) {
             // 1. 设备登录请求处理
             case 'device_login_request':
-                return handleDeviceLogin(deviceId);
-                
+                return handleDeviceLogin(deviceId, targetAppid);
+
+            // 1.5 预创建设备（用于切换归属）
+            case 'pre_create_device':
+                return handlePreCreateDevice(deviceId, data);
+
             // 2. 设备心跳消息处理
             case 'device_heartbeat':
                 return handleDeviceHeartbeat(deviceId);
-                
+
             // 3. 手机号密码开门请求
             case 'open_by_phone_request':
                 return handleOpenByPhone(deviceId, data);
-            
+
             // 4. 设备离线通知
             case 'device_offline':
                 return handleDeviceOffline(deviceId);
-            //5.中途手机号密码开门
+
+            // 5.中途手机号密码开门
             case 'mid_way_open_door':
-                  return handleMidwayOpen(deviceId, data);
+                return handleMidwayOpen(deviceId, data);
+
+            // 6. 获取最大编号（供 locker_server 初始化）
+            case 'get_max_internal_no':
+                const maxSeq = await getMaxInternalNo();
+                return { code: 200, data: { maxSeq } };
 
             // 未知类型处理
             default:
@@ -79,7 +129,7 @@ const tokenCache = new Map();
 async function getMiniProgramConfig(appid) {
     try {
         const res = await miniProgramsCollection
-            .where({ appid: appid })
+            .where({ appid: appid, isActive: true })
             .limit(1)
             .get();
         return res.data.length > 0 ? res.data[0] : null;
@@ -172,116 +222,120 @@ async function generateUrlLink(deviceId, appid) {
   }
 }
 
-async function generateInternalNumber() {
-  const counterDocId = 'deviceCounter';
-  const MAX_RETRIES = 20; // 更多重试次数（模拟长队列）
-  let retryCount = 0;
-  const BASE_DELAY = 200; // 基础延迟稍大，给前一个事务足够时间完成
+async function handleDeviceLogin(deviceId, targetAppid) {
+    const currentAppid = process.env.APPID;
 
-  while (retryCount < MAX_RETRIES) {
-    try {
-      return await db.runTransaction(async transaction => {
-        const counterDocRef = transaction.collection('counters').doc(counterDocId);
-        let counterRes;
-
-        try {
-          counterRes = await counterDocRef.get();
-        } catch (err) {
-          await counterDocRef.set({ data: { internalNoSeq: 1 } });
-          return 'L0001';
-        }
-
-        const currentSeq = counterRes.data?.internalNoSeq || 0;
-        const newSeq = currentSeq + 1;
-        await counterDocRef.update({ data: { internalNoSeq: newSeq } });
-        return 'L' + String(newSeq).padStart(4, '0');
-      });
-    } catch (err) {
-      if (err.message.includes('TransactionConflict') && retryCount < MAX_RETRIES - 1) {
-        retryCount++;
-        // 延迟随重试次数线性增长，模拟排队等待时间
-        // 公式：基础延迟 × (重试次数) → 让后到的请求等更久
-        const delay = BASE_DELAY * retryCount; 
-        console.log(`冲突，排队等待 ${delay}ms 后重试（第${retryCount}次）`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        console.error('最终失败：', err);
-        throw new Error('编号生成失败，请稍后重试');
-      }
+    // 检查路由是否正确（如果指定了 targetAppid）
+    if (targetAppid && targetAppid !== currentAppid) {
+        console.log(`[设备登录] 路由错误: deviceId=${deviceId}, target=${targetAppid}, current=${currentAppid}`);
+        return { code: 301, message: '设备归属其他小程序' };
     }
-  }
-}
 
-async function handleDeviceLogin(deviceId) {
     // 查询设备是否已注册
     const deviceRes = await devicesCollection
         .where({ deviceId })
         .limit(1)
         .get();
 
-    console.log('deviceRes:',deviceRes);
+    console.log('deviceRes:', deviceRes);
 
     let internalNo;
-    let deviceAppid = process.env.APPID;  // 默认 appid
+    let deviceData;
 
     if (deviceRes.data.length === 0) {
-        // 设备未注册
-        internalNo = await generateInternalNumber();
+        // 新设备：从 locker_server 获取全局唯一编号
+        console.log(`[设备登录] 新设备，从 locker_server 获取编号: ${deviceId}`);
+        internalNo = await getInternalNoFromServer();
+
+        // 生成当前小程序的 URL Link
+        const urlLink = await generateUrlLink(deviceId, currentAppid);
+
+        // 创建设备记录
+        deviceData = {
+            deviceId: deviceId,
+            internalNo: internalNo,
+            appid: currentAppid,
+            cabinetCount: 0,
+            doorCount: 0,
+            deviceAddress: null,
+            isOnline: true,
+            isConfigured: false,
+            deviceDeposit: 0,
+            urlLink: urlLink,
+            screenNo: 0,
+            lastLoginTime: db.serverDate(),
+            createdAt: db.serverDate(),
+            updatedAt: db.serverDate()
+        };
+
+        await devicesCollection.add({ data: deviceData });
+        console.log(`[设备登录] 新设备注册成功: ${deviceId}, ${internalNo}`);
     } else {
-      // 获取设备已设置的 appid
-      internalNo = deviceRes.data[0].internalNo;
-      deviceAppid = deviceRes.data[0].appid || deviceAppid;
+        // 已有设备
+        deviceData = deviceRes.data[0];
+        internalNo = deviceData.internalNo;
+
+        // 重新生成 URL Link（使用当前小程序的 appid）
+        const urlLink = await generateUrlLink(deviceId, currentAppid);
+
+        // 更新在线状态和 URL
+        await devicesCollection.where({ deviceId }).update({
+            data: {
+                isOnline: true,
+                urlLink: urlLink,
+                appid: currentAppid,  // 更新 appid（可能从其他小程序迁移过来）
+                lastLoginTime: db.serverDate(),
+                updatedAt: db.serverDate()
+            }
+        });
+        console.log(`[设备登录] 设备登录成功: ${deviceId}, ${internalNo}`);
     }
 
-    // 每次登录重新生成 urllink，用设备的 appid 生成对应小程序的 URL Link
-    let urlLink = await generateUrlLink(deviceId, deviceAppid);
-    console.log('urlLink:', urlLink, 'appid:', deviceAppid);
-
-    if (deviceRes.data.length === 0) {
-        // 设备未注册
-        await devicesCollection.add({
-          data: {
-              deviceId: deviceId,       // 终端提供的设备ID
-              internalNo: internalNo,
-              appid: deviceAppid,        // 关联小程序 appid
-              cabinetCount: 0,
-              doorCount: 0,
-              deviceAddress:null,
-              isOnline: true,           // 新注册设备默认在线
-              isConfigured: false,
-              deviceDeposit: 0,
-              urlLink: urlLink,
-              screenNo: 0,
-              lastLoginTime: db.serverDate(), // 记录登录时间
-              createdAt: db.serverDate(),  // 创建时间
-              updatedAt: db.serverDate()
-          }
-      });
-      console.log(`设备 ${deviceId}已自动完成注册`);
-    } else {
-      // 更新设备在线状态
-      await devicesCollection
-      .where({ deviceId })
-      .update({
-        data: {
-          isOnline: true,
-          urlLink: urlLink,
-          lastLoginTime: db.serverDate(),
-          updatedAt: db.serverDate()
-        }
-      });
-    }
-    console.log('internalNo:', internalNo);
-    console.log('deviceAppid:', deviceAppid);
-    // 返回设备二维码
     return {
         code: 200,
         data: {
-          number: internalNo,
-          url: urlLink,
-          appid: deviceAppid
+            number: internalNo,
+            url: deviceData?.urlLink || await generateUrlLink(deviceId, currentAppid),
+            appid: currentAppid
         }
     };
+}
+
+// 处理预创建设备（用于切换归属时）
+async function handlePreCreateDevice(deviceId, data) {
+    const { deviceData } = data || {};
+
+    if (!deviceData || !deviceData.internalNo) {
+        return { code: 400, message: '缺少 deviceData 或 internalNo' };
+    }
+
+    // 检查设备是否已存在
+    const existRes = await devicesCollection.where({ deviceId }).get();
+    if (existRes.data.length > 0) {
+        console.log(`[预创建] 设备已存在: ${deviceId}`);
+        return { code: 200, message: '设备已存在' };
+    }
+
+    // 创建新记录（使用传入的编号）
+    await devicesCollection.add({
+        data: {
+            deviceId: deviceId,
+            internalNo: deviceData.internalNo,
+            appid: process.env.APPID,
+            cabinetCount: deviceData.cabinetCount || 0,
+            doorCount: deviceData.doorCount || 0,
+            deviceAddress: deviceData.deviceAddress || null,
+            screenNo: deviceData.screenNo || 0,
+            isOnline: false,  // 预创建时为离线，等登录后变在线
+            isConfigured: false,
+            deviceDeposit: 0,
+            createdAt: db.serverDate(),
+            updatedAt: db.serverDate()
+        }
+    });
+
+    console.log(`[预创建] 设备预创建成功: ${deviceId}, ${deviceData.internalNo}`);
+    return { code: 200, message: '预创建成功' };
 }
 
 

@@ -3,6 +3,10 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
 const fs = require('fs');
+const axios = require('axios');
+
+// locker_server 地址
+const LOCKER_SERVER_URL = process.env.LOCKER_SERVER_URL || 'http://1.116.109.239:3000';
 
 
 const batchCreateLockers = async (event) => {
@@ -551,13 +555,115 @@ exports.main = async (event, context) => {
     };
   }
 
-  // 验证超级管理员权限（以上两个action之后的操作需要超级管理员）
+  // 获取设备列表（带归属信息）- 普通管理员也可以查看
+  if (action === 'getDevices') {
+    try {
+      // 从 locker_server 获取所有设备归属映射
+      let deviceAppidMap = {};
+      try {
+        const mapRes = await axios.get(`${LOCKER_SERVER_URL}/listDeviceAppid`, { timeout: 5000 });
+        if (mapRes.data?.code === 200) {
+          deviceAppidMap = mapRes.data.data || {};
+        }
+      } catch (err) {
+        console.warn('[getDevices] 从 locker_server 获取映射失败:', err.message);
+      }
+
+      // 查询本地数据库所有设备（不分页，按编号从小到大返回）
+      const devicesRes = await db.collection('devices')
+        .orderBy('internalNo', 'asc')
+        .get();
+
+      // 获取小程序列表用于显示名称
+      const miniProgramsRes = await db.collection('mini_programs')
+        .where({ isActive: true })
+        .get();
+
+      const appidToName = {};
+      miniProgramsRes.data.forEach(p => {
+        appidToName[p.appid] = p.miniName;
+      });
+
+      // 组装数据（显示实际归属）
+      const devices = devicesRes.data.map(d => {
+        // 优先使用 locker_server 的映射，其次使用本地记录的 appid
+        const actualAppid = deviceAppidMap[d.deviceId] || d.appid || wxContext.APPID;
+        return {
+          ...d,
+          belongsToAppid: actualAppid,
+          belongsToName: appidToName[actualAppid] || d.miniName || '未知小程序',
+          isLocal: actualAppid === wxContext.APPID
+        };
+      });
+
+      return { success: true, data: devices, total: devices.length };
+    } catch (e) {
+      console.error('获取设备列表失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 验证超级管理员权限（以上action之后的操作需要超级管理员）
   const adminRes = await db.collection('admin_permission').where({
     openid: OPENID,
     type: 'super'
   }).get();
   if (adminRes.data.length === 0) {
     return { success: false, errMsg: '没有管理员权限' }
+  }
+
+  // 切换设备归属（调用 locker_server）
+  if (action === 'switchDeviceAppid') {
+    const { deviceId, targetAppid } = event;
+
+    if (!deviceId || !targetAppid) {
+      return { success: false, errMsg: '缺少设备ID或目标appid' };
+    }
+
+    try {
+      // 1. 获取设备当前数据
+      const deviceRes = await db.collection('devices').where({ deviceId }).get();
+      if (deviceRes.data.length === 0) {
+        return { success: false, errMsg: '设备不存在' };
+      }
+      const deviceData = deviceRes.data[0];
+
+      // 2. 验证目标 appid 有效（从 mini_programs 查询）
+      const miniProgram = await db.collection('mini_programs').where({ appid: targetAppid }).get();
+      if (miniProgram.data.length === 0) {
+        return { success: false, errMsg: '无效的小程序appid' };
+      }
+
+      // 3. 调用 locker_server 执行切换
+      await axios.post(`${LOCKER_SERVER_URL}/setDeviceAppid`, {
+        deviceId,
+        appid: targetAppid,
+        deviceData: {
+          internalNo: deviceData.internalNo,
+          cabinetCount: deviceData.cabinetCount,
+          doorCount: deviceData.doorCount,
+          deviceAddress: deviceData.deviceAddress,
+          screenNo: deviceData.screenNo
+        }
+      }, { timeout: 10000 });
+
+      // 4. 更新本地数据库 appid
+      await db.collection('devices').where({ deviceId }).update({
+        data: {
+          appid: targetAppid,
+          miniName: miniProgram.data[0].miniName,
+          updatedAt: db.serverDate()
+        }
+      });
+
+      return {
+        success: true,
+        message: `设备已切换到 ${miniProgram.data[0].miniName}，设备将重新连接`
+      };
+    } catch (e) {
+      console.error('切换设备归属失败:', e);
+      return { success: false, errMsg: e.message };
+    }
   }
 
   // 批量创建储物柜
@@ -677,24 +783,16 @@ exports.main = async (event, context) => {
     }
   }
 
-  // 获取小程序列表（从 merchant_configs，按 appid 去重）
+  // 获取小程序列表（从 mini_programs）
   if (action === 'getMiniPrograms') {
     try {
-      const res = await db.collection('merchant_configs')
-        .where({ appid: _.neq(null) })
-        .field({ appid: true, miniName: true, name: true })
-        .orderBy('order', 'asc')
+      const res = await db.collection('mini_programs')
+        .where({ isActive: true })
+        .field({ appid: true, miniName: true })
+        .orderBy('createdAt', 'asc')
         .get();
 
-      // 按 appid 去重
-      const seen = new Set();
-      const uniqueData = res.data.filter(item => {
-        if (seen.has(item.appid)) return false;
-        seen.add(item.appid);
-        return true;
-      });
-
-      return { success: true, data: uniqueData };
+      return { success: true, data: res.data };
     } catch (e) {
       console.error('获取小程序列表失败:', e);
       return { success: false, errMsg: e.message };

@@ -77,8 +77,8 @@
 
               <view class="row">
                 <text class="label">设备归属</text>
-                <text class="value {{item.appid ? 'green-text' : 'red-text'}}">
-                  {{item.miniName || '未设置'}}
+                <text class="value {{item.isLocal ? 'green-text' : 'orange-text'}}">
+                  {{item.belongsToName}}{{item.isLocal ? '（当前）' : ''}}
                 </text>
               </view>
 
@@ -127,25 +127,37 @@
 
             <!-- ✅ 新增操作按钮 -->
             <view class="action-buttons">
-              <button class="ios-btn blue"
-              data-deviceId="{{item.deviceId}}"
-              data-internalNo="{{item.internalNo}}"
-              bindtap="showOpenLockerModal">开柜</button>
-              <button class="ios-btn orange" data-deviceId="{{item.deviceId}}" bindtap="confirmClearLockers">清柜</button>
-              <button class="ios-btn red"
-              data-internalNo="{{item.internalNo}}"
-              data-cabinetCount="{{item.cabinetCount}}"
-              data-doorCount="{{item.doorCount}}"
-              bindtap="confirmOpenAllLockers">全开</button>
+              <block wx:if="{{item.isLocal}}">
+                <!-- 当前小程序的设备显示完整操作 -->
+                <button class="ios-btn blue"
+                data-deviceId="{{item.deviceId}}"
+                data-internalNo="{{item.internalNo}}"
+                bindtap="showOpenLockerModal">开柜</button>
+                <button class="ios-btn orange" data-deviceId="{{item.deviceId}}" bindtap="confirmClearLockers">清柜</button>
+                <button class="ios-btn red"
+                data-internalNo="{{item.internalNo}}"
+                data-cabinetCount="{{item.cabinetCount}}"
+                data-doorCount="{{item.doorCount}}"
+                bindtap="confirmOpenAllLockers">全开</button>
 
-              <button class="ios-btn purple"
-              data-internalNo="{{item.internalNo}}"
-              bindtap="showStatusModal">柜门状态</button>
+                <button class="ios-btn purple"
+                data-internalNo="{{item.internalNo}}"
+                bindtap="showStatusModal">柜门状态</button>
 
-              <button class="ios-btn green"
-              data-deviceid="{{item.deviceId}}"
-              data-internalno="{{item.internalNo}}"
-              bindtap="showAppidModal">归属设置</button>
+                <button class="ios-btn green"
+                data-deviceid="{{item.deviceId}}"
+                data-internalno="{{item.internalNo}}"
+                bindtap="showAppidModal">归属设置</button>
+              </block>
+
+              <block wx:if="{{!item.isLocal}}">
+                <!-- 非当前小程序的设备只显示归属设置 -->
+                <button class="ios-btn gray" disabled>已迁移</button>
+                <button class="ios-btn green"
+                data-deviceid="{{item.deviceId}}"
+                data-internalno="{{item.internalNo}}"
+                bindtap="showAppidModal">归属设置</button>
+              </block>
             </view>
           </view>
 
