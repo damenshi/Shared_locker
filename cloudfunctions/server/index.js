@@ -1,6 +1,7 @@
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const axios = require('axios')
+const { getLockerServerUrl, getCurrentMiniProgram, getMiniProgramByAppid } = require('./utils/config');
 
 // 数据库引用
 const db = cloud.database();
@@ -8,18 +9,11 @@ const devicesCollection = db.collection('devices');
 const miniProgramsCollection = db.collection('mini_programs');
 const _ = db.command;
 
-const CONFIG = {
-  appsecret: process.env.APPSECRET,
-  appid: process.env.APPID,
-};
-
-// locker_server 地址
-const LOCKER_SERVER_URL = process.env.LOCKER_SERVER_URL || 'http://1.116.109.239:3000';
-
 // 从 locker_server 获取全局唯一编号
 async function getInternalNoFromServer() {
     try {
-        const res = await axios.get(`${LOCKER_SERVER_URL}/generateInternalNo`, { timeout: 5000 });
+        const lockerUrl = await getLockerServerUrl();
+        const res = await axios.get(`${lockerUrl}/generateInternalNo`, { timeout: 5000 });
         if (res.data?.code === 200 && res.data?.data?.internalNo) {
             console.log('[编号生成] 从 locker_server 获取:', res.data.data.internalNo);
             return res.data.data.internalNo;
@@ -62,7 +56,8 @@ exports.main = async (event, context) => {
         console.error('解析 body 失败:', e.message);
         return { code: 400, message: 'Invalid body format' };
     }
-    const { type, deviceId, data, targetAppid } = body;
+    const { type, deviceId, data, deviceData, targetAppid } = body;
+    // 兼容处理：pre_create_device 时数据在 deviceData 字段，其他情况在 data 字段
     console.log(`收到WebSocket转发消息:`, event);
 
     try {
@@ -74,7 +69,12 @@ exports.main = async (event, context) => {
 
             // 1.5 预创建设备（用于切换归属）
             case 'pre_create_device':
-                return handlePreCreateDevice(deviceId, data);
+                // pre_create_device 的数据直接放在 deviceData 字段
+                const preCreateData = deviceData || (data?.deviceData);
+                const preCreateDeviceId = preCreateData?.deviceId;
+                // appid 从 deviceData 里取（locker_server 没传 targetAppid）
+                const preCreateAppid = preCreateData?.appid || targetAppid;
+                return handlePreCreateDevice(preCreateDeviceId, { deviceData: preCreateData }, preCreateAppid);
 
             // 2. 设备心跳消息处理
             case 'device_heartbeat':
@@ -146,7 +146,14 @@ async function getMiniProgramConfig(appid) {
  */
 async function getAccessToken(appid) {
     const now = Date.now();
-    const targetAppid = appid || CONFIG.appid;
+
+    // 从 mini_programs 获取小程序配置
+    const miniProgram = await getMiniProgramConfig(appid);
+    if (!miniProgram || !miniProgram.appid || !miniProgram.appsecret) {
+        throw new Error(`缺少 appid=${appid} 的配置，请检查 mini_programs 集合`);
+    }
+
+    const targetAppid = miniProgram.appid;
 
     // 如果缓存的 token 仍然有效，直接返回
     const cached = tokenCache.get(targetAppid);
@@ -155,18 +162,8 @@ async function getAccessToken(appid) {
         return cached.token;
     }
 
-    // 从 mini_programs 获取 appsecret
-    let APPSECRET = CONFIG.appsecret; // 默认值
-    const miniProgram = await getMiniProgramConfig(targetAppid);
-    if (miniProgram && miniProgram.appsecret) {
-        APPSECRET = miniProgram.appsecret;
-        console.log(`[微信access_token] 从 mini_programs 获取 appid=${targetAppid} 的 appsecret`);
-    } else if (targetAppid === CONFIG.appid) {
-        // 如果是默认 appid，使用环境变量
-        APPSECRET = CONFIG.appsecret;
-    } else {
-        throw new Error(`缺少 appid=${targetAppid} 的 appsecret，请检查 mini_programs 配置`);
-    }
+    const APPSECRET = miniProgram.appsecret;
+    console.log(`[微信access_token] 从 mini_programs 获取 appid=${targetAppid} 的 appsecret`);
 
     try {
         const res = await axios.get('https://api.weixin.qq.com/cgi-bin/token', {
@@ -223,13 +220,17 @@ async function generateUrlLink(deviceId, appid) {
 }
 
 async function handleDeviceLogin(deviceId, targetAppid) {
-    const currentAppid = process.env.APPID;
+    // 使用 targetAppid 作为当前 appid（从 locker_server 路由传入）
+    // 注意：不能依赖 wxContext.APPID，因为跨环境调用时它显示的是调用方 appid
+    const currentAppid = targetAppid;
 
-    // 检查路由是否正确（如果指定了 targetAppid）
-    if (targetAppid && targetAppid !== currentAppid) {
-        console.log(`[设备登录] 路由错误: deviceId=${deviceId}, target=${targetAppid}, current=${currentAppid}`);
-        return { code: 301, message: '设备归属其他小程序' };
+    if (!currentAppid) {
+        console.error('[设备登录] 缺少 targetAppid');
+        return { code: 500, message: '缺少目标小程序信息' };
     }
+
+    // 获取当前小程序配置
+    const currentMiniProgram = await getMiniProgramConfig(currentAppid);
 
     // 查询设备是否已注册
     const deviceRes = await devicesCollection
@@ -302,7 +303,7 @@ async function handleDeviceLogin(deviceId, targetAppid) {
 }
 
 // 处理预创建设备（用于切换归属时）
-async function handlePreCreateDevice(deviceId, data) {
+async function handlePreCreateDevice(deviceId, data, targetAppid) {
     const { deviceData } = data || {};
 
     if (!deviceData || !deviceData.internalNo) {
@@ -316,12 +317,18 @@ async function handlePreCreateDevice(deviceId, data) {
         return { code: 200, message: '设备已存在' };
     }
 
-    // 创建新记录（使用传入的编号）
+    // 创建新记录（使用传入的编号和 appid）
+    // 注意：使用 targetAppid，不要用 getCurrentMiniProgram()，因为跨环境调用会获取错误 appid
+    const currentAppid = targetAppid;
+    if (!currentAppid) {
+        return { code: 400, message: '缺少 appid' };
+    }
+
     await devicesCollection.add({
         data: {
             deviceId: deviceId,
             internalNo: deviceData.internalNo,
-            appid: process.env.APPID,
+            appid: currentAppid,
             cabinetCount: deviceData.cabinetCount || 0,
             doorCount: deviceData.doorCount || 0,
             deviceAddress: deviceData.deviceAddress || null,

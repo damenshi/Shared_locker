@@ -6,6 +6,7 @@ const _ = db.command
 const fs = require('fs');
 const Pay = require('wechatpay-node-v3');
 const crypto = require('crypto');
+const { getActiveMerchant, getMiniName, getOrderDescription } = require('./utils/config');
 
 // 常量定义：订单状态
 const CONSTANTS = {
@@ -42,18 +43,6 @@ const validateParams = (params, rules) => {
   }
   return { valid: true }
 }
-
-// 以下配置请使用环境变量或云函数的安全配置
-const CONFIG = {
-  mchid: process.env.MCHID_YH,
-  appid: process.env.APPID,
-  notify_url: 'https://cloudbase-3gnr17whd71a5b45-1379469522.ap-shanghai.app.tcloudbase.com/paynotify',
-  privateKeyPath: './private/apiclient_key_yh.pem',
-  wechatPayPublicKeyPath: './private/pub_key_yh.pem',
-  publicKeyPath: './private/apiclient_cert_yh.pem',
-  merchantSerialNo: process.env.MERCHANT_SERIAL_NO_YH, // 商户证书序列号
-  apiv3Key: process.env.WX_API_V3_KEY_YH
-};
 
 // ==========================================
 // 商户配置获取函数
@@ -136,34 +125,17 @@ async function getClient(merchantConfig) {
     // 如果没有传入配置，获取当前激活的
     const config = merchantConfig || await getActiveMerchantConfig();
 
-    // 如果数据库没有配置，使用默认硬编码配置（兼容）
     if (!config) {
-      const privateKey = fs.readFileSync(CONFIG.privateKeyPath, 'utf8');
-      const wechatPayPublicKey = fs.readFileSync(CONFIG.wechatPayPublicKeyPath, 'utf8');
-      const publicKey = fs.readFileSync(CONFIG.publicKeyPath, 'utf8');
-
-      return new Pay({
-        mchid: CONFIG.mchid,
-        appid: CONFIG.appid,
-        serial_no: CONFIG.merchantSerialNo,
-        publicKey: publicKey,
-        privateKey: privateKey
-      });
+      throw new Error('未找到商户配置，请先配置商户信息');
     }
 
-    // 根据商户ID确定证书文件路径
-    const merchantId = config._id || 'yh';
-    const isXyhMerchant = merchantId === 'xyh';
-    const privateKeyPath = isXyhMerchant ? './private/apiclient_key_xyh.pem' : CONFIG.privateKeyPath;
-    const publicCertPath = isXyhMerchant ? './private/apiclient_cert_xyh.pem' : CONFIG.publicKeyPath;
-
     // 使用数据库配置，如果数据库中没有证书内容则从文件读取
-    const privateKey = config.privateKey || fs.readFileSync(privateKeyPath, 'utf8');
-    const publicKey = config.publicCert || fs.readFileSync(publicCertPath, 'utf8');
+    const privateKey = config.privateKey || fs.readFileSync('./private/apiclient_key.pem', 'utf8');
+    const publicKey = config.publicCert || fs.readFileSync('./private/apiclient_cert.pem', 'utf8');
 
     return new Pay({
       mchid: config.mchid,
-      appid: CONFIG.appid,
+      appid: config.appid,
       serial_no: config.merchantSerialNo,
       publicKey: publicKey,
       privateKey: privateKey
@@ -175,13 +147,18 @@ async function getClient(merchantConfig) {
   }
 }
 
-function getPayParams(prepayId) {
-  const privateKey = fs.readFileSync(CONFIG.privateKeyPath, 'utf8');
+async function getPayParams(prepayId, merchantConfig) {
+  const config = merchantConfig || await getActiveMerchantConfig();
+  if (!config) {
+    throw new Error('未找到商户配置');
+  }
+
+  const privateKey = config.privateKey || fs.readFileSync('./private/apiclient_key.pem', 'utf8');
   const timeStamp = Math.floor(Date.now() / 1000).toString();
   const nonceStr = crypto.randomBytes(16).toString('hex');
 
   const payParams = {
-    appId: CONFIG.appid,
+    appId: config.appid,
     timeStamp,
     nonceStr,
     package: `prepay_id=${prepayId}`,
@@ -197,9 +174,9 @@ function getPayParams(prepayId) {
   return payParams;
 }
 
-function decryptNotify(resource) {
+async function decryptNotify(resource, apiv3Key) {
   const { ciphertext, nonce, associated_data } = resource;
-  const key = Buffer.from(CONFIG.apiv3Key, 'utf8');
+  const key = Buffer.from(apiv3Key, 'utf8');
   const dataBuffer = Buffer.from(ciphertext, 'base64');
 
   const authTag = dataBuffer.slice(dataBuffer.length - 16);
@@ -311,13 +288,20 @@ exports.main = async (event, context) => {
       const client = await getClient(activeMerchant);
 
       // 使用对应商户的配置
-      const merchantConfig = activeMerchant || CONFIG;
+      const merchantConfig = activeMerchant;
+      if (!merchantConfig) {
+        return { success: false, errMsg: '未找到商户配置' };
+      }
+
+      // 动态获取小程序名称
+      const orderDesc = await getOrderDescription();
 
       const orderParams = {
-        mchid: merchantConfig.mchid || CONFIG.mchid,
+        appid: merchantConfig.appid,
+        mchid: merchantConfig.mchid,
         out_trade_no: orderId,
-        description: '珊星智能存储 - 付款',
-        notify_url: merchantConfig.notify_url || CONFIG.notify_url,
+        description: orderDesc,
+        notify_url: merchantConfig.notify_url,
         amount: { total: amount, currency: 'CNY' },
         payer: { openid }
       };
@@ -330,13 +314,13 @@ exports.main = async (event, context) => {
       }
 
       // 直接生成支付签名参数，使用对应商户的私钥
-      const privateKey = merchantConfig.privateKey || fs.readFileSync(CONFIG.privateKeyPath, 'utf8');
+      const privateKey = merchantConfig.privateKey || fs.readFileSync('./private/apiclient_key.pem', 'utf8');
       const timeStamp = Math.floor(Date.now() / 1000).toString();
       const nonceStr = crypto.randomBytes(16).toString('hex');
       const packageStr = `prepay_id=${prepayId}`;
 
       const payParams = {
-        appId: merchantConfig.appid || CONFIG.appid,
+        appId: merchantConfig.appid,
         timeStamp,
         nonceStr,
         package: packageStr,
@@ -566,7 +550,7 @@ exports.main = async (event, context) => {
         password: password,
         // 新增：记录商户信息和 appid
         appid: deviceAppid,
-        mchid: activeMerchant ? activeMerchant.mchid : (CONFIG.mchid || ''),
+        mchid: activeMerchant ? activeMerchant.mchid : '',
         merchantId: activeMerchant ? activeMerchant._id : 'default',
         lockerId: targetLocker._id,
         deviceId: targetLocker.deviceId,
@@ -624,10 +608,13 @@ exports.main = async (event, context) => {
       // 如果数据库显示“待支付”，我们去微信那边核实一下到底付没付
       if (order.status === CONSTANTS.ORDER_STATUSES.PENDING_PAY) {
         try {
-          const client = await getClient();
+          // 获取订单对应的商户配置
+          const orderMerchant = order.merchantId ? await db.collection('merchant_configs').doc(order.merchantId).get() : null;
+          const merchantConfig = orderMerchant?.data || await getActiveMerchantConfig();
+          const client = await getClient(merchantConfig);
           // 查询微信订单状态
           const wxRes = await client.transactions_out_trade_no({
-            mchid: CONFIG.mchid,
+            mchid: merchantConfig?.mchid || order.mchid,
             out_trade_no: orderId
           });
 
@@ -1309,7 +1296,7 @@ exports.main = async (event, context) => {
                 total: Math.round(order.deposit * 100),
                 currency: 'CNY'
               },
-              notify_url: CONFIG.notify_url
+              notify_url: merchant.notify_url
             };
 
             refundRes = await client.refunds(refundParams);
@@ -1348,7 +1335,7 @@ exports.main = async (event, context) => {
             total: Math.round(order.deposit * 100),
             currency: 'CNY'
           },
-          notify_url: CONFIG.notify_url
+          notify_url: merchantConfig.notify_url
         };
 
         refundRes = await client.refunds(refundParams);
@@ -1517,7 +1504,7 @@ exports.main = async (event, context) => {
                 total: Math.round(order.deposit * 100),
                 currency: 'CNY'
               },
-              notify_url: CONFIG.notify_url
+              notify_url: merchant.notify_url
             };
 
             refundRes = await client.refunds(refundParams);
@@ -1556,7 +1543,7 @@ exports.main = async (event, context) => {
             total: Math.round(order.deposit * 100),
             currency: 'CNY'
           },
-          notify_url: CONFIG.notify_url
+          notify_url: merchantConfig.notify_url
         };
 
         refundRes = await client.refunds(refundParams);

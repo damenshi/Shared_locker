@@ -16,11 +16,6 @@ const CONSTANTS = {
   VALID_STATUSES_FOR_QUERY: ['进行中']
 }
 
-// 默认配置（兼容旧逻辑）
-const CONFIG = {
-  apiv3Key: process.env.WX_API_V3_KEY_YH
-};
-
 // ==========================================
 // 商户配置获取函数
 // ==========================================
@@ -148,24 +143,15 @@ async function decryptNotifyWithFallback(resource, orderAppid) {
     }
   }
 
-  // 3. 最终兜底：使用旧版硬编码配置
-  if (CONFIG.apiv3Key) {
-    console.log('[解密] 数据库无商户配置，使用旧版配置...');
-    try {
-      const result = tryDecrypt(resource, CONFIG.apiv3Key);
-      console.log('[解密] 使用旧版配置解密成功');
-      return { data: result, merchant: null };
-    } catch (e) {
-      console.error('[解密] 旧版配置解密也失败:', e.message);
-    }
-  }
-
   throw new Error('无法使用任何商户配置解密回调');
 }
 
-// 兼容旧接口
-function decryptNotify(resource) {
-  return tryDecrypt(resource, CONFIG.apiv3Key);
+// 使用指定商户配置解密
+async function decryptNotifyWithMerchant(resource, merchant) {
+  if (!merchant || !merchant.apiv3Key) {
+    throw new Error('商户配置缺少 apiv3Key');
+  }
+  return tryDecrypt(resource, merchant.apiv3Key);
 }
 
 

@@ -5,7 +5,8 @@ App({
     deviceAddress: null,
     freeDoorCnt: null,
     addressReadyCallback: null,
-    freedoorReadyCallback: null
+    freedoorReadyCallback: null,
+    miniName: '储物柜' // 小程序名称（从数据库动态获取）
   },
   
   onLaunch(options) {
@@ -15,8 +16,33 @@ App({
       traceUser: true
     });
 
-    // 1. 获取用户openid并缓存
+    // 1. 设置小程序名称（从数据库动态获取）
+    this.setMiniProgramName();
+
+    // 2. 获取用户openid并缓存
     this.getOpenid();
+  },
+
+  // 新增：动态获取并设置小程序名称
+  async setMiniProgramName() {
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'user',
+        data: { action: 'getMiniInfo' }
+      });
+      const miniName = res.result?.miniName || '储物柜';
+
+      // 设置全局导航栏标题
+      wx.setNavigationBarTitle({
+        title: miniName
+      });
+
+      // 保存到全局数据供页面使用
+      this.globalData.miniName = miniName;
+      console.log('[app.js] 小程序名称:', miniName);
+    } catch (e) {
+      console.error('[app.js] 获取小程序名称失败:', e);
+    }
   },
 
   onShow(options) {

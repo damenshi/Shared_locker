@@ -6,12 +6,39 @@ cloud.init({
 const db = cloud.database();
 const _ = db.command;
 
-const CONFIG = {
-  appsecret: process.env.APPSECRET,
-  appid: process.env.APPID,
-};
+const { getCurrentMiniProgram, getActiveMerchant } = require('./utils/config');
 const axios = require('axios')
 const crypto = require('crypto');
+const fs = require('fs');
+const Pay = require('wechatpay-node-v3');
+
+// 获取商户支付客户端
+async function getClient(merchantConfig) {
+  try {
+    // 如果没有传入配置，获取当前激活的
+    const config = merchantConfig || await getActiveMerchant();
+
+    if (!config) {
+      throw new Error('未找到商户配置');
+    }
+
+    // 使用数据库配置，如果数据库中没有证书内容则从文件读取
+    const privateKey = config.privateKey || fs.readFileSync('./private/apiclient_key.pem', 'utf8');
+    const publicKey = config.publicCert || fs.readFileSync('./private/apiclient_cert.pem', 'utf8');
+
+    return new Pay({
+      mchid: config.mchid,
+      appid: config.appid,
+      serial_no: config.merchantSerialNo,
+      publicKey: publicKey,
+      privateKey: privateKey
+    });
+
+  } catch (err) {
+    console.error('初始化支付客户端失败:', err);
+    throw err;
+  }
+}
 
 const validateParams = (params, rules) => {
   for (const [key, rule] of Object.entries(rules)) {
@@ -160,7 +187,10 @@ exports.main = async (event, context) => {
         }
 
         const order = orderRes.data;
-        const client = getClient();
+        // 获取商户配置
+        const merchant = order.merchantId ? await db.collection('merchant_configs').doc(order.merchantId).get() : await getActiveMerchant();
+        const merchantConfig = merchant?.data || merchant;
+        const client = getClient(merchantConfig);
         const refundParams = {
           out_trade_no: order.outTradeNo || order._id, // 原商户订单号
           out_refund_no: `refund_${Date.now()}`, // 退款单号
@@ -169,7 +199,7 @@ exports.main = async (event, context) => {
             total: order.amount || refundAmount, // 原订单总金额
             currency: 'CNY'
           },
-          notify_url: CONFIG.notify_url // 退款结果通知地址
+          notify_url: merchantConfig?.notify_url || '' // 退款结果通知地址
         };
 
         const refundResult = await client.refunds(refundParams);
@@ -219,11 +249,16 @@ exports.main = async (event, context) => {
     if (!code || !encryptedData || !iv) {
       return { error: '缺少参数' }
     }
-  
+
     // 1. 调用 jscode2session 获取 session_key
-    const appid = CONFIG.appid
-    const secret = CONFIG.appsecret
-  
+    const miniProgram = await getCurrentMiniProgram();
+    const appid = miniProgram?.appid;
+    const secret = miniProgram?.appsecret;
+
+    if (!appid || !secret) {
+      return { error: '未找到小程序配置' };
+    }
+
     const resp = await axios.get('https://api.weixin.qq.com/sns/jscode2session', {
       params: {
         appid,
@@ -254,6 +289,23 @@ exports.main = async (event, context) => {
     } catch (err) {
       console.error('解密失败：', err)
       return { error: '解密失败', detail: err.message }
+    }
+  }
+
+  // 获取小程序信息（名称等）
+  if (action === 'getMiniInfo') {
+    try {
+      const mini = await getCurrentMiniProgram();
+      return {
+        success: true,
+        miniName: mini?.miniName || '储物柜'
+      };
+    } catch (e) {
+      console.error('获取小程序信息失败:', e);
+      return {
+        success: false,
+        miniName: '储物柜'
+      };
     }
   }
 

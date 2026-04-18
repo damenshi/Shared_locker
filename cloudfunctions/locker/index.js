@@ -2,6 +2,7 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
+const { getLockerServerUrl } = require('./utils/config')
 
 // 常量定义：集中管理固定值
 const CONSTANTS = {
@@ -111,6 +112,9 @@ exports.main = async (event, context) => {
       return { ok: false, errMsg: validation.msg }
     }
 
+    // 获取 lockerUrl（供内部闭包函数使用）
+    const lockerUrl = await getLockerServerUrl();
+
     // P0优化: 指令结果查询接口
     const queryCommandResult = async (requestId, maxRetries = 3) => {
       const axios = require('axios');
@@ -119,7 +123,7 @@ exports.main = async (event, context) => {
         try {
           attempt++;
           const queryRes = await axios.get(
-            `http://1.116.109.239:3000/command-result/${requestId}`,
+            `${lockerUrl}/command-result/${requestId}`,
             { timeout: 5000 }
           );
           if (queryRes.data.code === 200) {
@@ -164,7 +168,7 @@ exports.main = async (event, context) => {
 
           const axios = require('axios');
           const response = await axios.post(
-            'http://1.116.109.239:3000/send-command',
+            `${lockerUrl}/send-command`,
             {
               direct: 'openDoor',
               deviceId: deviceId,
@@ -450,11 +454,12 @@ exports.main = async (event, context) => {
 
     try {
       const axios = require('axios');
+      const lockerUrl = await getLockerServerUrl();
       const formattedCabinetNo = String(cabinetNo).padStart(2, '0');
       const formattedDoorNo = String(doorNo).padStart(2, '0');
       const combinedCode = formattedCabinetNo + formattedDoorNo;
       const response = await axios.post(
-        'http://1.116.109.239:3000/send-command', 
+        `${lockerUrl}/send-command`,
         {
           direct: 'doorStatus',
           deviceId: deviceId,
@@ -500,15 +505,19 @@ exports.main = async (event, context) => {
       return { ok: false, errMsg: validation.msg }
     }
 
+    // 获取 lockerUrl（供内部闭包函数使用）
+    const lockerUrl = await getLockerServerUrl();
+
     // P0优化: 指令结果查询接口 (管理员版本)
     const queryCommandResultAdmin = async (requestId, maxRetries = 3) => {
       const axios = require('axios');
+      const lockerUrl = await getLockerServerUrl();
       let attempt = 0;
       while (attempt < maxRetries) {
         try {
           attempt++;
           const queryRes = await axios.get(
-            `http://1.116.109.239:3000/command-result/${requestId}`,
+            `${lockerUrl}/command-result/${requestId}`,
             { timeout: 5000 }
           );
           if (queryRes.data.code === 200) {
@@ -551,7 +560,7 @@ exports.main = async (event, context) => {
 
           const axios = require('axios');
           const response = await axios.post(
-            'http://1.116.109.239:3000/send-command',
+            `${lockerUrl}/send-command`,
             {
               direct: 'openDoor',
               deviceId: deviceId,

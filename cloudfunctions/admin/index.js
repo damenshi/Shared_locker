@@ -4,9 +4,7 @@ const db = cloud.database()
 const _ = db.command
 const fs = require('fs');
 const axios = require('axios');
-
-// locker_server 地址
-const LOCKER_SERVER_URL = process.env.LOCKER_SERVER_URL || 'http://1.116.109.239:3000';
+const { getLockerServerUrl, getCurrentMiniProgram } = require('./utils/config');
 
 
 const batchCreateLockers = async (event) => {
@@ -241,16 +239,6 @@ async function initMerchantConfig() {
       if (publicCert) {
         updateData.publicCert = publicCert;
       }
-      // 如果环境变量有值，更新配置
-      if (process.env.MCHID_YH && process.env.MCHID_YH !== existing.data[0].mchid) {
-        updateData.mchid = process.env.MCHID_YH;
-      }
-      if (process.env.MERCHANT_SERIAL_NO_YH && process.env.MERCHANT_SERIAL_NO_YH !== existing.data[0].merchantSerialNo) {
-        updateData.merchantSerialNo = process.env.MERCHANT_SERIAL_NO_YH;
-      }
-      if (process.env.WX_API_V3_KEY_YH && process.env.WX_API_V3_KEY_YH !== existing.data[0].apiv3Key) {
-        updateData.apiv3Key = process.env.WX_API_V3_KEY_YH;
-      }
 
       if (Object.keys(updateData).length > 1) {
         await db.collection('merchant_configs').doc('yh').update({ data: updateData });
@@ -260,14 +248,14 @@ async function initMerchantConfig() {
       return { success: true, message: '商户配置已存在且无需更新' };
     }
 
-    // 插入默认商户配置
+    // 插入默认商户配置（不从环境变量读取，需要手动在数据库配置）
     await db.collection('merchant_configs').add({
       data: {
         _id: 'yh',
         name: '珊星设备',
-        mchid: process.env.MCHID_YH || '',
-        merchantSerialNo: process.env.MERCHANT_SERIAL_NO_YH || '',
-        apiv3Key: process.env.WX_API_V3_KEY_YH || '',
+        mchid: '',
+        merchantSerialNo: '',
+        apiv3Key: '',
         privateKey: privateKey,
         publicCert: publicCert,
         isActive: true,
@@ -314,9 +302,6 @@ async function initSecondMerchant() {
       const updateData = { updatedAt: db.serverDate() };
       if (privateKey) updateData.privateKey = privateKey;
       if (publicCert) updateData.publicCert = publicCert;
-      if (process.env.MCHID_XYH) updateData.mchid = process.env.MCHID_XYH;
-      if (process.env.MERCHANT_SERIAL_NO_XYH) updateData.merchantSerialNo = process.env.MERCHANT_SERIAL_NO_XYH;
-      if (process.env.WX_API_V3_KEY_XYH) updateData.apiv3Key = process.env.WX_API_V3_KEY_XYH;
 
       if (Object.keys(updateData).length > 1) {
         await db.collection('merchant_configs').doc('xyh').update({ data: updateData });
@@ -326,14 +311,14 @@ async function initSecondMerchant() {
       return { success: true, message: '第二个商户配置已存在且无需更新' };
     }
 
-    // 插入第二个商户配置
+    // 插入第二个商户配置（不从环境变量读取，需要手动在数据库配置）
     await db.collection('merchant_configs').add({
       data: {
         _id: 'xyh',
         name: '珊星智能存储',
-        mchid: process.env.MCHID_XYH || '',
-        merchantSerialNo: process.env.MERCHANT_SERIAL_NO_XYH || '',
-        apiv3Key: process.env.WX_API_V3_KEY_XYH || '',
+        mchid: '',
+        merchantSerialNo: '',
+        apiv3Key: '',
         privateKey: privateKey,
         publicCert: publicCert,
         isActive: false,
@@ -561,7 +546,8 @@ exports.main = async (event, context) => {
       // 从 locker_server 获取所有设备归属映射
       let deviceAppidMap = {};
       try {
-        const mapRes = await axios.get(`${LOCKER_SERVER_URL}/listDeviceAppid`, { timeout: 5000 });
+        const lockerUrl = await getLockerServerUrl();
+        const mapRes = await axios.get(`${lockerUrl}/listDeviceAppid`, { timeout: 5000 });
         if (mapRes.data?.code === 200) {
           deviceAppidMap = mapRes.data.data || {};
         }
@@ -635,7 +621,8 @@ exports.main = async (event, context) => {
       }
 
       // 3. 调用 locker_server 执行切换
-      await axios.post(`${LOCKER_SERVER_URL}/setDeviceAppid`, {
+      const lockerUrl = await getLockerServerUrl();
+      await axios.post(`${lockerUrl}/setDeviceAppid`, {
         deviceId,
         appid: targetAppid,
         deviceData: {
@@ -710,12 +697,13 @@ exports.main = async (event, context) => {
     try {
       // 验证目标商户是否存在
       const targetMerchant = await db.collection('merchant_configs').doc(merchantId).get();
-      if (!targetMerchant.data || targetMerchant.data.length === 0) {
+      // doc().get() 返回单个对象，不是数组
+      if (!targetMerchant.data) {
         return { success: false, errMsg: '商户不存在' };
       }
 
       // 验证目标商户是否属于当前小程序
-      if (userAppid && targetMerchant.data[0].appid !== userAppid) {
+      if (userAppid && targetMerchant.data.appid !== userAppid) {
         return { success: false, errMsg: '无权切换其他小程序的商户' };
       }
 
@@ -723,7 +711,7 @@ exports.main = async (event, context) => {
       await db.runTransaction(async (transaction) => {
         // 1. 取消当前小程序所有商户的激活状态
         await transaction.collection('merchant_configs')
-          .where({ appid: targetMerchant.data[0].appid, isActive: true })
+          .where({ appid: targetMerchant.data.appid, isActive: true })
           .update({ data: { isActive: false } });
 
         // 2. 设置目标商户为激活
@@ -737,7 +725,7 @@ exports.main = async (event, context) => {
           });
       });
 
-      return { success: true, message: `已切换到商户: ${targetMerchant.data[0].name}` };
+      return { success: true, message: `已切换到商户: ${targetMerchant.data.name}` };
     } catch (e) {
       console.error('切换商户失败:', e);
       return { success: false, errMsg: e.message };

@@ -66,6 +66,9 @@ Page({
 
 
   onLoad(options) {
+    // 动态设置页面标题
+    const miniName = app.globalData.miniName || '储物柜';
+    wx.setNavigationBarTitle({ title: miniName });
 
     if (options && options.query && options.query.deviceId) {
       app.globalData.deviceId = options.query.deviceId;
@@ -97,7 +100,7 @@ Page({
     }
 
     setTimeout(() => {
-      this.playVoicePrompt("欢迎使用珊星储物，请输入手机号和取件码");
+      this.playVoicePrompt(`欢迎使用${miniName}，请输入手机号和取件码`);
     }, 500);
   },
 
