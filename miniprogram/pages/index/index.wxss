@@ -1,12 +1,24 @@
-/* 页面容器 */
+/* 页面容器 - 商务风格 */
 .page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: #f8f9fb;
-  padding: 24rpx;
+  background: #f8fafc;
+  padding: 0;
   position: relative;
   font-family: "SF Pro Display", "PingFang SC", -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", sans-serif;
+}
+
+/* 顶部装饰条 */
+.page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8rpx;
+  background: linear-gradient(90deg, #1e3a5f 0%, #2d4a6f 50%, #c9a961 100%);
+  z-index: 1;
 }
 
 /* 返回首页按钮 */
@@ -30,70 +42,77 @@
   box-shadow: 0 3rpx 7rpx rgba(0, 0, 0, 0.12);
 }
 
-/* 顶部信息 */
+/* 顶部信息 - 商务卡片风格 */
 .header {
   position: relative;
-  margin-bottom: 36rpx;
+  margin: 24rpx 24rpx 32rpx;
+  background: #ffffff;
+  border-radius: 8rpx;
+  padding: 32rpx;
+  box-shadow: 0 2rpx 12rpx rgba(30, 58, 95, 0.06);
+  border-left: 6rpx solid #1e3a5f;
 }
 
 .school-name {
-  font-size: 38rpx;
-  font-weight: 700;
-  color: #1c1c1e;
-  margin-bottom: 8rpx;
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin-bottom: 12rpx;
+  letter-spacing: 0.5rpx;
 }
 
 .business-hours {
-  font-size: 28rpx;
-  color: #9a9a9a;
+  font-size: 26rpx;
+  color: #6b7280;
+  font-weight: 400;
 }
 
-/* ====== 空闲柜显示 ====== */
+/* ====== 空闲柜显示 - 商务风格 ====== */
 .free-lockers {
   position: absolute;
-  right: 0;
-  top: 0;
-  background-color: #ffffff;
-  border-radius: 30rpx;
-  padding: 14rpx 36rpx;
-  font-size: 42rpx;
-  color: #111;
+  right: 32rpx;
+  top: 32rpx;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+  border-radius: 4rpx;
+  padding: 16rpx 28rpx;
+  font-size: 28rpx;
+  color: #ffffff;
   display: flex;
   align-items: center;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
-  border: 1rpx solid #eaeaea;
+  box-shadow: 0 4rpx 12rpx rgba(30, 58, 95, 0.15);
 }
 
 .free-lockers::before {
   content: '';
   display: inline-block;
-  width: 20rpx;
-  height: 20rpx;
+  width: 16rpx;
+  height: 16rpx;
   border-radius: 50%;
-  background-color: #10b981;
+  background-color: #c9a961;
   margin-right: 12rpx;
   animation: breathe 2.5s ease-in-out infinite;
 }
 
 @keyframes breathe {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.15); }
+  50% { opacity: 0.7; transform: scale(1.1); }
 }
 
 .free-count {
-  font-weight: 700;
-  color: #10b981;
-  margin-left: 6rpx;
+  font-weight: 600;
+  color: #c9a961;
+  margin-left: 8rpx;
+  font-size: 32rpx;
 }
 
-/* 帮助提示框 */
+/* 帮助提示框 - 商务风格 */
 .help-box {
   background-color: #fff;
-  border-radius: 20rpx;
+  border-radius: 4rpx;
   padding: 28rpx;
-  margin-bottom: 44rpx;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.03);
-  border: 1rpx solid #f2f2f2;
+  margin: 0 24rpx 32rpx;
+  box-shadow: 0 2rpx 8rpx rgba(30, 58, 95, 0.04);
+  border: 1rpx solid #e5e7eb;
 }
 
 .help-question, .help-answer {
@@ -107,7 +126,7 @@
 }
 
 .question-text {
-  color: #ff5a3c;
+  color: #1e3a5f;
   font-size: 30rpx;
   margin-left: 10rpx;
   font-weight: 500;
@@ -120,14 +139,14 @@
   line-height: 42rpx;
 }
 
-/* 输入表单区域 */
+/* 输入表单区域 - 商务风格 */
 .input-container {
   background-color: #fff;
-  border-radius: 20rpx;
+  border-radius: 4rpx;
   padding: 32rpx;
-  margin-bottom: 44rpx;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.03);
-  border: 1rpx solid #f2f2f2;
+  margin: 0 24rpx 32rpx;
+  box-shadow: 0 2rpx 8rpx rgba(30, 58, 95, 0.04);
+  border: 1rpx solid #e5e7eb;
 }
 
 .input-title {
@@ -137,28 +156,28 @@
   font-weight: 600;
 }
 
-/* 输入框通用样式 */
+/* 输入框通用样式 - 商务底线风格 */
 .input-item {
   display: flex;
   align-items: center;
-  border: 1rpx solid #e6e6e6;
-  border-radius: 14rpx;
-  padding: 0 20rpx;
-  height: 82rpx;
-  margin-bottom: 20rpx;
-  background-color: #fafafa;
-  box-shadow: inset 0 2rpx 4rpx rgba(0, 0, 0, 0.02);
+  border: none;
+  border-bottom: 2rpx solid #e5e7eb;
+  border-radius: 0;
+  padding: 0 0 16rpx 0;
+  height: auto;
+  margin-bottom: 32rpx;
+  background-color: transparent;
   transition: all 0.2s ease;
 }
 .input-item:focus-within {
-  border-color: #1677ff;
-  box-shadow: 0 4rpx 10rpx rgba(22, 119, 255, 0.12);
+  border-bottom-color: #1e3a5f;
 }
 
 .input-label {
-  width: 140rpx;
-  font-size: 30rpx;
-  color: #333;
+  width: 160rpx;
+  font-size: 28rpx;
+  color: #4b5563;
+  font-weight: 500;
 }
 
 .input-field {
@@ -179,11 +198,12 @@
   display: flex;
   align-items: center;
   flex: 1;
-  background-color: #fafafa;
-  border-radius: 12rpx;
+  background-color: transparent;
+  border-radius: 0;
   overflow: hidden;
-  border: 1rpx solid #e6e6e6;
-  height: 64rpx;       /* 调小输入框高度 */
+  border: none;
+  height: 64rpx;
+  border-bottom: 2rpx solid transparent;
 }
 
 .phone-input-box .input-field {
@@ -197,105 +217,121 @@
 }
 
 .phone-input-box .auto-btn {
-  font-size: 24rpx;         /* 字体稍小 */
-  padding: 0 12rpx;         /* 左右内边距小一点 */
-  width: auto;               /* 宽度根据内容自适应 */
-  min-width: 80rpx;          /* 设置最小宽度，保证点击区域够用 */
-  height: 48rpx;             /* 调整高度，让按钮更小巧 */
+  font-size: 24rpx;
+  padding: 0 20rpx;
+  width: auto;
+  min-width: 100rpx;
+  height: 52rpx;
   margin: 0;
   border: none;
-  border-left: 1rpx solid #e6e6e6;
-  border-radius: 8rpx;       /* 小圆角 */
-  background-color: #1677ff;
+  border-radius: 4rpx;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
   color: #fff;
-  line-height: 48rpx;
+  line-height: 52rpx;
   font-weight: 500;
-  box-shadow: none;          /* 内嵌按钮不要阴影 */
+  box-shadow: 0 4rpx 12rpx rgba(30, 58, 95, 0.2);
   transition: all 0.2s ease;
 }
 
 .phone-input-box .auto-btn:active {
-  transform: scale(0.97);
-  background-color: #105ecf;
+  transform: translateY(2rpx);
+  box-shadow: 0 2rpx 6rpx rgba(30, 58, 95, 0.25);
 }
 
 /* 密码提示文字 */
 .password-hint {
   font-size: 26rpx;
-  color: #007aff;
+  color: #6b7280;
   margin-top: 12rpx;
   text-align: right;
 }
 
-/* 按钮（iOS 风格） */
+/* 按钮 - 商务风格 */
 .next-btn {
-  background: #1677ff;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
   color: #fff;
   font-size: 32rpx;
-  height: 90rpx;
-  line-height: 90rpx;
-  border-radius: 45rpx;
-  margin-top: 24rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  border-radius: 4rpx;
+  margin: 24rpx;
   text-align: center;
   font-weight: 600;
-  box-shadow: 0 6rpx 16rpx rgba(22, 119, 255, 0.25);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  letter-spacing: 2rpx;
+  box-shadow: 0 6rpx 20rpx rgba(30, 58, 95, 0.2);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.next-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4rpx;
+  background: linear-gradient(90deg, transparent, #c9a961, transparent);
 }
 
 .next-btn:active {
-  transform: scale(0.97);
-  box-shadow: 0 3rpx 10rpx rgba(22, 119, 255, 0.35);
+  transform: translateY(2rpx);
+  box-shadow: 0 3rpx 12rpx rgba(30, 58, 95, 0.3);
 }
 
 .next-btn[disabled] {
-  background-color: #d7d7d7;
-  color: #fff;
+  background: #d1d5db;
+  color: #9ca3af;
   box-shadow: none;
   cursor: not-allowed;
 }
 
-/* 固定开柜框 */
+.next-btn[disabled]::after {
+  display: none;
+}
+
+/* 固定开柜框 - 商务风格 */
 .locker-box-large {
-  margin-top: 48rpx;
-  padding: 40rpx 24rpx;
-  border-radius: 28rpx;
-  background-color: #f0f7ff;
-  border: 1rpx solid #1677ff;
+  margin: 24rpx;
+  padding: 40rpx;
+  border-radius: 4rpx;
+  background-color: #ffffff;
+  border: 2rpx solid #1e3a5f;
   display: flex;
-  flex-direction: column;  
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 6rpx 16rpx rgba(22,119,255,0.15);
+  box-shadow: 0 4rpx 16rpx rgba(30, 58, 95, 0.08);
 }
 
 .locker-box-text {
-  font-size: 48rpx;
-  font-weight: 700;
-  color: #1677ff;
-  margin-bottom: 24rpx;
+  font-size: 44rpx;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin-bottom: 32rpx;
   text-align: center;
+  letter-spacing: 2rpx;
 }
 
 .reopen-btn {
   background-color: #ffffff;
-  color: #1677ff;
-  border: 2rpx solid #1677ff;
-  border-radius: 36rpx;
+  color: #1e3a5f;
+  border: 2rpx solid #1e3a5f;
+  border-radius: 4rpx;
   font-size: 28rpx;
-  height: 70rpx;
-  width: 200rpx;
-  line-height: 70rpx;
+  height: 76rpx;
+  width: 220rpx;
+  line-height: 76rpx;
   text-align: center;
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4rpx 10rpx rgba(22,119,255,0.15);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .reopen-btn:active {
-  transform: scale(0.97);
-  box-shadow: 0 2rpx 6rpx rgba(22,119,255,0.2);
+  background-color: #1e3a5f;
+  color: #ffffff;
 }
 
 .locker-btn-row {
@@ -303,18 +339,19 @@
   display: flex;
   flex-direction: row;
   justify-content: center;
-  gap: 24rpx;
+  gap: 32rpx;
 }
 
 .finish-btn {
-  background-color: #ff4d4f;
+  background: linear-gradient(135deg, #c9a961 0%, #b8944f 100%);
   color: #ffffff;
-  border-color: #ff4d4f;
-  box-shadow: 0 4rpx 10rpx rgba(255, 77, 79, 0.15);
+  border-color: transparent;
+  box-shadow: 0 4rpx 12rpx rgba(201, 169, 97, 0.25);
 }
 
 .finish-btn:active {
-  box-shadow: 0 2rpx 6rpx rgba(255, 77, 79, 0.2);
+  box-shadow: 0 2rpx 8rpx rgba(201, 169, 97, 0.35);
+  opacity: 0.9;
 }
 
 
@@ -335,17 +372,18 @@
   to { opacity: 1; }
 }
 
-/* 弹窗盒子 */
+/* 弹窗盒子 - 商务风格 */
 .custom-modal-box {
   width: 75%;
   background-color: #fff;
-  border-radius: 28rpx;
-  padding: 40rpx 24rpx;
-  box-shadow: 0 12rpx 28rpx rgba(0,0,0,0.2);
+  border-radius: 4rpx;
+  padding: 48rpx 32rpx;
+  box-shadow: 0 16rpx 40rpx rgba(30, 58, 95, 0.15);
   display: flex;
   flex-direction: column;
   align-items: center;
   animation: scaleIn 0.25s ease;
+  border-top: 6rpx solid #1e3a5f;
 }
 
 @keyframes scaleIn {
@@ -359,7 +397,8 @@
   font-weight: 600;
   text-align: center;
   margin-bottom: 32rpx;
-  color: #111;
+  color: #1e3a5f;
+  letter-spacing: 2rpx;
 }
 
 /* 内容 */
@@ -372,12 +411,13 @@
 
 /* 高亮手机号和密码 */
 .highlight-text {
-  color: #ff3b30;
-  font-weight: 700;
+  color: #1e3a5f;
+  font-weight: 600;
   font-size: 36rpx;
   text-align: center;
   display: block;
   margin: 12rpx 0;
+  letter-spacing: 2rpx;
 }
 
 /* 按钮容器 */
@@ -392,12 +432,12 @@
 /* 弹窗按钮 */
 .confirm-btn, .cancel-btn {
   flex: 1;
-  height: 80rpx;
-  border-radius: 40rpx;
+  height: 84rpx;
+  border-radius: 4rpx;
   font-size: 30rpx;
   font-weight: 500;
   text-align: center;
-  line-height: 80rpx;
+  line-height: 84rpx;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -405,21 +445,34 @@
 }
 
 .confirm-btn {
-  background-color: #007aff;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
   color: #fff;
-  box-shadow: 0 4rpx 10rpx rgba(0,122,255,0.25);
+  box-shadow: 0 4rpx 12rpx rgba(30, 58, 95, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.confirm-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2rpx;
+  background: linear-gradient(90deg, transparent, #c9a961, transparent);
 }
 
 .confirm-btn:active {
-  transform: scale(0.97);
-  box-shadow: 0 2rpx 6rpx rgba(0,122,255,0.25);
+  transform: translateY(2rpx);
+  box-shadow: 0 2rpx 8rpx rgba(30, 58, 95, 0.3);
 }
 
 .cancel-btn {
-  background-color: #f2f2f7;
-  color: #333;
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1rpx solid #e5e7eb;
 }
 
 .cancel-btn:active {
-  transform: scale(0.97);
+  background-color: #e5e7eb;
 }

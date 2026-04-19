@@ -1,49 +1,70 @@
-<view class="container">
-  <!-- 顶部用户信息 -->
-  <view class="user-info">
-    <view class="avatar">
-      <image 
-        src="{{userInfo ? userInfo.avatarUrl : '/images/avatar-default.png'}}" 
-        mode="widthFix"
-      ></image>
-    </view>
-    <view class="user-detail">
-      <view class="phone">{{phone}}</view>
-      <view class="deposit" wx:if="{{false}}">账户余额：¥{{deposit}}</view>
+<view class="page">
+  <!-- 极简顶部 -->
+  <view class="top-section">
+    <view class="user-row">
+      <view class="avatar">
+        <text class="avatar-text">{{phone ? phone.slice(-4) : 'GUEST'}}</text>
+      </view>
+      <view class="user-info">
+        <text class="user-label">用户</text>
+        <text class="user-value">{{phone || '访客模式'}}</text>
+      </view>
     </view>
   </view>
 
-  <!-- 功能菜单 -->
-  <view class="menu-list">
-    <!-- 我的余额 -->
+  <!-- 功能列表 - 极简线条风格 -->
+  <view class="menu-section">
     <view class="menu-item" bindtap="goMywallet">
-      <view class="menu-text">我的余额</view>
+      <view class="item-left">
+        <view class="item-dot gold"></view>
+        <text class="item-text">我的余额</text>
+      </view>
+      <view class="item-arrow"></view>
     </view>
 
-    <!-- 我的订单 -->
     <view class="menu-item" bindtap="goMyOrders">
-      <view class="menu-text">我的订单</view>
+      <view class="item-left">
+        <view class="item-dot blue"></view>
+        <text class="item-text">我的订单</text>
+      </view>
+      <view class="item-arrow"></view>
     </view>
 
-    <!-- 客服电话 -->
     <view class="menu-item" bindtap="customerService">
-      <view class="menu-text">客服电话</view>
-      <view class="customerphone">{{'400-832-6132'}}</view>
+      <view class="item-left">
+        <view class="item-dot"></view>
+        <text class="item-text">客服电话</text>
+      </view>
+      <view class="item-right">
+        <text class="item-extra">400-832-6132</text>
+        <view class="item-arrow"></view>
+      </view>
     </view>
 
-    <!-- 关于我们 -->
     <view class="menu-item" bindtap="goAbout">
-      <view class="menu-text">关于我们</view>
+      <view class="item-left">
+        <view class="item-dot"></view>
+        <text class="item-text">关于我们</text>
+      </view>
+      <view class="item-arrow"></view>
     </view>
 
-    <!-- <view class="menu-item" bindtap="customerService">
-      <view class="menu-text">客服电话</view>
-      <view class="customerphone">{{'400-832-6132'}}</view>
-    </view> -->
+    <!-- 管理员入口 - 更隐蔽 -->
+    <view class="admin-entry" wx:if="{{isAdmin}}" bindtap="goAdmin">
+      <text class="admin-text">管理后台</text>
+    </view>
+  </view>
 
-    <!-- 管理员界面 -->
-    <view class="menu-item" bindtap="goAdmin" wx:if="{{isAdmin}}">
-      <view class="menu-text">后台管理</view>
+  <!-- 底部极简导航 -->
+  <view class="bottom-nav">
+    <view class="nav-item" bindtap="goHome">
+      <view class="nav-dot"></view>
+      <text class="nav-text">首页</text>
+    </view>
+    <view class="nav-divider"></view>
+    <view class="nav-item active">
+      <view class="nav-dot"></view>
+      <text class="nav-text">我的</text>
     </view>
   </view>
 </view>

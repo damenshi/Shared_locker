@@ -1,195 +1,215 @@
-/* 页面容器 */
-.container {
-  min-height: 100vh;
-  background-color: #f7f8fa;
-  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", sans-serif;
-  padding-bottom: 20rpx;
-}
+/* 明亮极简风格 */
 
-/* 用户信息区域 */
-.user-info {
-  background: linear-gradient(135deg, #5ac8fa, #4da6f7); /* 柔和蓝色渐变 */
-  padding: 48rpx 32rpx 40rpx 32rpx;
-  color: white;
-  display: flex;
-  align-items: center;
-  border-bottom-left-radius: 24rpx;
-  border-bottom-right-radius: 24rpx;
-  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.08);
-}
-
-.avatar {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 50%;
-  background-color: rgba(255,255,255,0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 30rpx;
-  overflow: hidden;
-  cursor: pointer;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.1);
-}
-
-.avatar image {
-  width: 100%;
+page {
   height: 100%;
-  object-fit: cover;
+  background: #f8fafc;
 }
 
-.user-detail {
-  flex: 1;
+.page {
+  height: 100%;
   display: flex;
   flex-direction: column;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+}
+
+/* 顶部区域 */
+.top-section {
+  padding: 48rpx;
+  background: #ffffff;
+  border-bottom: 1rpx solid #e2e8f0;
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+}
+
+/* 头像 - 圆形深蓝 */
+.avatar {
+  width: 88rpx;
+  height: 88rpx;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+  display: flex;
+  align-items: center;
   justify-content: center;
+  border-radius: 50%;
+  box-shadow: 0 4rpx 12rpx rgba(30, 58, 95, 0.15);
 }
 
-.phone {
-  font-size: 36rpx;
+.avatar-text {
+  font-size: 24rpx;
+  color: #ffffff;
   font-weight: 600;
-  margin-bottom: 8rpx;
+  letter-spacing: 2rpx;
 }
 
-.deposit {
-  font-size: 28rpx;
-  opacity: 0.9;
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
 }
 
-/* 功能菜单 */
-.menu-list {
-  background-color: #fff;
-  margin: 20rpx 16rpx;
-  border-radius: 20rpx;
-  overflow: hidden;
-  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
+.user-label {
+  font-size: 22rpx;
+  color: #64748b;
+  letter-spacing: 3rpx;
+}
+
+.user-value {
+  font-size: 32rpx;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* 菜单区域 */
+.menu-section {
+  flex: 1;
+  padding: 32rpx 48rpx;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  padding: 28rpx 24rpx;
-  border-bottom: 1rpx solid #f1f1f1;
-  transition: background-color 0.2s;
-}
-
-.menu-item:last-child {
-  border-bottom: none;
+  justify-content: space-between;
+  padding: 36rpx 0;
+  border-bottom: 1rpx solid #f1f5f9;
+  transition: all 0.2s ease;
 }
 
 .menu-item:active {
-  background-color: #f2f5f8;
+  opacity: 0.6;
 }
 
-.menu-text {
-  flex: 1;
-  font-size: 32rpx;
-  color: #333;
-  font-weight: 500;
-}
-
-/* 箭头提示 */
-.menu-arrow {
-  color: #ccc;
-  font-size: 32rpx;
-}
-
-/* 订单列表 */
-.order-list {
-  margin: 20rpx 16rpx;
-  border-radius: 20rpx;
-  overflow: hidden;
-  background-color: #fff;
-  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
-}
-
-.order-item {
-  padding: 24rpx 20rpx;
-  border-bottom: 1rpx solid #f5f5f5;
-  transition: background-color 0.2s;
-}
-
-.order-item:last-child {
-  border-bottom: none;
-}
-
-.order-item:active {
-  background-color: #f2f5f8;
-}
-
-.order-info {
+.item-left {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 12rpx;
+  align-items: center;
+  gap: 24rpx;
 }
 
-.order-no {
-  font-size: 28rpx;
-  color: #666;
+/* 圆点标记 */
+.item-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #cbd5e1;
 }
 
-.order-status {
-  font-size: 28rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 12rpx;
+.item-dot.gold {
+  background: linear-gradient(135deg, #c9a961 0%, #b8944f 100%);
+}
+
+.item-dot.blue {
+  background: #1e3a5f;
+}
+
+.item-text {
+  font-size: 32rpx;
+  color: #334155;
   font-weight: 500;
 }
 
-.status-success {
-  color: #52c41a;
-  background-color: #f6ffed;
-  border: 1rpx solid #b7eb8f;
+.item-right {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
 }
 
-.status-refund {
-  color: #faad14;
-  background-color: #fffbe6;
-  border: 1rpx solid #ffe58f;
-}
-
-.status-processing {
-  color: #1890ff;
-  background-color: #e6f7ff;
-  border: 1rpx solid #91d5ff;
-}
-
-.order-detail {
+.item-extra {
   font-size: 26rpx;
-  color: #999;
-  line-height: 1.6;
-  margin-bottom: 12rpx;
+  color: #94a3b8;
+  font-weight: 400;
 }
 
-/* 按钮 */
-.refund-btn {
-  background-color: #1890ff;
-  color: white;
-  font-size: 28rpx;
-  padding: 10rpx 24rpx;
-  border-radius: 16rpx;
-  line-height: normal;
+/* 箭头 */
+.item-arrow {
+  width: 12rpx;
+  height: 12rpx;
+  border-top: 2rpx solid #cbd5e1;
+  border-right: 2rpx solid #cbd5e1;
+  transform: rotate(45deg);
+}
+
+/* 管理员入口 */
+.admin-entry {
+  margin-top: 48rpx;
+  padding: 28rpx 0;
   text-align: center;
-  display: inline-block;
-  transition: background 0.2s, transform 0.15s;
+  background: #f8fafc;
+  border: 2rpx solid #1e3a5f;
+  border-radius: 8rpx;
+  transition: all 0.2s ease;
 }
 
-.refund-btn:active {
-  background-color: #096dd9;
-  transform: scale(0.97);
+.admin-entry:active {
+  background: #1e3a5f;
 }
 
-.refund-all-btn {
-  background-color: #ff4d4f;
+.admin-entry:active .admin-text {
+  color: #ffffff;
 }
 
-.refund-all-btn:active {
-  background-color: #d93025;
-}
-
-/* 空状态 */
-.empty {
-  text-align: center;
-  padding: 60rpx 0;
-  color: #999;
+.admin-text {
   font-size: 28rpx;
+  color: #1e3a5f;
+  letter-spacing: 4rpx;
+  font-weight: 500;
+}
+
+/* 底部导航 */
+.bottom-nav {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx 80rpx 48rpx;
+  gap: 48rpx;
+  background: #ffffff;
+  border-top: 1rpx solid #e2e8f0;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx 32rpx;
+  transition: all 0.3s ease;
+}
+
+.nav-item:active {
+  opacity: 0.7;
+}
+
+.nav-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transition: all 0.3s ease;
+}
+
+.nav-item.active .nav-dot {
+  width: 48rpx;
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: #1e3a5f;
+}
+
+.nav-text {
+  font-size: 26rpx;
+  color: #94a3b8;
+  letter-spacing: 4rpx;
+  font-weight: 400;
+}
+
+.nav-item.active .nav-text {
+  color: #1e3a5f;
+  font-weight: 600;
+}
+
+.nav-divider {
+  width: 1rpx;
+  height: 40rpx;
+  background: #e2e8f0;
 }

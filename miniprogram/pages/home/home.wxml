@@ -1,30 +1,39 @@
+<view class="page">
+  <!-- 简洁头部 -->
+  <view class="header">
+    <text class="title">智能储物服务</text>
+    <text class="subtitle">Smart Locker Service</text>
+  </view>
 
-<view class="button-section">
-  <!-- 存包按钮 -->
-  <view class="store-btn" bindtap="goStore">
-    <view class="btn-icon">
-      <text>📦</text> <!-- emoji 图标，可换成 iconfont -->
+  <!-- 极简操作区 - 左右并排 -->
+  <view class="action-area">
+    <!-- 存包 - 左半边 -->
+    <view class="action-block store" bindtap="goStore">
+      <view class="action-line"></view>
+      <text class="action-text">存包</text>
+      <text class="action-en">STORE</text>
+      <view class="action-arrow">→</view>
     </view>
-    <text class="btn-text">存 包</text>
-  </view>
 
-  <!-- 取包按钮 -->
-  <view class="take-btn" bindtap="goTake">
-    <view class="btn-icon">
-      <text>👜</text>
+    <!-- 取包 - 右半边 -->
+    <view class="action-block take" bindtap="goTake">
+      <view class="action-line"></view>
+      <text class="action-text">取包</text>
+      <text class="action-en">PICKUP</text>
+      <view class="action-arrow">→</view>
     </view>
-    <text class="btn-text">取 包</text>
   </view>
-</view>
 
-<!-- 底部 Tab 栏 -->
-<view class="tab-bar">
-  <view class="tab-item active" bindtap="goHome">
-    <view class="tab-icon">🏠</view>
-    <text>首页</text>
-  </view>
-  <view class="tab-item" bindtap="goMine">
-    <view class="tab-icon">👤</view>
-    <text>我的</text>
+  <!-- 底部极简导航 -->
+  <view class="bottom-nav">
+    <view class="nav-item active" bindtap="goHome">
+      <view class="nav-dot"></view>
+      <text class="nav-text">首页</text>
+    </view>
+    <view class="nav-divider"></view>
+    <view class="nav-item" bindtap="goMine">
+      <view class="nav-dot"></view>
+      <text class="nav-text">我的</text>
+    </view>
   </view>
 </view>

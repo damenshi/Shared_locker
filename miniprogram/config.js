@@ -1,4 +1,5 @@
 module.exports = {
-  envId: 'cloudbase-3gnr17whd71a5b45',
-  appid: 'wxc447a8e66f5f8294'
+  envId: 'cloudbase-d1g6vw253b659ade2',
+  appid: 'wx2697ba99fe54bd9d',
+  miniName: '星耀储物'
 }

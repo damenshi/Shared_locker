@@ -1,19 +1,7 @@
 {
   "libVersion": "3.9.3",
-  "projectname": "LockerShare",
-  "condition": {
-    "miniprogram": {
-      "list": [
-        {
-          "name": "pages/index/index",
-          "pathName": "pages/index/index",
-          "query": "",
-          "scene": null,
-          "launchMode": "default"
-        }
-      ]
-    }
-  },
+  "projectname": "Shared_Locker_xyh",
+  "condition": {},
   "setting": {
     "urlCheck": false,
     "coverView": false,

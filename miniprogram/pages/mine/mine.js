@@ -76,11 +76,17 @@ Page({
   },
 
   // 页面跳转方法
+  goHome() { wx.switchTab({ url: '/pages/home/home' }); },
+
   goMyOrders() { wx.navigateTo({ url: '/pages/mine/myorder' }); },
 
   goAbout() { wx.navigateTo({ url: '/pages/mine/about' }); },
 
   goMywallet() { wx.navigateTo({ url: '/pages/mine/mywallet' }); },
+
+  customerService() {
+    wx.makePhoneCall({ phoneNumber: '400-832-6132' });
+  },
 
   async goAdmin() {
     try {
