@@ -23,26 +23,19 @@ App({
     this.getOpenid();
   },
 
-  // 新增：动态获取并设置小程序名称
-  async setMiniProgramName() {
-    try {
-      const res = await wx.cloud.callFunction({
-        name: 'user',
-        data: { action: 'getMiniInfo' }
-      });
-      const miniName = res.result?.miniName || '储物柜';
+  // 设置小程序名称（从配置文件读取）
+  setMiniProgramName() {
+    const config = require('./config');
+    const miniName = config.miniName || '储物柜';
 
-      // 设置全局导航栏标题
-      wx.setNavigationBarTitle({
-        title: miniName
-      });
+    // 设置全局导航栏标题
+    wx.setNavigationBarTitle({
+      title: miniName
+    });
 
-      // 保存到全局数据供页面使用
-      this.globalData.miniName = miniName;
-      console.log('[app.js] 小程序名称:', miniName);
-    } catch (e) {
-      console.error('[app.js] 获取小程序名称失败:', e);
-    }
+    // 保存到全局数据供页面使用
+    this.globalData.miniName = miniName;
+    console.log('[app.js] 小程序名称:', miniName);
   },
 
   onShow(options) {

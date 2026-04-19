@@ -2,7 +2,7 @@
   <!-- 顶部欢迎语 -->
   <view class="welcome-header">
     <text class="welcome-title">管理后台</text>
-    <text class="welcome-subtitle">珊星储物柜管理系统</text>
+    <text class="welcome-subtitle">储物柜管理系统</text>
   </view>
 
   <!-- 分组标题：订单管理 -->
