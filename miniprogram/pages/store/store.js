@@ -417,96 +417,108 @@ Page({
         const orderInfo = checkRes.result.data;
         //检测到有进行中订单
         if(orderInfo.status == this.data.constants.ORDER_STATUS_PROCESSING){
-          await new Promise((resolve, reject) => {
+          const userChoice = await new Promise((resolve) => {
             wx.showModal({
               title: '提示',
-              content: `检测到您在本机还有正在使用的柜门（${orderInfo.lockerNo}号）。是否先取出物品再继续存新包？`, 
+              content: `检测到您在本机还有正在使用的柜门（${orderInfo.lockerNo}号）。是否先取出物品再继续存新包？`,
               showCancel: true,
               cancelText: '取消',
               confirmText: '开旧柜',
-              success: async (res) => {
-                if (res.confirm) {
-                  try {
-                    wx.showLoading({ title: '正在打开旧柜门...' });
-
-                    // 1. 直接调用后端的取件接口（后端会自动开门、释放柜子、结算订单）
-                    const takeRes = await wx.cloud.callFunction({
-                      name: 'locker',
-                      data: {
-                        action: 'openDoor',
-                        deviceId: orderInfo.deviceId,
-                        cabinetNo: orderInfo.cabinetNo,
-                        doorNo: orderInfo.doorNo,
-                        orderId: orderInfo._id, // 注意数据库的主键是 _id
-                        type: 'take'
-                      }
-                    });
-
-                    if (!takeRes.result?.success) {
-                      throw new Error(takeRes.result?.errMsg || '旧柜门打开失败');
-                    }
-
-                    wx.hideLoading();
-
-                    // 2. 旧门开了，给用户一个缓冲时间拿东西，拿完再继续分配新柜子
-                    wx.showModal({
-                      title: '旧柜门已开',
-                      content: `请取出 ${orderInfo.lockerNo} 号柜内的物品并关好门。点击“继续”将立刻为您分配新的空柜子。`,
-                      showCancel: false,
-                      confirmText: '继续',
-                      success: () => {
-                        // 用户点继续，resolve 放行！代码会顺畅地走到下面的 createOrder 去分配新门
-                        resolve();
-                      }
-                    });
-
-                  } catch (err) {
-                    wx.hideLoading();
-                    // 旧柜门打开失败，询问是否强制结束旧订单
-                    wx.showModal({
-                      title: '旧柜门处理失败',
-                      content: err.message + '。是否强制结束旧订单并继续存新包？',
-                      showCancel: true,
-                      cancelText: '取消',
-                      confirmText: '强制结束并继续',
-                      success: async (res) => {
-                        if (res.confirm) {
-                          try {
-                            wx.showLoading({ title: '正在结束旧订单...' });
-                            // 强制结束旧订单（不依赖柜门状态）
-                            const forceFinishRes = await wx.cloud.callFunction({
-                              name: 'order',
-                              data: {
-                                action: 'forceFinish',
-                                orderId: orderInfo._id
-                              }
-                            });
-                            wx.hideLoading();
-                            if (forceFinishRes.result?.success) {
-                              wx.showToast({ title: '旧订单已结束', icon: 'success' });
-                              resolve(); // 继续存新包
-                            } else {
-                              wx.showToast({ title: forceFinishRes.result?.errMsg || '结束旧订单失败', icon: 'none' });
-                              reject(new Error('结束旧订单失败'));
-                            }
-                          } catch (forceErr) {
-                            wx.hideLoading();
-                            wx.showToast({ title: '结束旧订单失败', icon: 'none' });
-                            reject(new Error('结束旧订单失败'));
-                          }
-                        } else {
-                          reject(new Error('已取消操作'));
-                        }
-                      }
-                    });
-                  }
-                } else {
-                  // 用户点击取消，拒绝执行，中断存包
-                  reject(new Error('已取消操作'));
-                }
-              }
+              success: (res) => resolve(res.confirm ? 'open' : 'cancel')
             });
           });
+
+          if (userChoice === 'cancel') {
+            throw new Error('已取消操作');
+          }
+
+          // 用户选择开旧柜
+          try {
+            wx.showLoading({ title: '正在打开旧柜门...' });
+
+            const takeRes = await wx.cloud.callFunction({
+              name: 'locker',
+              data: {
+                action: 'openDoor',
+                deviceId: orderInfo.deviceId,
+                cabinetNo: orderInfo.cabinetNo,
+                doorNo: orderInfo.doorNo,
+                orderId: orderInfo._id,
+                type: 'take'
+              }
+            });
+
+            if (!takeRes.result?.success) {
+              throw new Error(takeRes.result?.errMsg || '旧柜门打开失败');
+            }
+
+            wx.hideLoading();
+
+            // 旧门开了，等待用户确认继续
+            await new Promise((resolve) => {
+              wx.showModal({
+                title: '旧柜门已开',
+                content: `请取出 ${orderInfo.lockerNo} 号柜内的物品并关好门。点击”继续”将立刻为您分配新的空柜子。`,
+                showCancel: false,
+                confirmText: '继续',
+                success: () => resolve()
+              });
+            });
+
+          } catch (err) {
+            wx.hideLoading();
+            console.error('开旧柜失败:', err);
+
+            // 截断错误信息避免超长
+            let errMsg = (err.message || '未知错误').substring(0, 40);
+            if (err.message && err.message.length > 40) errMsg += '...';
+
+            // 等待 loading 完全消失
+            await new Promise(r => setTimeout(r, 200));
+
+            // 询问是否强制结束旧订单
+            const forceChoice = await new Promise((resolve) => {
+              wx.showModal({
+                title: '旧柜门处理失败',
+                content: errMsg + '。是否强制结束旧订单并继续存新包？',
+                showCancel: true,
+                cancelText: '取消',
+                confirmText: "继续",
+                success: (res) => resolve(res.confirm),
+                fail: (e) => {
+                  console.error('showModal 失败:', e);
+                  resolve(false);
+                }
+              });
+            });
+
+            if (!forceChoice) {
+              throw new Error('已取消操作');
+            }
+
+            // 强制结束旧订单
+            try {
+              wx.showLoading({ title: '正在结束旧订单...' });
+              const forceFinishRes = await wx.cloud.callFunction({
+                name: 'order',
+                data: {
+                  action: 'forceFinish',
+                  orderId: orderInfo._id
+                }
+              });
+              wx.hideLoading();
+
+              if (forceFinishRes.result?.success) {
+                wx.showToast({ title: '旧订单已结束', icon: 'success' });
+                // 继续执行下面的创建新订单逻辑
+              } else {
+                throw new Error(forceFinishRes.result?.errMsg || '结束旧订单失败');
+              }
+            } catch (forceErr) {
+              wx.hideLoading();
+              throw new Error(forceErr.message || '结束旧订单失败');
+            }
+          }
         }
       }
 
