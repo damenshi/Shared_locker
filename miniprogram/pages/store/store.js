@@ -462,8 +462,43 @@ Page({
 
                   } catch (err) {
                     wx.hideLoading();
-                    wx.showToast({ title: err.message, icon: 'none', duration: 3000 });
-                    reject(new Error('旧订单处理失败，已中断存包'));
+                    // 旧柜门打开失败，询问是否强制结束旧订单
+                    wx.showModal({
+                      title: '旧柜门处理失败',
+                      content: err.message + '。是否强制结束旧订单并继续存新包？',
+                      showCancel: true,
+                      cancelText: '取消',
+                      confirmText: '强制结束并继续',
+                      success: async (res) => {
+                        if (res.confirm) {
+                          try {
+                            wx.showLoading({ title: '正在结束旧订单...' });
+                            // 强制结束旧订单（不依赖柜门状态）
+                            const forceFinishRes = await wx.cloud.callFunction({
+                              name: 'order',
+                              data: {
+                                action: 'forceFinish',
+                                orderId: orderInfo._id
+                              }
+                            });
+                            wx.hideLoading();
+                            if (forceFinishRes.result?.success) {
+                              wx.showToast({ title: '旧订单已结束', icon: 'success' });
+                              resolve(); // 继续存新包
+                            } else {
+                              wx.showToast({ title: forceFinishRes.result?.errMsg || '结束旧订单失败', icon: 'none' });
+                              reject(new Error('结束旧订单失败'));
+                            }
+                          } catch (forceErr) {
+                            wx.hideLoading();
+                            wx.showToast({ title: '结束旧订单失败', icon: 'none' });
+                            reject(new Error('结束旧订单失败'));
+                          }
+                        } else {
+                          reject(new Error('已取消操作'));
+                        }
+                      }
+                    });
                   }
                 } else {
                   // 用户点击取消，拒绝执行，中断存包
