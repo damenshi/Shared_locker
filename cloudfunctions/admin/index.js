@@ -787,5 +787,89 @@ exports.main = async (event, context) => {
     }
   }
 
+  // 按设备设置免费模式（不影响其他设备）
+  if (action === 'setDeviceFree') {
+    const { deviceId, isFree } = event;
+
+    if (!deviceId) {
+      return { success: false, errMsg: '缺少设备ID' };
+    }
+
+    try {
+      // 验证设备是否存在
+      const device = await db.collection('devices').where({ deviceId }).get();
+      if (!device.data || device.data.length === 0) {
+        return { success: false, errMsg: '设备不存在' };
+      }
+
+      // 更新设备的免费模式
+      // 处理字符串 "true"/"false" 转布尔值
+      const isFreeValue = isFree === true || isFree === 'true';
+      await db.collection('devices').where({ deviceId }).update({
+        data: {
+          isFree: isFreeValue,
+          updatedAt: db.serverDate()
+        }
+      });
+
+      return {
+        success: true,
+        message: `设备 ${device.data[0].internalNo} 已${isFreeValue ? '开启' : '关闭'}免费模式`
+      };
+    } catch (e) {
+      console.error('设置设备免费模式失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 获取当前设置了免费模式的设备列表
+  if (action === 'getFreeDevices') {
+    try {
+      const result = await db.collection('devices')
+        .where({ isFree: true })
+        .field({
+          deviceId: true,
+          internalNo: true,
+          deviceAddress: true,
+          isOnline: true
+        })
+        .get();
+
+      return {
+        success: true,
+        data: result.data,
+        count: result.data.length
+      };
+    } catch (e) {
+      console.error('获取免费设备列表失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 获取当前离线设备列表
+  if (action === 'getOfflineDevices') {
+    try {
+      const result = await db.collection('devices')
+        .where({ isOnline: false })
+        .field({
+          deviceId: true,
+          internalNo: true,
+          deviceAddress: true,
+          isOnline: true
+        })
+        .orderBy('updatedAt', 'desc')
+        .get();
+
+      return {
+        success: true,
+        data: result.data,
+        count: result.data.length
+      };
+    } catch (e) {
+      console.error('获取离线设备列表失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
   return { error: 'unknown action' }
 }

@@ -5,6 +5,36 @@
     <text class="welcome-subtitle">储物柜管理系统</text>
   </view>
 
+  <!-- 免费设备列表 -->
+  <view class="summary-section" wx:if="{{freeDevices.length > 0}}">
+    <view class="summary-header">
+      <text class="summary-title">当前免费设备</text>
+      <text class="summary-count free">{{freeDevices.length}} 台</text>
+    </view>
+    <view class="summary-list">
+      <view class="summary-item free" wx:for="{{freeDevices}}" wx:key="deviceId">
+        <text class="summary-no">{{item.internalNo}}</text>
+        <text class="summary-addr">{{item.deviceAddress || '无地址'}}</text>
+        <text class="summary-status {{item.isOnline ? 'online' : 'offline'}}">{{item.isOnline ? '在线' : '离线'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 离线设备列表 -->
+  <view class="summary-section" wx:if="{{offlineDevices.length > 0}}">
+    <view class="summary-header">
+      <text class="summary-title">当前离线设备</text>
+      <text class="summary-count offline">{{offlineDevices.length}} 台</text>
+    </view>
+    <view class="summary-list">
+      <view class="summary-item offline" wx:for="{{offlineDevices}}" wx:key="deviceId">
+        <text class="summary-no">{{item.internalNo}}</text>
+        <text class="summary-addr">{{item.deviceAddress || '无地址'}}</text>
+        <text class="summary-status offline-text">离线</text>
+      </view>
+    </view>
+  </view>
+
   <!-- 分组标题：订单管理 -->
   <view class="section-header">
     <view class="section-line"></view>

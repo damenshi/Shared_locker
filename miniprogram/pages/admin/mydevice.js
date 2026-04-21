@@ -31,6 +31,11 @@ Page({
     showAppidModal: false,
     currentChangeDeviceId: null,
     currentChangeDeviceName: '',
+    // 免费模式弹窗
+    showFreeModal: false,
+    currentFreeDeviceId: null,
+    currentFreeDeviceName: '',
+    currentFreeStatus: false,
   },
 
   onLoad() {
@@ -374,6 +379,71 @@ Page({
       showAppidModal: false,
       currentChangeDeviceId: null,
       currentChangeDeviceName: ''
+    });
+  },
+
+  // === 按设备设置免费模式 ===
+  showFreeModeModal(e) {
+    const deviceId = e.currentTarget.dataset.deviceid;
+    const internalNo = e.currentTarget.dataset.internalno;
+    // 从设备列表中查找当前设备的 isFree 状态，而不是依赖 dataset
+    const device = this.data.devices.find(d => d.deviceId === deviceId);
+    const isFreeStatus = device ? (device.isFree === true || device.isFree === 'true') : false;
+    this.setData({
+      showFreeModal: true,
+      currentFreeDeviceId: deviceId,
+      currentFreeDeviceName: internalNo,
+      currentFreeStatus: isFreeStatus
+    });
+  },
+
+  closeFreeModal() {
+    this.setData({
+      showFreeModal: false,
+      currentFreeDeviceId: null,
+      currentFreeDeviceName: '',
+      currentFreeStatus: false
+    });
+  },
+
+  // 切换免费模式
+  async toggleDeviceFree() {
+    const { currentFreeDeviceId, currentFreeDeviceName, currentFreeStatus } = this.data;
+    // 关闭免费 -> isFree 设为 false，开启免费 -> isFree 设为 true
+    const newFreeStatus = !currentFreeStatus;
+    const actionText = newFreeStatus ? '开启' : '关闭';
+
+    wx.showModal({
+      title: '确认操作',
+      content: `确定${actionText}设备 ${currentFreeDeviceName} 的免费模式吗？`,
+      success: async res => {
+        if (res.confirm) {
+          wx.showLoading({ title: '设置中...' });
+          try {
+            const result = await wx.cloud.callFunction({
+              name: 'admin',
+              data: {
+                action: 'setDeviceFree',
+                deviceId: currentFreeDeviceId,
+                isFree: newFreeStatus
+              }
+            });
+
+            wx.hideLoading();
+            if (result.result.success) {
+              wx.showToast({ title: result.result.message || '设置成功', icon: 'success' });
+              this.closeFreeModal();
+              this.getDevices(); // 刷新设备列表
+            } else {
+              wx.showToast({ title: result.result.errMsg || '设置失败', icon: 'none' });
+            }
+          } catch (err) {
+            wx.hideLoading();
+            console.error('设置免费模式失败:', err);
+            wx.showToast({ title: '设置失败', icon: 'none' });
+          }
+        }
+      }
     });
   },
 

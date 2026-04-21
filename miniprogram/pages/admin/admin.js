@@ -29,7 +29,11 @@ Page({
     isFreeMode: false,
 
     // 商户列表
-    merchantList: []
+    merchantList: [],
+
+    // 免费设备和离线设备列表
+    freeDevices: [],
+    offlineDevices: []
   },
 
   // 输入框变化处理
@@ -161,6 +165,8 @@ Page({
       this.fetchFreeModeStatus();
       // 获取商户配置列表
       this.fetchMerchantConfigs();
+      // 获取免费设备和离线设备列表
+      this.fetchSummaryLists();
     } catch (err) {
       console.error('管理员权限验证失败：', err);
       wx.showToast({ title: '验证失败', icon: 'none' });
@@ -299,6 +305,28 @@ Page({
       }
     } catch (err) {
       console.error('获取商户配置失败:', err);
+    }
+  },
+
+  // 获取免费设备和离线设备列表
+  async fetchSummaryLists() {
+    try {
+      const [freeRes, offlineRes] = await Promise.all([
+        wx.cloud.callFunction({
+          name: 'admin',
+          data: { action: 'getFreeDevices' }
+        }),
+        wx.cloud.callFunction({
+          name: 'admin',
+          data: { action: 'getOfflineDevices' }
+        })
+      ]);
+      this.setData({
+        freeDevices: freeRes.result.success ? (freeRes.result.data || []) : [],
+        offlineDevices: offlineRes.result.success ? (offlineRes.result.data || []) : []
+      });
+    } catch (err) {
+      console.error('获取汇总列表失败:', err);
     }
   },
 
