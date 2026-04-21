@@ -9,6 +9,9 @@
         <view class="devices-card">
           <view class="devices-header">
             <text class="devices-id">设备编号：{{item.internalNo}}</text>
+            <text class="free-tag {{item.isFree ? 'free' : 'paid'}}">
+              {{item.isFree ? '免费' : '收费'}}
+            </text>
           </view>
 
           <view class="devices-body">
@@ -126,38 +129,42 @@
             </view>
 
             <!-- ✅ 新增操作按钮 -->
-            <view class="action-buttons">
-              <block wx:if="{{item.isLocal}}">
-                <!-- 当前小程序的设备显示完整操作 -->
-                <button class="ios-btn blue"
+            <view class="action-buttons" wx:if="{{item.isLocal}}">
+              <!-- 第一行：主要操作 -->
+              <button class="ios-btn blue"
                 data-deviceId="{{item.deviceId}}"
                 data-internalNo="{{item.internalNo}}"
                 bindtap="showOpenLockerModal">开柜</button>
-                <button class="ios-btn orange" data-deviceId="{{item.deviceId}}" bindtap="confirmClearLockers">清柜</button>
-                <button class="ios-btn red"
+              <button class="ios-btn orange" data-deviceId="{{item.deviceId}}" bindtap="confirmClearLockers">清柜</button>
+              <button class="ios-btn red"
                 data-internalNo="{{item.internalNo}}"
                 data-cabinetCount="{{item.cabinetCount}}"
                 data-doorCount="{{item.doorCount}}"
                 bindtap="confirmOpenAllLockers">全开</button>
-
-                <button class="ios-btn purple"
+            </view>
+            <view class="action-buttons" wx:if="{{item.isLocal}}">
+              <!-- 第二行：辅助操作 -->
+              <button class="ios-btn purple"
                 data-internalNo="{{item.internalNo}}"
                 bindtap="showStatusModal">柜门状态</button>
-
-                <button class="ios-btn green"
+              <button class="ios-btn {{item.isFree ? 'orange' : 'green'}}"
+                data-deviceid="{{item.deviceId}}"
+                data-internalno="{{item.internalNo}}"
+                data-isFree="{{item.isFree}}"
+                bindtap="showFreeModeModal">{{item.isFree ? '关闭免费' : '开启免费'}}</button>
+              <button class="ios-btn purple-light"
                 data-deviceid="{{item.deviceId}}"
                 data-internalno="{{item.internalNo}}"
                 bindtap="showAppidModal">归属设置</button>
-              </block>
+            </view>
 
-              <block wx:if="{{!item.isLocal}}">
-                <!-- 非当前小程序的设备只显示归属设置 -->
-                <button class="ios-btn gray" disabled>已迁移</button>
-                <button class="ios-btn green"
+            <view class="action-buttons" wx:if="{{!item.isLocal}}">
+              <!-- 非当前小程序的设备 -->
+              <button class="ios-btn gray" disabled>已迁移</button>
+              <button class="ios-btn purple-light"
                 data-deviceid="{{item.deviceId}}"
                 data-internalno="{{item.internalNo}}"
                 bindtap="showAppidModal">归属设置</button>
-              </block>
             </view>
           </view>
 
@@ -238,6 +245,23 @@
       <view class="modal-buttons" style="margin-top: 20rpx;">
         <button class="cancel-btn" catchtap="closeAppidModal">取消</button>
         <button class="confirm-btn" catchtap="confirmChangeAppid">确定</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 按设备设置免费模式弹窗 -->
+  <view class="modal-mask" wx:if="{{showFreeModal}}" bindtap="closeFreeModal">
+    <view class="modal" catchtap="true">
+      <view class="modal-title">设置免费模式</view>
+      <view class="modal-content-body">
+        <view class="device-tip">当前设备：{{currentFreeDeviceName}}</view>
+        <view class="free-tip">当前状态：{{currentFreeStatus ? '已开启免费' : '未开启免费'}}</view>
+      </view>
+      <view class="modal-buttons" style="margin-top: 20rpx;">
+        <button class="confirm-btn green" catchtap="toggleDeviceFree">
+          {{currentFreeStatus ? '关闭免费模式' : '开启免费模式'}}
+        </button>
+        <button class="cancel-btn" catchtap="closeFreeModal">取消</button>
       </view>
     </view>
   </view>
