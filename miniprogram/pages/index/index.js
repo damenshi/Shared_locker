@@ -102,6 +102,11 @@ Page({
     setTimeout(() => {
       this.playVoicePrompt(`欢迎使用${miniName}，请输入手机号和取件码`);
     }, 500);
+
+    // 清理旧的缓存数据（新逻辑不再使用这些缓存）
+    wx.removeStorageSync('showLockerBox');
+    wx.removeStorageSync('openedLockerNo');
+    wx.removeStorageSync('lockerShowTime');
   },
 
   onUnload() {
@@ -125,46 +130,53 @@ Page({
   //   }
   // },
 
-  onShow() {
+  async onShow() {
     this.setData({
       openid: app.globalData.openid || '',
       deviceId: app.globalData.deviceId || '',
     });
 
-    // 1. 获取缓存中的显示状态和时间
-    const showLockerBox = wx.getStorageSync('showLockerBox');
-    const openedLockerNo = wx.getStorageSync('openedLockerNo');
-    const lockerShowTime = wx.getStorageSync('lockerShowTime') || 0;
+    // 查询用户是否有进行中的订单，决定是否显示柜门标签
+    await this.checkAndShowLockerBox();
+  },
 
-    // 2. 定义超时时间 (24小时)
-    const EXPIRE_TIME = 24 * 60 * 60 * 1000;
+  // 查询进行中的订单并显示柜门标签
+  async checkAndShowLockerBox() {
+    try {
+      const openid = app.globalData.openid;
+      const deviceId = app.globalData.deviceId;
 
-    const now = Date.now();
+      if (!openid || !deviceId) {
+        this.setData({ showLockerBox: false, openedLockerNo: '' });
+        return;
+      }
 
-    if (showLockerBox) {
-      // 3. 核心判断：如果距离上次显示已经超过 24 小时
-      if (now - lockerShowTime > EXPIRE_TIME) {
-        // === 超时处理 ===
-        console.log('柜门显示状态已超时(超过1天)，自动隐藏');
-        
-        // (1) 清除页面数据，隐藏UI
+      const res = await wx.cloud.callFunction({
+        name: 'order',
+        data: {
+          action: 'queryByOpenid',
+          openid: openid,
+          deviceId: deviceId
+        }
+      });
+
+      if (res.result?.success && res.result?.data) {
+        // 有进行中的订单，显示柜门号
+        const order = res.result.data;
+        this.setData({
+          showLockerBox: true,
+          openedLockerNo: order.lockerNo || ''
+        });
+      } else {
+        // 没有进行中的订单，隐藏标签
         this.setData({
           showLockerBox: false,
           openedLockerNo: ''
         });
-
-        //清除过期缓存，防止下次进来还显示
-        wx.removeStorageSync('showLockerBox');
-        wx.removeStorageSync('openedLockerNo');
-        wx.removeStorageSync('lockerShowTime');
-      } else {
-        // === 未超时 ===
-        // 正常恢复显示
-        this.setData({
-          showLockerBox: true,
-          openedLockerNo: openedLockerNo
-        });
       }
+    } catch (err) {
+      console.error('查询进行中的订单失败:', err);
+      this.setData({ showLockerBox: false, openedLockerNo: '' });
     }
   },
 
@@ -210,10 +222,6 @@ Page({
       showLockerBox: true,
       openedLockerNo: lockerNo
     });
-
-    wx.setStorageSync('lockerShowTime', Date.now());
-    wx.setStorageSync('showLockerBox', true);
-    wx.setStorageSync('openedLockerNo', lockerNo);
   },
 
    // 点击中途开柜按钮

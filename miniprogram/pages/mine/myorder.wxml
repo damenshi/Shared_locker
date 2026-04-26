@@ -66,7 +66,7 @@
             </block>
           </view>
           <button class="btn refund"
-                  wx:if="{{item.status === '已完成' || item.status === '已关闭' || item.status === '进行中'}}"
+                  wx:if="{{item.status === '已完成' || item.status === '已关闭' || item.status === '进行中' || item.status === '已强制结束'}}"
                   bindtap="refund"
                   data-openid="{{item.openid}}"
                   data-id="{{item._id}}">

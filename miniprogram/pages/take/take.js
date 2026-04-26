@@ -218,8 +218,6 @@ Page({
         `取件成功，柜门 ${order.lockerNo} 已打开，订单已结束`,
         () => { wx.navigateBack({ delta: 2 }); }
       );
-      wx.setStorageSync('showLockerBox', false);
-      wx.setStorageSync('openedLockerNo', '');
       if (!isOrderFinished) {
         throw new Error('取件后订单更新失败');
       }
