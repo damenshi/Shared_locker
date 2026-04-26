@@ -566,26 +566,43 @@ Page({
       if (isFree) {
         //免费模式 ---
         //开门前提示
-        this.playVoicePrompt("正在为您开门，请稍后");
+        this.playVoicePrompt('正在为您开门，请稍后');
         wx.showLoading({ title: '正在开门...' });
 
-        // 直接将订单状态更新为“进行中”，押金设为 0
+        // 直接将订单状态更新为”进行中”，押金设为 0
         const updateOrderRes = await wx.cloud.callFunction({
-          name: "order",
+          name: 'order',
           data: {
-            action: "updateOrder",
+            action: 'updateOrder',
             orderId: orderId,
             status: this.data.constants.ORDER_STATUS_PROCESSING,
             deposit: 0
           }
         });
 
-        if (!updateOrderRes.result?.success) 
+        if (!updateOrderRes.result?.success)
           throw new Error('激活免费服务失败');
-        
+
+        // 免费模式也需要实际开门
+        const openDoorRes = await wx.cloud.callFunction({
+          name: 'locker',
+          data: {
+            action: 'openDoor',
+            deviceId: this.data.deviceId,
+            doorNo: lockerInfo.doorNo,
+            cabinetNo: lockerInfo.cabinetNo,
+            orderId: orderId,
+            type: 'store'
+          }
+        });
+
+        if (!openDoorRes.result?.success) {
+          throw new Error('开门失败，设备不在线');
+        }
+
         canRecover = false; // 状态已更新，不再执行前端回滚
         newDeposit = 0;
-        console.log('免费模式：已直接激活订单');
+        console.log('免费模式：已直接激活订单并开门');
 
       } else {
         const confirmPay = await this.showPaymentConfirmModal(deviceDeposit, lockerInfo.lockerNo);
