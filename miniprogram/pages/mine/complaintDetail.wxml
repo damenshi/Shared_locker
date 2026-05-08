@@ -1,0 +1,41 @@
+<view class="container">
+  <view class="detail-card">
+    <view class="detail-header">
+      <text class="detail-type">{{complaint.typeText}}</text>
+      <text class="detail-status status-{{complaint.status}}">{{complaint.statusText}}</text>
+    </view>
+
+    <view class="detail-row">
+      <text class="detail-label">投诉内容</text>
+    </view>
+    <view class="detail-content">{{complaint.content}}</view>
+
+    <view class="detail-row" wx:if="{{complaint.orderId}}">
+      <text class="detail-label">关联订单</text>
+      <text class="detail-value">{{complaint.orderId}}</text>
+    </view>
+
+    <view class="detail-row" wx:if="{{complaint.internalNo}}">
+      <text class="detail-label">设备编号</text>
+      <text class="detail-value">{{complaint.internalNo}}</text>
+    </view>
+
+    <view class="detail-row" wx:if="{{complaint.lockerNo}}">
+      <text class="detail-label">柜门号</text>
+      <text class="detail-value">{{complaint.lockerNo}}</text>
+    </view>
+
+    <view class="detail-row">
+      <text class="detail-label">提交时间</text>
+      <text class="detail-value">{{complaint.createdAtFormatted}}</text>
+    </view>
+
+    <view class="reply-section" wx:if="{{complaint.reply}}">
+      <view class="reply-label">管理员回复</view>
+      <view class="reply-content">{{complaint.reply}}</view>
+      <view class="reply-time" wx:if="{{complaint.handledAtFormatted}}">
+        回复时间：{{complaint.handledAtFormatted}}
+      </view>
+    </view>
+  </view>
+</view>

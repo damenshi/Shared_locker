@@ -1,0 +1,31 @@
+<view class="container">
+  <view class="create-btn" bindtap="goComplaintForm">
+    + 发起新投诉
+  </view>
+
+  <block wx:if="{{!loading && complaints.length === 0}}">
+    <view class="empty">暂无投诉记录</view>
+  </block>
+
+  <block wx:if="{{complaints.length > 0}}">
+    <view class="complaint-list">
+      <view
+        class="complaint-card"
+        wx:for="{{complaints}}"
+        wx:key="_id"
+        bindtap="goComplaintDetail"
+        data-id="{{item._id}}"
+      >
+        <view class="card-header">
+          <text class="type-tag">{{item.typeText}}</text>
+          <text class="status-tag status-{{item.status}}">{{item.statusText}}</text>
+        </view>
+        <view class="card-content">{{item.content}}</view>
+        <view class="card-footer">{{item.createdAtFormatted}}</view>
+        <view class="order-link" wx:if="{{item.orderId}}">
+          关联订单：{{item.orderId}}
+        </view>
+      </view>
+    </view>
+  </block>
+</view>
