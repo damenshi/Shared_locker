@@ -173,6 +173,27 @@
     </view>
   </view>
 
+  <!-- 分组标题：投诉管理 -->
+  <view class="section-header">
+    <view class="section-line"></view>
+    <text class="section-title">投诉管理</text>
+    <view class="section-line"></view>
+  </view>
+
+  <!-- 投诉管理 -->
+  <view class="card card-complaint" bindtap="goComplaints">
+    <view class="card-header-row">
+      <view class="card-icon icon-complaint">
+        <text class="icon-text">📝</text>
+      </view>
+      <view class="card-info">
+        <view class="card-title">用户投诉</view>
+        <view class="card-desc">查看和处理用户投诉</view>
+      </view>
+      <view class="card-arrow">›</view>
+    </view>
+  </view>
+
   <!-- 分组标题：系统设置 -->
   <view class="section-header">
     <view class="section-line"></view>

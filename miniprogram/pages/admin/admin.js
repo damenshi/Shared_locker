@@ -258,6 +258,8 @@ Page({
 
   goMyDeviceList() { wx.navigateTo({ url: '/pages/admin/mydevice' }); },
 
+  goComplaints() { wx.navigateTo({ url: '/pages/admin/complaints' }); },
+
   // 一键清空所有柜门
   async clearAllLockers() {
     wx.showModal({
