@@ -110,6 +110,13 @@ Page({
     }
   },
 
+  goComplaint(event) {
+    const orderId = event.currentTarget.dataset.id;
+    wx.navigateTo({
+      url: `/pages/mine/complaintForm?orderId=${orderId}`
+    });
+  },
+
   async refund(event) {
     console.log('退款事件：', event)
   

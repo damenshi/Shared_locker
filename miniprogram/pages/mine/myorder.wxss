@@ -78,6 +78,17 @@
   font-size: 20rpx;
 }
 
+.action-btns {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 20rpx;
+}
+
+.btn.complaint {
+  background: #f0f0f0;
+  color: #666;
+}
+
 .footer-tips {
   text-align: center;
   font-size: 28rpx; /* 字号较小 */
