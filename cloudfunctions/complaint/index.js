@@ -1,7 +1,6 @@
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
-const _ = db.command
 
 // 投诉类型常量
 const COMPLAINT_TYPES = {
@@ -21,16 +20,17 @@ const COMPLAINT_STATUSES = {
 // 参数验证
 const validateParams = (params, rules) => {
   for (const [key, rule] of Object.entries(rules)) {
-    if (params[key] === undefined || params[key] === null || params[key] === '') {
+    const value = params[key]
+    if (value === undefined || value === null || value === '' || (typeof value === 'string' && value.trim() === '')) {
       return { valid: false, msg: `参数错误：${key}不能为空` }
     }
-    if (rule.type && typeof params[key] !== rule.type) {
+    if (rule.type && typeof value !== rule.type) {
       return { valid: false, msg: `参数错误：${key}应为${rule.type}` }
     }
-    if (rule.enum && !rule.enum.includes(params[key])) {
+    if (rule.enum && !rule.enum.includes(value)) {
       return { valid: false, msg: `参数错误：${key}必须为${rule.enum.join('或')}` }
     }
-    if (rule.maxLength && params[key].length > rule.maxLength) {
+    if (rule.maxLength && value.length > rule.maxLength) {
       return { valid: false, msg: `参数错误：${key}最多${rule.maxLength}字` }
     }
   }
@@ -39,11 +39,16 @@ const validateParams = (params, rules) => {
 
 // 检查是否为超级管理员
 const checkSuperAdmin = async (openid) => {
-  const adminRes = await db.collection('admin_permission').where({
-    openid: openid,
-    type: 'super'
-  }).get()
-  return adminRes.data.length > 0
+  try {
+    const adminRes = await db.collection('admin_permission').where({
+      openid: openid,
+      type: 'super'
+    }).get()
+    return adminRes.data.length > 0
+  } catch (err) {
+    console.error('[checkSuperAdmin] 查询失败:', err)
+    return false
+  }
 }
 
 // ========== 创建投诉 ==========
@@ -63,8 +68,13 @@ const createComplaint = async (event, openid) => {
   }
 
   // 获取用户信息
-  const userRes = await db.collection('users').where({ openid }).get()
-  const phone = userRes.data.length > 0 ? userRes.data[0].phone : ''
+  let phone = ''
+  try {
+    const userRes = await db.collection('users').where({ openid }).get()
+    phone = userRes.data.length > 0 ? (userRes.data[0].phone || '') : ''
+  } catch (err) {
+    console.error('[createComplaint] 获取用户信息失败:', err)
+  }
 
   // 构建投诉数据
   const complaintData = {
@@ -72,7 +82,7 @@ const createComplaint = async (event, openid) => {
     phone,
     type,
     typeText: COMPLAINT_TYPES[type].text,
-    content,
+    content: content.trim(),
     status: 'pending',
     statusText: COMPLAINT_STATUSES.pending.text,
     reply: '',
@@ -84,15 +94,24 @@ const createComplaint = async (event, openid) => {
 
   // 如有关联订单，自动带入订单信息
   if (orderId) {
-    const orderRes = await db.collection('orders').doc(orderId).get()
-    if (!orderRes.data) {
+    let order = null
+    try {
+      const orderRes = await db.collection('orders').doc(orderId).get()
+      order = orderRes.data
+    } catch (err) {
+      console.error('[createComplaint] 查询订单失败:', err)
       return { success: false, errMsg: '订单不存在' }
     }
-    const order = orderRes.data
+
+    if (!order) {
+      return { success: false, errMsg: '订单不存在' }
+    }
+
     // 验证订单归属
     if (order.openid !== openid) {
       return { success: false, errMsg: '无权投诉此订单' }
     }
+
     complaintData.orderId = orderId
     complaintData.deviceId = order.deviceId || ''
     complaintData.internalNo = order.internalNo || ''
@@ -100,21 +119,30 @@ const createComplaint = async (event, openid) => {
   }
 
   // 插入数据库
-  const result = await db.collection('complaints').add({
-    data: complaintData
-  })
-
-  return { success: true, data: { complaintId: result._id } }
+  try {
+    const result = await db.collection('complaints').add({
+      data: complaintData
+    })
+    return { success: true, data: { complaintId: result._id } }
+  } catch (err) {
+    console.error('[createComplaint] 插入投诉记录失败:', err)
+    return { success: false, errMsg: '创建投诉失败，请重试' }
+  }
 }
 
 // ========== 获取我的投诉列表 ==========
 const getMyComplaints = async (openid) => {
-  const result = await db.collection('complaints')
-    .where({ openid })
-    .orderBy('createdAt', 'desc')
-    .get()
+  try {
+    const result = await db.collection('complaints')
+      .where({ openid })
+      .orderBy('createdAt', 'desc')
+      .get()
 
-  return { success: true, data: result.data }
+    return { success: true, data: result.data }
+  } catch (err) {
+    console.error('[getMyComplaints] 查询失败:', err)
+    return { success: false, errMsg: '获取投诉列表失败' }
+  }
 }
 
 // ========== 获取投诉列表（管理员） ==========
@@ -131,12 +159,17 @@ const getComplaintList = async (event, openid) => {
     query.status = status
   }
 
-  const result = await db.collection('complaints')
-    .where(query)
-    .orderBy('createdAt', 'desc')
-    .get()
+  try {
+    const result = await db.collection('complaints')
+      .where(query)
+      .orderBy('createdAt', 'desc')
+      .get()
 
-  return { success: true, data: result.data }
+    return { success: true, data: result.data }
+  } catch (err) {
+    console.error('[getComplaintList] 查询失败:', err)
+    return { success: false, errMsg: '获取投诉列表失败' }
+  }
 }
 
 // ========== 获取投诉详情 ==========
@@ -146,18 +179,26 @@ const getComplaintDetail = async (event, openid) => {
     return { success: false, errMsg: '缺少投诉ID' }
   }
 
-  const result = await db.collection('complaints').doc(complaintId).get()
-  if (!result.data) {
+  let complaint = null
+  try {
+    const result = await db.collection('complaints').doc(complaintId).get()
+    complaint = result.data
+  } catch (err) {
+    console.error('[getComplaintDetail] 查询投诉失败:', err)
+    return { success: false, errMsg: '投诉记录不存在' }
+  }
+
+  if (!complaint) {
     return { success: false, errMsg: '投诉记录不存在' }
   }
 
   // 权限检查：用户只能看自己的，管理员可以看所有
   const isSuperAdmin = await checkSuperAdmin(openid)
-  if (!isSuperAdmin && result.data.openid !== openid) {
+  if (!isSuperAdmin && complaint.openid !== openid) {
     return { success: false, errMsg: '无权查看此投诉' }
   }
 
-  return { success: true, data: result.data }
+  return { success: true, data: complaint }
 }
 
 // ========== 更新投诉状态（管理员） ==========
@@ -183,17 +224,21 @@ const updateStatus = async (event, openid) => {
     updatedAt: db.serverDate()
   }
 
-  // 状态变为 processing/resolver/rejected 时记录处理人
+  // 状态变为 processing/resolved/rejected 时记录处理人
   if (['processing', 'resolved', 'rejected'].includes(status)) {
     updateData.handledBy = openid
     updateData.handledAt = db.serverDate()
   }
 
-  await db.collection('complaints').doc(complaintId).update({
-    data: updateData
-  })
-
-  return { success: true, message: `状态已更新为${COMPLAINT_STATUSES[status].text}` }
+  try {
+    await db.collection('complaints').doc(complaintId).update({
+      data: updateData
+    })
+    return { success: true, message: `状态已更新为${COMPLAINT_STATUSES[status].text}` }
+  } catch (err) {
+    console.error('[updateStatus] 更新失败:', err)
+    return { success: false, errMsg: '更新状态失败，投诉记录可能不存在' }
+  }
 }
 
 // ========== 添加回复（管理员） ==========
@@ -205,20 +250,24 @@ const addReply = async (event, openid) => {
   }
 
   const { complaintId, reply } = event
-  if (!complaintId || !reply) {
+  if (!complaintId || !reply || reply.trim() === '') {
     return { success: false, errMsg: '缺少投诉ID或回复内容' }
   }
 
-  await db.collection('complaints').doc(complaintId).update({
-    data: {
-      reply,
-      handledBy: openid,
-      handledAt: db.serverDate(),
-      updatedAt: db.serverDate()
-    }
-  })
-
-  return { success: true, message: '回复已提交' }
+  try {
+    await db.collection('complaints').doc(complaintId).update({
+      data: {
+        reply: reply.trim(),
+        handledBy: openid,
+        handledAt: db.serverDate(),
+        updatedAt: db.serverDate()
+      }
+    })
+    return { success: true, message: '回复已提交' }
+  } catch (err) {
+    console.error('[addReply] 更新失败:', err)
+    return { success: false, errMsg: '提交回复失败，投诉记录可能不存在' }
+  }
 }
 
 exports.main = async (event, context) => {
@@ -226,24 +275,33 @@ exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext()
   const OPENID = wxContext.OPENID
 
-  if (action === 'createComplaint') {
-    return await createComplaint(event, OPENID)
-  }
-  if (action === 'getMyComplaints') {
-    return await getMyComplaints(OPENID)
-  }
-  if (action === 'getComplaintList') {
-    return await getComplaintList(event, OPENID)
-  }
-  if (action === 'getComplaintDetail') {
-    return await getComplaintDetail(event, OPENID)
-  }
-  if (action === 'updateStatus') {
-    return await updateStatus(event, OPENID)
-  }
-  if (action === 'addReply') {
-    return await addReply(event, OPENID)
+  if (!OPENID) {
+    return { success: false, errMsg: '用户未登录' }
   }
 
-  return { error: 'unknown action', errMsg: '未找到对应的操作' }
+  try {
+    if (action === 'createComplaint') {
+      return await createComplaint(event, OPENID)
+    }
+    if (action === 'getMyComplaints') {
+      return await getMyComplaints(OPENID)
+    }
+    if (action === 'getComplaintList') {
+      return await getComplaintList(event, OPENID)
+    }
+    if (action === 'getComplaintDetail') {
+      return await getComplaintDetail(event, OPENID)
+    }
+    if (action === 'updateStatus') {
+      return await updateStatus(event, OPENID)
+    }
+    if (action === 'addReply') {
+      return await addReply(event, OPENID)
+    }
+
+    return { error: 'unknown action', errMsg: '未找到对应的操作' }
+  } catch (err) {
+    console.error('[complaint] 未捕获的异常:', err)
+    return { success: false, errMsg: '服务器内部错误' }
+  }
 }
