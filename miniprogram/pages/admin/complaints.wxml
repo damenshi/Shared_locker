@@ -1,0 +1,81 @@
+<view class="container">
+  <view class="stats-bar">
+    <view class="stat-item">
+      <view class="stat-num">{{stats.total}}</view>
+      <view class="stat-label">全部</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-num" style="color: #856404;">{{stats.pending}}</view>
+      <view class="stat-label">待处理</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-num" style="color: #004085;">{{stats.processing}}</view>
+      <view class="stat-label">处理中</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-num" style="color: #155724;">{{stats.resolved}}</view>
+      <view class="stat-label">已解决</view>
+    </view>
+  </view>
+
+  <view class="filter-bar">
+    <view
+      class="filter-item {{currentFilter === '' ? 'active' : ''}}"
+      bindtap="filterByStatus"
+      data-status=""
+    >全部</view>
+    <view
+      class="filter-item {{currentFilter === 'pending' ? 'active' : ''}}"
+      bindtap="filterByStatus"
+      data-status="pending"
+    >待处理</view>
+    <view
+      class="filter-item {{currentFilter === 'processing' ? 'active' : ''}}"
+      bindtap="filterByStatus"
+      data-status="processing"
+    >处理中</view>
+    <view
+      class="filter-item {{currentFilter === 'resolved' ? 'active' : ''}}"
+      bindtap="filterByStatus"
+      data-status="resolved"
+    >已解决</view>
+    <view
+      class="filter-item {{currentFilter === 'rejected' ? 'active' : ''}}"
+      bindtap="filterByStatus"
+      data-status="rejected"
+    >已拒绝</view>
+  </view>
+
+  <block wx:if="{{!loading && complaints.length === 0}}">
+    <view class="empty">暂无投诉记录</view>
+  </block>
+
+  <block wx:if="{{complaints.length > 0}}">
+    <view class="complaint-list">
+      <view class="complaint-card" wx:for="{{complaints}}" wx:key="_id">
+        <view class="card-header">
+          <text class="user-info">{{item.phone || '未知用户'}}</text>
+          <text class="status-tag status-{{item.status}}">{{item.statusText}}</text>
+        </view>
+        <view class="card-meta">
+          {{item.typeText}} | {{item.createdAtFormatted}}
+          <text wx:if="{{item.internalNo}}"> | {{item.internalNo}}</text>
+        </view>
+        <view class="card-content">{{item.content}}</view>
+        <view class="card-actions">
+          <button
+            class="action-btn primary"
+            wx:if="{{item.status === 'pending'}}"
+            bindtap="handleComplaint"
+            data-id="{{item._id}}"
+          >处理</button>
+          <button
+            class="action-btn"
+            bindtap="viewDetail"
+            data-id="{{item._id}}"
+          >查看</button>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>
