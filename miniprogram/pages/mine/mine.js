@@ -84,6 +84,10 @@ Page({
 
   goMywallet() { wx.navigateTo({ url: '/pages/mine/mywallet' }); },
 
+  goComplaintList() {
+    wx.navigateTo({ url: '/pages/mine/complaintList' });
+  },
+
   customerService() {
     wx.makePhoneCall({ phoneNumber: '400-832-6132' });
   },

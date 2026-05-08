@@ -13,7 +13,12 @@
     "pages/mine/myorder",
     "pages/mine/mywallet",
     "pages/mine/about",
-    "pages/mine/agreement/userAgreement"
+    "pages/mine/agreement/userAgreement",
+    "pages/mine/complaintList",
+    "pages/mine/complaintForm",
+    "pages/mine/complaintDetail",
+    "pages/admin/complaints",
+    "pages/admin/complaintDetail"
   ],
   "window": {
     "navigationBarTitleText": "星耀储物",
