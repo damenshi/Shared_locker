@@ -20,6 +20,7 @@
           <text class="type-tag">{{item.typeText}}</text>
           <text class="status-tag status-{{item.status}}">{{item.statusText}}</text>
         </view>
+        <view class="card-phone">{{item.phone || '未填写手机号'}}</view>
         <view class="card-content">{{item.content}}</view>
         <view class="card-footer">{{item.createdAtFormatted}}</view>
         <view class="order-link" wx:if="{{item.orderId}}">
