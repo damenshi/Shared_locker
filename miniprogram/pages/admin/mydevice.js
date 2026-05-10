@@ -95,9 +95,9 @@ Page({
         lastMonthRefunded: 0,
       }));
 
-      const deviceIds = devices.filter(d => d.isLocal).map(d => d.deviceId);
+      const deviceIds = devices.map(d => d.deviceId);
 
-      // 只查询当前小程序设备的订单统计
+      // 查询所有设备的订单统计（包括已切换归属的设备，历史订单仍在当前环境）
       if (deviceIds.length > 0) {
         const statRes = await wx.cloud.callFunction({
           name: 'order',
@@ -109,10 +109,10 @@ Page({
 
         if (statRes.result.success) {
           const statsMap = statRes.result.data;
-          // 合并统计数据（只合并当前小程序的设备）
+          // 合并统计数据（所有设备都合并，已切换归属的设备历史订单仍在当前环境）
           devices = devices.map(d => ({
             ...d,
-            ...(d.isLocal && statsMap[d.deviceId] ? statsMap[d.deviceId] : {})
+            ...(statsMap[d.deviceId] || {})
           }));
         }
       }
@@ -154,6 +154,21 @@ Page({
     const id = e.currentTarget.dataset.deviceid;
     this.setData({
       expandedDeviceId: this.data.expandedDeviceId === id ? null : id
+    });
+  },
+
+  // === 复制设备链接 ===
+  copyUrlLink(e) {
+    const url = e.currentTarget.dataset.url;
+    if (!url) return;
+    wx.setClipboardData({
+      data: url,
+      success: () => {
+        wx.showToast({ title: '链接已复制', icon: 'success' });
+      },
+      fail: () => {
+        wx.showToast({ title: '复制失败', icon: 'none' });
+      }
     });
   },
 

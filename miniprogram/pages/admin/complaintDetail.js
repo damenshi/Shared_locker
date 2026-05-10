@@ -101,6 +101,17 @@ Page({
     });
   },
 
+  viewUserOrders() {
+    const phone = this.data.complaint.phone;
+    if (!phone) {
+      wx.showToast({ title: '用户未提供手机号', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: `/pages/admin/userorder?userPhone=${phone}`
+    });
+  },
+
   async submitReply() {
     const reply = this.data.replyText.trim();
     if (!reply) {

@@ -1,10 +1,17 @@
 // pages/mine/complaintForm.js
 const app = getApp();
 
+// 手机号格式校验
+function isValidPhone(phone) {
+  return /^1[3-9]\d{9}$/.test(phone);
+}
+
 Page({
   data: {
     type: 'refund',
     content: '',
+    phone: '',
+    phoneDisabled: false,
     orderId: '',
     orderInfo: null,
     canSubmit: false,
@@ -32,7 +39,13 @@ Page({
         }
       });
       if (res.result.success && res.result.data) {
-        this.setData({ orderInfo: res.result.data });
+        const order = res.result.data;
+        this.setData({
+          orderInfo: order,
+          phone: order.phone || '',
+          phoneDisabled: !!order.phone
+        });
+        this.checkCanSubmit();
       }
     } catch (err) {
       console.error('获取订单信息失败：', err);
@@ -42,6 +55,12 @@ Page({
   selectType(e) {
     this.setData({
       type: e.currentTarget.dataset.type
+    });
+  },
+
+  onPhoneInput(e) {
+    this.setData({
+      phone: e.detail.value
     });
     this.checkCanSubmit();
   },
@@ -54,13 +73,18 @@ Page({
   },
 
   checkCanSubmit() {
-    const canSubmit = this.data.content.trim().length > 0;
-    this.setData({ canSubmit });
+    const phoneValid = isValidPhone(this.data.phone);
+    const contentValid = this.data.content.trim().length > 0;
+    this.setData({ canSubmit: phoneValid && contentValid });
   },
 
   async submitComplaint() {
     if (!this.data.canSubmit) {
-      wx.showToast({ title: '请填写投诉内容', icon: 'none' });
+      if (!isValidPhone(this.data.phone)) {
+        wx.showToast({ title: '请输入正确的手机号', icon: 'none' });
+      } else {
+        wx.showToast({ title: '请填写投诉内容', icon: 'none' });
+      }
       return;
     }
 
@@ -73,6 +97,7 @@ Page({
           action: 'createComplaint',
           type: this.data.type,
           content: this.data.content.trim(),
+          phone: this.data.phone.trim(),
           orderId: this.data.orderId || undefined
         }
       });

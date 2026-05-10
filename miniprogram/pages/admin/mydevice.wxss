@@ -98,6 +98,15 @@
   font-weight: 500;
 }
 
+.url-link {
+  color: #007aff;
+  font-weight: 500;
+  max-width: 400rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .device-footer {
   margin-top: 20rpx;
   display: flex;

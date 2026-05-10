@@ -85,6 +85,11 @@
                 </text>
               </view>
 
+              <view class="row" wx:if="{{item.urlLink}}" bindtap="copyUrlLink" data-url="{{item.urlLink}}">
+                <text class="label">设备链接</text>
+                <text class="value url-link">{{item.urlLink}}</text>
+              </view>
+
               <view class="row">
                 <text class="label">设备锁板数量</text>
                 <text class="value">{{item.cabinetCount}}</text>

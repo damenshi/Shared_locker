@@ -1,0 +1,24 @@
+{
+  "collection": "complaints",
+  "description": "用户投诉记录",
+  "fields": {
+    "_id": "系统自动生成",
+    "openid": "用户openid",
+    "phone": "用户手机号",
+    "orderId": "关联订单ID",
+    "deviceId": "设备ID",
+    "internalNo": "设备编号",
+    "lockerNo": "柜门号",
+    "type": "投诉类型: refund(退款)|door(柜门打不开)|other(其他)",
+    "typeText": "投诉类型文本",
+    "content": "投诉描述",
+    "images": "图片凭证URL数组(可选)",
+    "status": "状态: pending(待处理)|processing(处理中)|resolved(已解决)|rejected(已拒绝)",
+    "statusText": "状态文本",
+    "reply": "管理员回复",
+    "handledBy": "处理人openid",
+    "handledAt": "处理时间",
+    "createdAt": "创建时间",
+    "updatedAt": "更新时间"
+  }
+}

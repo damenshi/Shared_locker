@@ -51,9 +51,21 @@ const checkSuperAdmin = async (openid) => {
   }
 }
 
+// 手机号验证（中国大陆手机号）
+const validatePhone = (phone) => {
+  if (!phone || phone.trim() === '') {
+    return { valid: false, msg: '手机号不能为空' }
+  }
+  const cleaned = phone.trim()
+  if (!/^1[3-9]\d{9}$/.test(cleaned)) {
+    return { valid: false, msg: '请输入正确的11位手机号' }
+  }
+  return { valid: true, phone: cleaned }
+}
+
 // ========== 创建投诉 ==========
 const createComplaint = async (event, openid) => {
-  const { type, content, orderId } = event
+  const { type, content, orderId, phone: inputPhone } = event
 
   // 验证参数
   const validation = validateParams(
@@ -67,32 +79,10 @@ const createComplaint = async (event, openid) => {
     return { success: false, errMsg: validation.msg }
   }
 
-  // 获取用户信息
   let phone = ''
-  try {
-    const userRes = await db.collection('users').where({ openid }).get()
-    phone = userRes.data.length > 0 ? (userRes.data[0].phone || '') : ''
-  } catch (err) {
-    console.error('[createComplaint] 获取用户信息失败:', err)
-  }
+  let orderInfo = null
 
-  // 构建投诉数据
-  const complaintData = {
-    openid,
-    phone,
-    type,
-    typeText: COMPLAINT_TYPES[type].text,
-    content: content.trim(),
-    status: 'pending',
-    statusText: COMPLAINT_STATUSES.pending.text,
-    reply: '',
-    handledBy: '',
-    handledAt: null,
-    createdAt: db.serverDate(),
-    updatedAt: db.serverDate()
-  }
-
-  // 如有关联订单，自动带入订单信息
+  // 如有关联订单，自动带入订单信息并验证手机号
   if (orderId) {
     let order = null
     try {
@@ -112,10 +102,50 @@ const createComplaint = async (event, openid) => {
       return { success: false, errMsg: '无权投诉此订单' }
     }
 
-    complaintData.orderId = orderId
-    complaintData.deviceId = order.deviceId || ''
-    complaintData.internalNo = order.internalNo || ''
-    complaintData.lockerNo = order.lockerNo || ''
+    // 使用传入的手机号，如无则使用订单手机号
+    if (inputPhone && inputPhone.trim()) {
+      const phoneCheck = validatePhone(inputPhone)
+      if (!phoneCheck.valid) {
+        return { success: false, errMsg: phoneCheck.msg }
+      }
+      phone = phoneCheck.phone
+    } else {
+      phone = order.phone || ''
+    }
+
+    orderInfo = {
+      orderId: orderId,
+      deviceId: order.deviceId || '',
+      internalNo: order.internalNo || '',
+      lockerNo: order.lockerNo || ''
+    }
+  } else {
+    // 无关联订单，必须传入手机号
+    if (!inputPhone || inputPhone.trim() === '') {
+      return { success: false, errMsg: '请输入手机号' }
+    }
+    const phoneCheck = validatePhone(inputPhone)
+    if (!phoneCheck.valid) {
+      return { success: false, errMsg: phoneCheck.msg }
+    }
+    phone = phoneCheck.phone
+  }
+
+  // 构建投诉数据
+  const complaintData = {
+    openid,
+    phone,
+    type,
+    typeText: COMPLAINT_TYPES[type].text,
+    content: content.trim(),
+    status: 'pending',
+    statusText: COMPLAINT_STATUSES.pending.text,
+    reply: '',
+    handledBy: '',
+    handledAt: null,
+    createdAt: db.serverDate(),
+    updatedAt: db.serverDate(),
+    ...orderInfo
   }
 
   // 插入数据库

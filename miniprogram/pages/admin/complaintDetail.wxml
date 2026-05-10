@@ -45,6 +45,19 @@
     <view class="content-box">{{complaint.content}}</view>
   </view>
 
+  <view class="action-section">
+    <view class="action-title">用户订单</view>
+    <view class="user-orders-row">
+      <text class="orders-hint">根据手机号查询该用户的历史订单</text>
+      <view
+        class="view-orders-btn"
+        wx:if="{{complaint.phone}}"
+        bindtap="viewUserOrders"
+      >查看订单</view>
+      <text class="orders-hint" wx:else>用户未提供手机号</text>
+    </view>
+  </view>
+
   <view class="action-section" wx:if="{{complaint.status !== 'resolved' && complaint.status !== 'rejected'}}">
     <view class="action-title">状态操作</view>
     <view class="status-actions">
