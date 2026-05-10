@@ -1,104 +1,51 @@
 <view class="container">
-  <view class="detail-card">
-    <view class="section-title">投诉详情</view>
-
-    <view class="info-row">
-      <text class="info-label">用户手机号</text>
+  <!-- 头部信息 -->
+  <view class="header-card">
+    <view class="header-top">
+      <text class="complaint-type">{{complaint.typeText}}</text>
+      <text class="status-badge status-{{complaint.status}}">{{complaint.statusText}}</text>
+    </view>
+    <view class="header-info">
+      <text class="info-label">用户:</text>
       <text class="info-value">{{complaint.phone || '未知'}}</text>
     </view>
-
-    <view class="info-row">
-      <text class="info-label">投诉类型</text>
-      <text class="info-value">{{complaint.typeText}}</text>
-    </view>
-
-    <view class="info-row">
-      <text class="info-label">当前状态</text>
-      <view class="info-value">
-        <text class="status-badge status-{{complaint.status}}">{{complaint.statusText}}</text>
-      </view>
-    </view>
-
-    <view class="info-row" wx:if="{{complaint.orderId}}">
-      <text class="info-label">关联订单</text>
+    <view class="header-info" wx:if="{{complaint.orderId}}">
+      <text class="info-label">订单:</text>
       <text class="info-value">{{complaint.orderId}}</text>
     </view>
-
-    <view class="info-row" wx:if="{{complaint.internalNo}}">
-      <text class="info-label">设备编号</text>
+    <view class="header-info" wx:if="{{complaint.internalNo}}">
+      <text class="info-label">设备:</text>
       <text class="info-value">{{complaint.internalNo}}</text>
-    </view>
-
-    <view class="info-row" wx:if="{{complaint.lockerNo}}">
-      <text class="info-label">柜门号</text>
-      <text class="info-value">{{complaint.lockerNo}}</text>
-    </view>
-
-    <view class="info-row">
-      <text class="info-label">提交时间</text>
-      <text class="info-value">{{complaint.createdAtFormatted}}</text>
-    </view>
-
-    <view class="info-row">
-      <text class="info-label">投诉内容</text>
-    </view>
-    <view class="content-box">{{complaint.content}}</view>
-  </view>
-
-  <view class="action-section">
-    <view class="action-title">用户订单</view>
-    <view class="user-orders-row">
-      <text class="orders-hint">根据手机号查询该用户的历史订单</text>
-      <view
-        class="view-orders-btn"
-        wx:if="{{complaint.phone}}"
-        bindtap="viewUserOrders"
-      >查看订单</view>
-      <text class="orders-hint" wx:else>用户未提供手机号</text>
+      <text class="info-label" wx:if="{{complaint.lockerNo}}" style="margin-left: 20rpx;">柜号:</text>
+      <text class="info-value" wx:if="{{complaint.lockerNo}}">{{complaint.lockerNo}}</text>
     </view>
   </view>
 
-  <view class="action-section" wx:if="{{complaint.status !== 'resolved' && complaint.status !== 'rejected'}}">
-    <view class="action-title">状态操作</view>
-    <view class="status-actions">
-      <view
-        class="status-btn processing"
-        wx:if="{{complaint.status === 'pending'}}"
-        bindtap="updateStatus"
-        data-status="processing"
-      >标记为处理中</view>
-      <view
-        class="status-btn resolved"
-        wx:if="{{complaint.status === 'processing'}}"
-        bindtap="updateStatus"
-        data-status="resolved"
-      >标记为已解决</view>
-      <view
-        class="status-btn rejected"
-        wx:if="{{complaint.status === 'processing'}}"
-        bindtap="updateStatus"
-        data-status="rejected"
-      >标记为已拒绝</view>
-    </view>
+  <!-- 操作区域 -->
+  <view class="action-bar">
+    <view class="action-btn" bindtap="viewUserOrders" wx:if="{{complaint.phone}}">查看用户订单</view>
+    <view class="action-btn resolve" wx:if="{{complaint.status === 'pending'}}" bindtap="updateStatus" data-status="resolved">标记已解决</view>
   </view>
 
-  <view class="reply-section">
-    <view class="action-title">管理员回复</view>
-
-    <view class="existing-reply" wx:if="{{complaint.reply}}">
-      <view class="existing-reply-label">历史回复</view>
-      <view class="existing-reply-content">{{complaint.reply}}</view>
-      <view class="existing-reply-time" wx:if="{{complaint.handledAtFormatted}}">
-        {{complaint.handledAtFormatted}}
+  <!-- 对话区域 -->
+  <view class="chat-area">
+    <view class="message {{item.sender}}" wx:for="{{messages}}" wx:key="index">
+      <view class="message-header">
+        <text class="sender-name" wx:if="{{item.sender === 'user'}}">{{item.name}}</text>
+        <text class="message-time">{{item.time}}</text>
+        <text class="sender-name" wx:if="{{item.sender === 'admin'}}">{{item.name}}</text>
+      </view>
+      <view class="bubble-wrapper">
+        <view class="bubble">
+          <text>{{item.content}}</text>
+        </view>
       </view>
     </view>
+  </view>
 
-    <textarea
-      class="reply-input"
-      placeholder="输入回复内容..."
-      value="{{replyText}}"
-      bindinput="onReplyInput"
-    />
+  <!-- 回复输入 -->
+  <view class="reply-section">
+    <textarea class="reply-input" placeholder="输入回复内容..." value="{{replyText}}" bindinput="onReplyInput" />
     <view class="reply-btn" bindtap="submitReply">提交回复</view>
   </view>
 </view>

@@ -2,23 +2,12 @@
   <view class="form-card">
     <view class="form-item">
       <text class="form-label">投诉类型</text>
-      <view class="type-options">
-        <view
-          class="type-option {{type === 'refund' ? 'selected' : ''}}"
-          bindtap="selectType"
-          data-type="refund"
-        >退款问题</view>
-        <view
-          class="type-option {{type === 'door' ? 'selected' : ''}}"
-          bindtap="selectType"
-          data-type="door"
-        >柜门打不开</view>
-        <view
-          class="type-option {{type === 'other' ? 'selected' : ''}}"
-          bindtap="selectType"
-          data-type="other"
-        >其他</view>
-      </view>
+      <picker mode="selector" range="{{typeOptions}}" value="{{typeIndex}}" bindchange="onTypeChange">
+        <view class="picker-value">
+          <text class="{{type ? '' : 'placeholder'}}">{{type ? typeOptions[typeIndex] : typePlaceholder}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
     </view>
 
     <view class="form-item" wx:if="{{orderId}}">

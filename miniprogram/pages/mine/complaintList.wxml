@@ -29,4 +29,9 @@
       </view>
     </view>
   </block>
+
+  <view class="wait-tip">
+    <text>客服会在24小时内进行处理，请耐心等待，如有疑问请拨打</text>
+    <text class="tip-link" bindtap="callService">客服电话</text>
+  </view>
 </view>

@@ -21,7 +21,7 @@
     "pages/admin/complaintDetail"
   ],
   "window": {
-    "navigationBarTitleText": "星耀储物",
+    "navigationBarTitleText": "储物柜",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black"
   },

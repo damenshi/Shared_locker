@@ -33,7 +33,7 @@
     <view class="menu-item" bindtap="goComplaintList">
       <view class="item-left">
         <view class="item-dot"></view>
-        <text class="item-text">投诉与建议</text>
+        <text class="item-text">投诉建议</text>
       </view>
       <view class="item-arrow"></view>
     </view>

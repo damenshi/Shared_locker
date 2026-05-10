@@ -95,3 +95,16 @@
   color: #1e3a5f;
   margin-top: 8rpx;
 }
+
+.wait-tip {
+  text-align: center;
+  font-size: 24rpx;
+  color: #999;
+  padding: 30rpx 0;
+}
+
+.tip-link {
+  color: #1e3a5f;
+  font-weight: 500;
+  text-decoration: underline;
+}

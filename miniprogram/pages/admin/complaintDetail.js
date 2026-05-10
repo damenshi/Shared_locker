@@ -1,18 +1,19 @@
 // pages/admin/complaintDetail.js
 function formatDate(dateStr) {
-  if (!dateStr) return '无';
+  if (!dateStr) return '';
   const date = new Date(dateStr);
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   const hh = String(date.getHours()).padStart(2, '0');
   const mm = String(date.getMinutes()).padStart(2, '0');
-  return `${y}-${m}-${d} ${hh}:${mm}`;
+  return `${m}-${d} ${hh}:${mm}`;
 }
 
 Page({
   data: {
     complaint: {},
+    messages: [],
     replyText: '',
     loading: true
   },
@@ -39,10 +40,41 @@ Page({
 
       if (res.result.success) {
         const complaint = res.result.data;
-        complaint.createdAtFormatted = formatDate(complaint.createdAt);
-        complaint.handledAtFormatted = formatDate(complaint.handledAt);
+
+        // 构建消息数组
+        const messages = [];
+
+        // 用户初始投诉
+        messages.push({
+          sender: 'user',
+          name: complaint.phone || '用户',
+          content: complaint.content,
+          time: formatDate(complaint.createdAt)
+        });
+
+        // 管理员回复
+        if (complaint.reply) {
+          messages.push({
+            sender: 'admin',
+            name: '客服',
+            content: complaint.reply,
+            time: formatDate(complaint.handledAt)
+          });
+        }
+
+        // 用户追加回复
+        if (complaint.userReply) {
+          messages.push({
+            sender: 'user',
+            name: complaint.phone || '用户',
+            content: complaint.userReply,
+            time: formatDate(complaint.userReplyAt)
+          });
+        }
+
         this.setData({
           complaint,
+          messages,
           replyText: complaint.reply || '',
           loading: false
         });
@@ -64,9 +96,7 @@ Page({
   async updateStatus(e) {
     const status = e.currentTarget.dataset.status;
     const statusText = {
-      processing: '处理中',
-      resolved: '已解决',
-      rejected: '已拒绝'
+      resolved: '已解决'
     }[status];
 
     wx.showModal({
@@ -109,6 +139,41 @@ Page({
     }
     wx.navigateTo({
       url: `/pages/admin/userorder?userPhone=${phone}`
+    });
+  },
+
+  async deleteComplaint() {
+    wx.showModal({
+      title: '确认删除',
+      content: '确定要删除此投诉吗？删除后不可恢复。',
+      confirmColor: '#e74c3c',
+      success: async (res) => {
+        if (res.confirm) {
+          wx.showLoading({ title: '删除中...' });
+          try {
+            const result = await wx.cloud.callFunction({
+              name: 'complaint',
+              data: {
+                action: 'deleteComplaint',
+                complaintId: this.data.complaint._id
+              }
+            });
+
+            wx.hideLoading();
+            if (result.result.success) {
+              wx.showToast({ title: '已删除', icon: 'success' });
+              setTimeout(() => {
+                wx.navigateBack();
+              }, 1500);
+            } else {
+              wx.showToast({ title: result.result.errMsg || '删除失败', icon: 'none' });
+            }
+          } catch (err) {
+            wx.hideLoading();
+            wx.showToast({ title: '系统错误', icon: 'none' });
+          }
+        }
+      }
     });
   },
 

@@ -8,7 +8,11 @@ function isValidPhone(phone) {
 
 Page({
   data: {
-    type: 'refund',
+    type: '',
+    typeIndex: 0,
+    typeOptions: ['退款问题', '柜门打不开', '其他'],
+    typeValues: ['refund', 'door', 'other'],
+    typePlaceholder: '请选择投诉类型',
     content: '',
     phone: '',
     phoneDisabled: false,
@@ -52,10 +56,13 @@ Page({
     }
   },
 
-  selectType(e) {
+  onTypeChange(e) {
+    const index = e.detail.value;
     this.setData({
-      type: e.currentTarget.dataset.type
+      typeIndex: index,
+      type: this.data.typeValues[index]
     });
+    this.checkCanSubmit();
   },
 
   onPhoneInput(e) {
@@ -73,9 +80,10 @@ Page({
   },
 
   checkCanSubmit() {
+    const typeValid = !!this.data.type;
     const phoneValid = isValidPhone(this.data.phone);
     const contentValid = this.data.content.trim().length > 0;
-    this.setData({ canSubmit: phoneValid && contentValid });
+    this.setData({ canSubmit: typeValid && phoneValid && contentValid });
   },
 
   async submitComplaint() {

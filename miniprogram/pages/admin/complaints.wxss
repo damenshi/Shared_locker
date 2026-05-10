@@ -27,6 +27,13 @@
   color: #fff;
 }
 
+.subscribe-btn {
+  background: #e8f4fd;
+  color: #1890ff;
+  margin-left: auto;
+  font-weight: 500;
+}
+
 .stats-bar {
   display: flex;
   justify-content: space-around;
@@ -123,9 +130,21 @@
   color: #fff;
 }
 
+.action-btn.delete {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
 .empty {
   text-align: center;
   color: #999;
   font-size: 28rpx;
   padding: 100rpx 0;
+}
+
+.subscribe-tip {
+  font-size: 22rpx;
+  color: #999;
+  text-align: center;
+  padding: 8rpx 0 16rpx;
 }

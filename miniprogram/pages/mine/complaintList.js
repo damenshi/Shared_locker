@@ -69,5 +69,9 @@ Page({
   goComplaintDetail(e) {
     const id = e.currentTarget.dataset.id;
     wx.navigateTo({ url: `/pages/mine/complaintDetail?id=${id}` });
+  },
+
+  callService() {
+    wx.makePhoneCall({ phoneNumber: '4008326132' });
   }
 });

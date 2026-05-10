@@ -23,25 +23,25 @@
   display: block;
 }
 
-.type-options {
+.picker-value {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
-}
-
-.type-option {
-  padding: 16rpx 32rpx;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx;
   border: 2rpx solid #e2e8f0;
   border-radius: 12rpx;
   font-size: 28rpx;
-  color: #666;
+  color: #333;
   background: #fff;
 }
 
-.type-option.selected {
-  border-color: #1e3a5f;
-  color: #1e3a5f;
-  background: #f0f4f8;
+.picker-arrow {
+  font-size: 22rpx;
+  color: #999;
+}
+
+.placeholder {
+  color: #999;
 }
 
 .order-info {

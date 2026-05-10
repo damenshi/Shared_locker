@@ -351,6 +351,14 @@ Page({
   handleCancelConfirm() {
     wx.showToast({ title: '请检查信息后再操作', icon: 'none', duration: 1500 });
     this.setData({ showConfirmModal: false });
+  },
+
+  goComplaint() {
+    wx.navigateTo({ url: '/pages/mine/complaintList' });
+  },
+
+  callService() {
+    wx.makePhoneCall({ phoneNumber: '4008326132' });
   }
   
 });

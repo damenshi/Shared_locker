@@ -67,16 +67,26 @@
       建议生日日期，例：0109（01月09日）
     </view>
   </view>
-  
-    
+
   <!-- 下一步按钮 -->
-  <!-- <view 
-    class="next-btn {{!canProceed ? 'disabled' : ''}}" 
+  <!-- <view
+    class="next-btn {{!canProceed ? 'disabled' : ''}}"
     bindtap="{{canProceed ? 'goToNextPage' : ''}}">
     下一步
   </view> -->
   <view class="next-btn {{!canProceed ? 'disabled' : ''}}" bindtap="{{canProceed ? 'goToNextPage' : ''}}">
     下一步
+  </view>
+
+  <!-- 投诉/客服提示 -->
+  <view class="service-tip">
+    <view class="service-tip-content">
+      <icon type="info_circle" color="#1e3a5f" size="14"></icon>
+      <text class="tip-text">任何使用问题欢迎</text>
+      <text class="tip-link" bindtap="goComplaint">投诉建议</text>
+      <text class="tip-text">或拨打</text>
+      <text class="tip-link" bindtap="callService">客服电话</text>
+    </view>
   </view>
 
 <view wx:if="{{showLockerBox}}" class="locker-box-large">

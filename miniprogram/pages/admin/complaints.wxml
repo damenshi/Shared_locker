@@ -9,10 +9,6 @@
       <view class="stat-label">待处理</view>
     </view>
     <view class="stat-item">
-      <view class="stat-num" style="color: #004085;">{{stats.processing}}</view>
-      <view class="stat-label">处理中</view>
-    </view>
-    <view class="stat-item">
       <view class="stat-num" style="color: #155724;">{{stats.resolved}}</view>
       <view class="stat-label">已解决</view>
     </view>
@@ -30,21 +26,13 @@
       data-status="pending"
     >待处理</view>
     <view
-      class="filter-item {{currentFilter === 'processing' ? 'active' : ''}}"
-      bindtap="filterByStatus"
-      data-status="processing"
-    >处理中</view>
-    <view
       class="filter-item {{currentFilter === 'resolved' ? 'active' : ''}}"
       bindtap="filterByStatus"
       data-status="resolved"
     >已解决</view>
-    <view
-      class="filter-item {{currentFilter === 'rejected' ? 'active' : ''}}"
-      bindtap="filterByStatus"
-      data-status="rejected"
-    >已拒绝</view>
+    <view class="filter-item subscribe-btn" bindtap="subscribeNotify">订阅通知</view>
   </view>
+  <view class="subscribe-tip">提示：每次订阅仅接收一条通知，收到后需重新订阅</view>
 
   <block wx:if="{{!loading && complaints.length === 0}}">
     <view class="empty">暂无投诉记录</view>
@@ -71,9 +59,15 @@
           >处理</button>
           <button
             class="action-btn"
+            wx:if="{{item.status === 'resolved'}}"
             bindtap="viewDetail"
             data-id="{{item._id}}"
           >查看</button>
+          <button
+            class="action-btn delete"
+            bindtap="deleteComplaint"
+            data-id="{{item._id}}"
+          >删除</button>
         </view>
       </view>
     </view>

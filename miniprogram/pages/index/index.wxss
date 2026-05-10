@@ -246,6 +246,35 @@
   text-align: right;
 }
 
+/* 投诉/客服提示 */
+.service-tip {
+  margin: 0 24rpx;
+  padding: 0;
+}
+
+.service-tip-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  background: #eef2f7;
+  border: 1rpx solid #d5dde6;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 26rpx;
+}
+
+.tip-text {
+  color: #666;
+}
+
+.tip-link {
+  color: #1e3a5f;
+  font-weight: 600;
+  border-bottom: 2rpx solid #1e3a5f;
+  padding-bottom: 2rpx;
+}
+
 /* 按钮 - 商务风格 */
 .next-btn {
   background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
