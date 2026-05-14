@@ -1924,6 +1924,142 @@ exports.main = async (event, context) => {
     }
   }
 
+  // 退款率统计（使用真实数据，不混淆）
+  if (action === 'getRefundStats') {
+    const orders = db.collection('orders');
+    const _ = db.command;
+    const $ = db.command.aggregate;
+
+    try {
+      const now = new Date();
+      const OFFSET = 8 * 60 * 60 * 1000;
+      const beijingNow = new Date(now.getTime() + OFFSET);
+      const bjYear = beijingNow.getUTCFullYear();
+      const bjMonth = beijingNow.getUTCMonth();
+
+      const startOfLastMonth = new Date(Date.UTC(bjYear, bjMonth - 1, 1) - OFFSET);
+      const endOfNextMonth = new Date(Date.UTC(bjYear, bjMonth + 2, 1) - OFFSET);
+
+      const aggRes = await orders.aggregate()
+        .match({
+          createdAt: _.gte(startOfLastMonth).and(_.lt(endOfNextMonth))
+        })
+        .project({
+          deviceId: 1,
+          deposit: 1,
+          status: 1,
+          dateStr: $.dateToString({
+            date: '$createdAt',
+            format: '%Y-%m-%d',
+            timezone: 'Asia/Shanghai'
+          })
+        })
+        .group({
+          _id: {
+            deviceId: '$deviceId',
+            date: '$dateStr'
+          },
+          dailyPaid: $.sum($.cond({
+            if: $.gt(['$deposit', 0]),
+            then: 1,
+            else: 0
+          })),
+          dailyRefunded: $.sum($.cond({
+            if: $.and([
+              $.gt(['$deposit', 0]),
+              $.eq(['$status', '已退款'])
+            ]),
+            then: 1,
+            else: 0
+          }))
+        })
+        .group({
+          _id: '$_id.deviceId',
+          days: $.push({
+            date: '$_id.date',
+            paid: '$dailyPaid',
+            refunded: '$dailyRefunded'
+          })
+        })
+        .end();
+
+      const formatDate = (d) => {
+        const year = d.getUTCFullYear();
+        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        return `${year}-${mm}-${dd}`;
+      };
+
+      const todayStr = formatDate(beijingNow);
+      const currentMonthPrefix = todayStr.substring(0, 7);
+      const lastMonthYear = bjMonth === 0 ? bjYear - 1 : bjYear;
+      const lastMonthNum = bjMonth === 0 ? 12 : bjMonth;
+      const lastMonthPrefix = `${lastMonthYear}-${String(lastMonthNum).padStart(2, '0')}`;
+
+      const calcRate = (paid, refunded) => paid > 0 ? Math.round(refunded / paid * 100) : 0;
+
+      // 汇总
+      let sTodayPaid = 0, sTodayRefunded = 0;
+      let sThisMonthPaid = 0, sThisMonthRefunded = 0;
+      let sLastMonthPaid = 0, sLastMonthRefunded = 0;
+
+      const devices = {};
+
+      for (const item of aggRes.list) {
+        const deviceId = item._id;
+        let todayPaid = 0, todayRefunded = 0;
+        let thisMonthPaid = 0, thisMonthRefunded = 0;
+        let lastMonthPaid = 0, lastMonthRefunded = 0;
+
+        for (const dayData of item.days) {
+          const { date, paid, refunded } = dayData;
+          if (date === todayStr) {
+            todayPaid = paid || 0;
+            todayRefunded = refunded || 0;
+          }
+          if (date.startsWith(currentMonthPrefix)) {
+            thisMonthPaid += paid || 0;
+            thisMonthRefunded += refunded || 0;
+          }
+          if (date.startsWith(lastMonthPrefix)) {
+            lastMonthPaid += paid || 0;
+            lastMonthRefunded += refunded || 0;
+          }
+        }
+
+        sTodayPaid += todayPaid;
+        sTodayRefunded += todayRefunded;
+        sThisMonthPaid += thisMonthPaid;
+        sThisMonthRefunded += thisMonthRefunded;
+        sLastMonthPaid += lastMonthPaid;
+        sLastMonthRefunded += lastMonthRefunded;
+
+        devices[deviceId] = {
+          todayPaid, todayRefunded, todayRate: calcRate(todayPaid, todayRefunded),
+          thisMonthPaid, thisMonthRefunded, thisMonthRate: calcRate(thisMonthPaid, thisMonthRefunded),
+          lastMonthPaid, lastMonthRefunded, lastMonthRate: calcRate(lastMonthPaid, lastMonthRefunded)
+        };
+      }
+
+      const summary = {
+        todayPaid: sTodayPaid,
+        todayRefunded: sTodayRefunded,
+        todayRate: calcRate(sTodayPaid, sTodayRefunded),
+        thisMonthPaid: sThisMonthPaid,
+        thisMonthRefunded: sThisMonthRefunded,
+        thisMonthRate: calcRate(sThisMonthPaid, sThisMonthRefunded),
+        lastMonthPaid: sLastMonthPaid,
+        lastMonthRefunded: sLastMonthRefunded,
+        lastMonthRate: calcRate(sLastMonthPaid, sLastMonthRefunded)
+      };
+
+      return { success: true, data: { summary, devices } };
+    } catch (err) {
+      console.error('退款率统计失败：', err);
+      return { success: false, errMsg: err.message };
+    }
+  }
+
   // 新增：取消超时/主动放弃的未支付订单
   if (action === 'cancelUnpaidOrder') {
     const { orderId } = event;

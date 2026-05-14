@@ -1,0 +1,122 @@
+<view class="container">
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading-wrap">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- 汇总卡片 -->
+    <view class="summary-card" wx:if="{{summary}}">
+      <view class="card-title">整体退款率</view>
+
+      <!-- 今日 -->
+      <view class="stat-row">
+        <view class="stat-period">今日</view>
+        <view class="stat-detail">
+          <view class="stat-item">
+            <text class="stat-label">收款</text>
+            <text class="stat-value">{{summary.todayPaid}}</text>
+          </view>
+          <view class="stat-item">
+            <text class="stat-label">退款</text>
+            <text class="stat-value">{{summary.todayRefunded}}</text>
+          </view>
+          <view class="stat-item">
+            <text class="stat-label">退款率</text>
+            <text class="stat-value {{summary.todayRate === 0 ? 'rate-green' : summary.todayRate < 10 ? 'rate-green' : summary.todayRate < 30 ? 'rate-orange' : 'rate-red'}}">
+              {{summary.todayPaid > 0 ? summary.todayRate + '%' : '--'}}
+            </text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 本月 -->
+      <view class="stat-row">
+        <view class="stat-period">本月</view>
+        <view class="stat-detail">
+          <view class="stat-item">
+            <text class="stat-label">收款</text>
+            <text class="stat-value">{{summary.thisMonthPaid}}</text>
+          </view>
+          <view class="stat-item">
+            <text class="stat-label">退款</text>
+            <text class="stat-value">{{summary.thisMonthRefunded}}</text>
+          </view>
+          <view class="stat-item">
+            <text class="stat-label">退款率</text>
+            <text class="stat-value {{summary.thisMonthRate === 0 ? 'rate-green' : summary.thisMonthRate < 10 ? 'rate-green' : summary.thisMonthRate < 30 ? 'rate-orange' : 'rate-red'}}">
+              {{summary.thisMonthPaid > 0 ? summary.thisMonthRate + '%' : '--'}}
+            </text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 上月 -->
+      <view class="stat-row last-row">
+        <view class="stat-period">上月</view>
+        <view class="stat-detail">
+          <view class="stat-item">
+            <text class="stat-label">收款</text>
+            <text class="stat-value">{{summary.lastMonthPaid}}</text>
+          </view>
+          <view class="stat-item">
+            <text class="stat-label">退款</text>
+            <text class="stat-value">{{summary.lastMonthRefunded}}</text>
+          </view>
+          <view class="stat-item">
+            <text class="stat-label">退款率</text>
+            <text class="stat-value {{summary.lastMonthRate === 0 ? 'rate-green' : summary.lastMonthRate < 10 ? 'rate-green' : summary.lastMonthRate < 30 ? 'rate-orange' : 'rate-red'}}">
+              {{summary.lastMonthPaid > 0 ? summary.lastMonthRate + '%' : '--'}}
+            </text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 设备列表 -->
+    <view class="section-header">
+      <view class="section-line"></view>
+      <text class="section-title">各设备退款率</text>
+      <view class="section-line"></view>
+    </view>
+
+    <view wx:if="{{devices.length === 0}}" class="empty">暂无设备数据</view>
+
+    <view class="device-card" wx:for="{{devices}}" wx:key="deviceId">
+      <view class="device-header">
+        <text class="device-no">{{item.internalNo}}</text>
+        <text class="device-addr">{{item.deviceAddress || ''}}</text>
+      </view>
+
+      <view class="device-stats">
+        <!-- 今日 -->
+        <view class="device-stat-col">
+          <text class="col-label">今日</text>
+          <text class="col-detail">{{item.todayPaid}}收/{{item.todayRefunded}}退</text>
+          <text class="col-rate {{item.todayRate === 0 ? 'rate-green' : item.todayRate < 10 ? 'rate-green' : item.todayRate < 30 ? 'rate-orange' : 'rate-red'}}">
+            {{item.todayPaid > 0 ? item.todayRate + '%' : '--'}}
+          </text>
+        </view>
+        <!-- 本月 -->
+        <view class="device-stat-col">
+          <text class="col-label">本月</text>
+          <text class="col-detail">{{item.thisMonthPaid}}收/{{item.thisMonthRefunded}}退</text>
+          <text class="col-rate {{item.thisMonthRate === 0 ? 'rate-green' : item.thisMonthRate < 10 ? 'rate-green' : item.thisMonthRate < 30 ? 'rate-orange' : 'rate-red'}}">
+            {{item.thisMonthPaid > 0 ? item.thisMonthRate + '%' : '--'}}
+          </text>
+        </view>
+        <!-- 上月 -->
+        <view class="device-stat-col">
+          <text class="col-label">上月</text>
+          <text class="col-detail">{{item.lastMonthPaid}}收/{{item.lastMonthRefunded}}退</text>
+          <text class="col-rate {{item.lastMonthRate === 0 ? 'rate-green' : item.lastMonthRate < 10 ? 'rate-green' : item.lastMonthRate < 30 ? 'rate-orange' : 'rate-red'}}">
+            {{item.lastMonthPaid > 0 ? item.lastMonthRate + '%' : '--'}}
+          </text>
+        </view>
+      </view>
+    </view>
+
+    <view class="safe-bottom"></view>
+  </block>
+</view>

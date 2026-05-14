@@ -18,7 +18,8 @@
     "pages/mine/complaintForm",
     "pages/mine/complaintDetail",
     "pages/admin/complaints",
-    "pages/admin/complaintDetail"
+    "pages/admin/complaintDetail",
+    "pages/admin/refundStats"
   ],
   "window": {
     "navigationBarTitleText": "储物柜",
