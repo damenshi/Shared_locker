@@ -822,6 +822,41 @@ exports.main = async (event, context) => {
     }
   }
 
+  // 设置设备订单数显示折扣比例
+  if (action === 'updateObfuscationRate') {
+    const { deviceId, obfuscationRate } = event;
+
+    if (!deviceId) {
+      return { success: false, errMsg: '缺少设备ID' };
+    }
+
+    // 验证参数：0-1之间的小数，或-1表示使用默认值
+    const rate = parseFloat(obfuscationRate);
+    if (isNaN(rate) || rate < -1 || rate > 1) {
+      return { success: false, errMsg: '折扣比例无效，请输入0-100的数字' };
+    }
+
+    try {
+      const device = await db.collection('devices').where({ deviceId }).get();
+      if (!device.data || device.data.length === 0) {
+        return { success: false, errMsg: '设备不存在' };
+      }
+
+      // -1 表示删除字段（使用全局默认值）
+      const updateData = rate < 0
+        ? { obfuscationRate: _.remove(), updatedAt: db.serverDate() }
+        : { obfuscationRate: rate, updatedAt: db.serverDate() };
+
+      await db.collection('devices').where({ deviceId }).update({ data: updateData });
+
+      const displayRate = rate < 0 ? '默认(20%)' : `${Math.round((1 - rate) * 100)}%`;
+      return { success: true, message: `订单显示折扣已设置为：${displayRate}` };
+    } catch (e) {
+      console.error('设置折扣比例失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
   // 获取当前设置了免费模式的设备列表
   if (action === 'getFreeDevices') {
     try {

@@ -1743,10 +1743,11 @@ exports.main = async (event, context) => {
   // 策略：阈值8，比例0.8
   // 效果：单日订单前8单保真（应对现场测试），超过8后打8折（找回隐藏量）
   // 综合下来，月总数会比真实数据少 15% 左右
-  function getDailySafeCount(realCount) {
+  function getDailySafeCount(realCount, ratio) {
     const SAFE_THRESHOLD = 8; // 每天前8单是真实的
-    const RATIO = 0.8;        // 超过部分打8折
+    const RATIO = (typeof ratio === 'number' && ratio >= 0 && ratio <= 1) ? ratio : 0.8;
 
+    if (RATIO >= 1) return realCount; // 不打折
     if (realCount <= SAFE_THRESHOLD) {
       return realCount;
     }
@@ -1764,8 +1765,18 @@ exports.main = async (event, context) => {
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       return { success: false, errMsg: 'deviceIds 参数无效，应为非空数组' };
     }
-  
+
     try {
+      // 获取每台设备的折扣比例
+      const devicesRes = await db.collection('devices')
+        .where({ deviceId: _.in(deviceIds) })
+        .field({ deviceId: true, obfuscationRate: true })
+        .get()
+      const deviceRateMap = {}
+      for (const d of devicesRes.data) {
+        deviceRateMap[d.deviceId] = d.obfuscationRate
+      }
+
       const now = new Date();
 
       //统一使用北京时间计算查询边界
@@ -1872,7 +1883,7 @@ exports.main = async (event, context) => {
           if (dataMonth < START_OBFUSCATION_MONTH) {
             finalPaid = paid || 0;
           } else {
-            finalPaid = getDailySafeCount(paid || 0);
+            finalPaid = getDailySafeCount(paid || 0, deviceRateMap[deviceId]);
           }
 
           if (date === todayStr) {

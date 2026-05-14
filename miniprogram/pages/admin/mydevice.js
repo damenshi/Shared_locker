@@ -36,6 +36,13 @@ Page({
     currentFreeDeviceId: null,
     currentFreeDeviceName: '',
     currentFreeStatus: false,
+    // 订单显示设置弹窗
+    showObfuscationModal: false,
+    obfuscationDeviceId: null,
+    obfuscationDeviceName: '',
+    obfuscationDeviceRate: null,
+    selectedRateIndex: 0,
+    selectedRateValue: -1,
   },
 
   onLoad() {
@@ -455,6 +462,82 @@ Page({
           } catch (err) {
             wx.hideLoading();
             console.error('设置免费模式失败:', err);
+            wx.showToast({ title: '设置失败', icon: 'none' });
+          }
+        }
+      }
+    });
+  },
+
+  // === 订单显示设置 ===
+  showObfuscationModal(e) {
+    const deviceId = e.currentTarget.dataset.deviceid;
+    const internalNo = e.currentTarget.dataset.internalno;
+    const rate = e.currentTarget.dataset.obfuscationrate;
+
+    // 根据当前 rate 确定选中的索引
+    let selectedRateIndex = 0; // 默认
+    if (rate === 1) selectedRateIndex = 1;
+    else if (rate === 0.9) selectedRateIndex = 2;
+    else if (rate === 0.8) selectedRateIndex = 3;
+    else if (rate === 0.7) selectedRateIndex = 4;
+    else if (rate === 0.6) selectedRateIndex = 5;
+    else if (rate === 0.5) selectedRateIndex = 6;
+
+    this.setData({
+      showObfuscationModal: true,
+      obfuscationDeviceId: deviceId,
+      obfuscationDeviceName: internalNo,
+      obfuscationDeviceRate: rate,
+      selectedRateIndex: selectedRateIndex,
+      selectedRateValue: [-1, 1, 0.9, 0.8, 0.7, 0.6, 0.5][selectedRateIndex]
+    });
+  },
+
+  closeObfuscationModal() {
+    this.setData({ showObfuscationModal: false });
+  },
+
+  selectRate(e) {
+    const index = parseInt(e.currentTarget.dataset.index);
+    const rate = parseFloat(e.currentTarget.dataset.rate);
+    this.setData({
+      selectedRateIndex: index,
+      selectedRateValue: rate
+    });
+  },
+
+  async confirmObfuscationRate() {
+    const { obfuscationDeviceId, obfuscationDeviceName, selectedRateValue } = this.data;
+
+    const rateText = selectedRateValue < 0 ? '默认(20%)' : `${Math.round((1 - selectedRateValue) * 100)}%`;
+    wx.showModal({
+      title: '确认设置',
+      content: `确定将 ${obfuscationDeviceName} 的订单少显示比例设为 ${rateText} 吗？`,
+      success: async (res) => {
+        if (res.confirm) {
+          wx.showLoading({ title: '设置中...' });
+          try {
+            const result = await wx.cloud.callFunction({
+              name: 'admin',
+              data: {
+                action: 'updateObfuscationRate',
+                deviceId: obfuscationDeviceId,
+                obfuscationRate: selectedRateValue
+              }
+            });
+
+            wx.hideLoading();
+            if (result.result.success) {
+              wx.showToast({ title: result.result.message || '设置成功', icon: 'success' });
+              this.closeObfuscationModal();
+              this.getDevices();
+            } else {
+              wx.showToast({ title: result.result.errMsg || '设置失败', icon: 'none' });
+            }
+          } catch (err) {
+            wx.hideLoading();
+            console.error('设置折扣比例失败:', err);
             wx.showToast({ title: '设置失败', icon: 'none' });
           }
         }

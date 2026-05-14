@@ -162,6 +162,14 @@
                 data-internalno="{{item.internalNo}}"
                 bindtap="showAppidModal">归属设置</button>
             </view>
+            <view class="action-buttons" wx:if="{{item.isLocal}}">
+              <!-- 第三行：显示设置 -->
+              <button class="ios-btn cyan"
+                data-deviceid="{{item.deviceId}}"
+                data-internalno="{{item.internalNo}}"
+                data-obfuscationrate="{{item.obfuscationRate}}"
+                bindtap="showObfuscationModal">订单显示设置</button>
+            </view>
 
             <view class="action-buttons" wx:if="{{!item.isLocal}}">
               <!-- 非当前小程序的设备 -->
@@ -267,6 +275,34 @@
           {{currentFreeStatus ? '关闭免费模式' : '开启免费模式'}}
         </button>
         <button class="cancel-btn" catchtap="closeFreeModal">取消</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 订单显示设置弹窗 -->
+  <view class="modal-mask" wx:if="{{showObfuscationModal}}">
+    <view class="modal">
+      <view class="modal-title">订单显示设置</view>
+      <view class="modal-content-body">
+        <view class="device-tip">当前设备：{{obfuscationDeviceName}}</view>
+        <view class="free-tip">当前折扣：{{obfuscationDeviceRate !== undefined && obfuscationDeviceRate !== null ? Math.round((1 - obfuscationDeviceRate) * 100) + '%' : '默认(20%)'}}</view>
+        <view class="free-tip" style="font-size: 22rpx; color: #999;">每天前8单显示真实数量，超出部分按比例显示</view>
+        <view style="margin-top: 20rpx;">
+          <view class="free-tip">选择少显示的比例：</view>
+          <view class="rate-options">
+            <button class="rate-btn {{selectedRateIndex === 0 ? 'rate-active' : ''}}" bindtap="selectRate" hover-class="rate-hover" data-index="0" data-rate="-1">默认(20%)</button>
+            <button class="rate-btn {{selectedRateIndex === 1 ? 'rate-active' : ''}}" bindtap="selectRate" hover-class="rate-hover" data-index="1" data-rate="1">0% (不打折)</button>
+            <button class="rate-btn {{selectedRateIndex === 2 ? 'rate-active' : ''}}" bindtap="selectRate" hover-class="rate-hover" data-index="2" data-rate="0.9">10%</button>
+            <button class="rate-btn {{selectedRateIndex === 3 ? 'rate-active' : ''}}" bindtap="selectRate" hover-class="rate-hover" data-index="3" data-rate="0.8">20%</button>
+            <button class="rate-btn {{selectedRateIndex === 4 ? 'rate-active' : ''}}" bindtap="selectRate" hover-class="rate-hover" data-index="4" data-rate="0.7">30%</button>
+            <button class="rate-btn {{selectedRateIndex === 5 ? 'rate-active' : ''}}" bindtap="selectRate" hover-class="rate-hover" data-index="5" data-rate="0.6">40%</button>
+            <button class="rate-btn {{selectedRateIndex === 6 ? 'rate-active' : ''}}" bindtap="selectRate" hover-class="rate-hover" data-index="6" data-rate="0.5">50%</button>
+          </view>
+        </view>
+      </view>
+      <view class="modal-buttons" style="margin-top: 20rpx;">
+        <button class="confirm-btn" bindtap="confirmObfuscationRate">确定</button>
+        <button class="cancel-btn" bindtap="closeObfuscationModal">取消</button>
       </view>
     </view>
   </view>

@@ -582,3 +582,44 @@
   color: #ff3b30;
   background: #ffebeb;
 }
+
+.ios-btn.cyan {
+  background: #f0f9ff;
+  color: #0ea5e9;
+}
+
+.ios-btn.cyan:active {
+  background: #e0f2fe;
+}
+
+.rate-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.rate-btn {
+  padding: 12rpx 24rpx;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+  background: #f5f5f7;
+  color: #333;
+  border: 2rpx solid #e0e0e0;
+  line-height: 1.5;
+  min-height: 0;
+}
+
+.rate-btn::after {
+  border: none;
+}
+
+.rate-btn.rate-active {
+  background: #e0f2fe;
+  color: #0ea5e9;
+  border-color: #0ea5e9;
+}
+
+.rate-hover {
+  opacity: 0.7;
+}
