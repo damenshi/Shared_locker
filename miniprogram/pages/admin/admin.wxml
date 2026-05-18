@@ -130,7 +130,7 @@
         <text class="icon-text">📊</text>
       </view>
       <view class="card-info">
-        <view class="card-title">退款统计</view>
+        <view class="card-title">退款率统计</view>
         <view class="card-desc">查看今日/本月/上月的退款率数据</view>
       </view>
       <view class="card-arrow">›</view>

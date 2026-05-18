@@ -1184,7 +1184,15 @@ exports.main = async (event, context) => {
       }
 
       // ============================================================
-      // 2. 统一状态校验
+      // 2. 统一拦截未付款订单（免费模式 / 0元订单）
+      // ============================================================
+      const depositValue = parseFloat(order.deposit) || 0;
+      if (depositValue <= 0) {
+        return { success: false, errMsg: '该订单未付款，无需退款' };
+      }
+
+      // ============================================================
+      // 3. 统一状态校验
       // ============================================================
       const validStatuses = [
         CONSTANTS.ORDER_STATUSES.COMPLETED,
@@ -1196,14 +1204,6 @@ exports.main = async (event, context) => {
 
       if (force) {
         validStatuses.push('待提现');
-      }
-
-      // 新增：CANCELLED 状态额外判断：只有 deposit>0 的才允许退款（兼容存量数据）
-      if (order.status === CONSTANTS.ORDER_STATUSES.CANCELLED) {
-        const depositValue = parseFloat(order.deposit) || 0;
-        if (depositValue <= 0) {
-          return { success: false, errMsg: '该订单未付款，无需退款' };
-        }
       }
 
       if (!validStatuses.includes(order.status)) {
@@ -1226,7 +1226,7 @@ exports.main = async (event, context) => {
       }
 
       // ============================================================
-      // 3. 分支处理：延迟退款逻辑 (修改了内部逻辑)
+      // 4. 分支处理：延迟退款逻辑 (修改了内部逻辑)
       // ============================================================
       if (isDelayed) {
          // 使用事务，确保状态更新和柜子释放原子操作
@@ -1262,7 +1262,7 @@ exports.main = async (event, context) => {
       }
 
       // ============================================================
-      // 4. 分支处理：直接微信退款逻辑
+      // 5. 分支处理：直接微信退款逻辑
       // ============================================================
       // 获取退款用的商户配置
       let merchantConfig = null;

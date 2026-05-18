@@ -294,7 +294,7 @@ async function handleRefundNotify(notifyData) {
   const outRefundNo = notifyData.out_refund_no; // 微信传回的退款单号
   const outTradeNo = notifyData.out_trade_no;   // 微信传回的商户订单号 (对应你的 _id)
   const refundId = notifyData.refund_id;        // 微信生成的退款流水号
-  const refundAmountFen = notifyData.amount?.refund || 0;
+  const refundAmountFen = notifyData.amount?.refund || notifyData.refund_fee || 0;
   const refundAmountYuan = refundAmountFen / 100;
 
   console.log(`[退款回调] 开始处理，退款单号:${outRefundNo}, 订单号(ID):${outTradeNo}`);
@@ -327,11 +327,11 @@ async function handleRefundNotify(notifyData) {
   if (!order) {
     console.warn(`[退款回调-跳过] 数据库未找到订单，可能是测试数据或脏数据。停止重试。`);
     // 直接返回成功，骗过微信，停止重试
-    return; 
+    return;
   }
 
   const orderId = order._id;
-  
+
   // 检查状态，防止重复处理
   if (order.status === CONSTANTS.ORDER_STATUSES.REFUNDED) {
     console.log(`[退款回调] 订单 ${orderId} 已经是退款状态，跳过`);
@@ -342,7 +342,7 @@ async function handleRefundNotify(notifyData) {
   // 顺便把缺失的 refundNo 补进去
   const updateData = {
     status: CONSTANTS.ORDER_STATUSES.REFUNDED,
-    refundId: refundId,          
+    refundId: refundId,
     refundNo: outRefundNo,       // 补全这个字段！
     refundAmount: refundAmountYuan,
     updatedAt: db.serverDate()
@@ -350,6 +350,108 @@ async function handleRefundNotify(notifyData) {
 
   await db.collection('orders').doc(orderId).update({ data: updateData });
   console.log(`[退款回调] 订单 ${orderId} 退款状态更新成功`);
+}
+
+// ==========================================
+// V2 退款回调处理（商户平台退款配置 / 用户申诉退款）
+// ==========================================
+
+// 从 XML 中提取指定标签内容（支持 CDATA）
+function extractXmlTag(xml, tag) {
+  const match = xml.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?</${tag}>`));
+  return match ? match[1] : null;
+}
+
+// V2 退款回调处理
+async function handleV2RefundNotify(event) {
+  try {
+    // 1. base64 解码 body
+    let bodyStr = event.body;
+    if (event.isBase64Encoded) {
+      bodyStr = Buffer.from(bodyStr, 'base64').toString('utf8');
+    }
+    console.log('[V2回调] 收到退款结果通知');
+
+    // 2. 提取关键字段
+    const returnCode = extractXmlTag(bodyStr, 'return_code');
+    const mchId = extractXmlTag(bodyStr, 'mch_id');
+    const reqInfo = extractXmlTag(bodyStr, 'req_info');
+
+    if (returnCode !== 'SUCCESS') {
+      console.log('[V2回调] return_code 不为 SUCCESS，忽略');
+      return v2SuccessResponse();
+    }
+    if (!reqInfo) {
+      console.log('[V2回调] 缺少 req_info');
+      return v2SuccessResponse();
+    }
+
+    // 3. 查询商户 apiKey
+    let apiKey = null;
+    try {
+      const merchantRes = await db.collection('merchant_configs').where({ mchid: mchId }).limit(1).get();
+      if (merchantRes.data && merchantRes.data.length > 0) {
+        apiKey = merchantRes.data[0].apiKey;
+      }
+    } catch (e) {
+      console.error('[V2回调] 查询商户配置失败:', e);
+    }
+
+    if (!apiKey) {
+      console.log(`[V2回调] 未找到商户 ${mchId} 的 apiKey，跳过处理`);
+      return v2SuccessResponse();
+    }
+
+    // 4. 解密 req_info
+    // 密钥 = MD5(apiKey) 32位小写
+    const key = crypto.createHash('md5').update(apiKey, 'utf8').digest('hex').toLowerCase();
+    const encryptedData = Buffer.from(reqInfo, 'base64');
+
+    // AES-256-ECB 解密
+    const decipher = crypto.createDecipheriv('aes-256-ecb', Buffer.from(key, 'utf8'), Buffer.alloc(0));
+    let decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+
+    // 去除 PKCS7 填充
+    const padLen = decrypted[decrypted.length - 1];
+    const decryptedXml = decrypted.slice(0, decrypted.length - padLen).toString('utf8');
+
+    console.log('[V2回调] 解密成功，退款数据:', decryptedXml.substring(0, 200));
+
+    // 5. 从解密后的 XML 提取退款信息
+    const notifyData = {
+      out_trade_no: extractXmlTag(decryptedXml, 'out_trade_no'),
+      out_refund_no: extractXmlTag(decryptedXml, 'out_refund_no'),
+      refund_id: extractXmlTag(decryptedXml, 'refund_id'),
+      refund_status: extractXmlTag(decryptedXml, 'refund_status'),
+      refund_fee: parseInt(extractXmlTag(decryptedXml, 'refund_fee') || '0'),
+      total_fee: parseInt(extractXmlTag(decryptedXml, 'total_fee') || '0'),
+      transaction_id: extractXmlTag(decryptedXml, 'transaction_id')
+    };
+
+    console.log('[V2回调] 解析数据:', notifyData);
+
+    // 6. 只处理退款成功的
+    if (notifyData.refund_status === 'SUCCESS') {
+      await handleRefundNotify(notifyData);
+    } else {
+      console.log('[V2回调] 退款状态非 SUCCESS:', notifyData.refund_status);
+    }
+
+    return v2SuccessResponse();
+  } catch (err) {
+    console.error('[V2回调] 处理异常:', err);
+    // 即使处理失败也返回 SUCCESS，防止微信重试
+    return v2SuccessResponse();
+  }
+}
+
+// V2 回调成功响应（XML 格式）
+function v2SuccessResponse() {
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'text/xml' },
+    body: '<xml><return_code><![CDATA[SUCCESS]]></return_code><return_msg><![CDATA[OK]]></return_msg></xml>'
+  };
 }
 
 // 云函数入口
@@ -363,7 +465,13 @@ exports.main = async (event) => {
     }
   }
 
-  // Step1: 解析 body
+  // 检测 V2 XML 回调（商户平台退款配置 / 用户申诉退款）
+  const contentType = (event.headers['content-type'] || event.headers['Content-Type'] || '').toLowerCase();
+  if (contentType.includes('text/xml')) {
+    return await handleV2RefundNotify(event);
+  }
+
+  // Step1: 解析 body（V3 JSON 格式）
   let body
   try {
     body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body
