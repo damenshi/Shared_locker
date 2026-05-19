@@ -1,0 +1,10 @@
+{
+  "name": "wxpay-complaint",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "wechatpay-node-v3": "^2.2.1",
+    "wx-server-sdk": "^3.0.1"
+  }
+}
