@@ -17,6 +17,9 @@ Page({
     },
     currentOrderId: null,  // 当前订单ID，用于取消时释放
     payTimer: null,        // 支付倒计时定时器
+    showSuccessView: false, // 是否显示开门成功结果页
+    lockerInfo: null,       // 当前分配的柜门完整信息
+    lastReopenTime: 0,      // 上次点击再次开门的时间（防连点）
   },
 
   onUnload() {
@@ -660,26 +663,22 @@ Page({
 
       //缓存手机号和密码
       await this.saveUserCredentials(this.data.openid, this.data.phone, this.data.password);
-      
+
+      wx.hideLoading();
+      this.playVoicePrompt(`${lockerInfo.lockerNo}号柜门已打开，请存入物品并关好门`);
+
+      // 同步更新 index 页面的柜门显示，确保用户返回后能看到当前柜门
       const pages = getCurrentPages();
       const indexPage = pages.find(p => p.route === 'pages/index/index');
       if (indexPage) {
         indexPage.showOpenedLocker(lockerInfo.lockerNo);
       }
 
-      wx.hideLoading();
-      this.playVoicePrompt(`${lockerInfo.lockerNo}号柜门已打开，请存入物品并关好门`);
-      wx.showModal({
-        title: '提示',
-        content: `柜门 ${lockerInfo.lockerNo} 已打开`,
-        showCancel: false,
-        confirmText: '好的',
-        success: (res) => {
-          if (res.confirm) {
-            // 用户点击了“好的”
-            wx.navigateBack({ delta: 1 });
-          }
-        }
+      // 显示开门成功结果页（不自动返回，让用户自助处理常见问题）
+      this.setData({
+        showSuccessView: true,
+        lockerInfo: lockerInfo,
+        lockerNo: String(lockerInfo.lockerNo)
       });
 
     } catch (e) {
@@ -726,6 +725,207 @@ Page({
     } finally {
       this.setData({ isLoading: false });
       wx.hideLoading();
+    }
+  },
+
+  // ========== 开门成功结果页功能 ==========
+
+  /**
+   * 跳转到订单详情
+   */
+  goToOrderDetail() {
+    if (!this.data.currentOrderId) {
+      wx.showToast({ title: '订单信息异常', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: `/pages/mine/myorder?orderId=${this.data.currentOrderId}`
+    });
+  },
+
+  /**
+   * 跳转到个人中心
+   */
+  goToMine() {
+    wx.switchTab({
+      url: '/pages/mine/mine'
+    });
+  },
+
+  /**
+   * 柜里有物品 —— 重新分配柜门
+   */
+  async handleReassignLocker() {
+    if (this.data.isLoading) return;
+
+    const { currentOrderId, deviceId, lockerInfo } = this.data;
+    if (!currentOrderId || !deviceId || !lockerInfo) {
+      wx.showToast({ title: '订单信息异常，请重试', icon: 'none' });
+      return;
+    }
+
+    // 确认弹窗
+    const confirm = await new Promise((resolve) => {
+      wx.showModal({
+        title: '重新分配柜门',
+        content: '确定柜中已有物品？请关好柜门，系统为您重新分配一个新的空闲柜门。',
+        showCancel: true,
+        cancelText: '取消',
+        confirmText: '确定',
+        success: (res) => resolve(res.confirm)
+      });
+    });
+
+    if (!confirm) return;
+
+    this.setData({ isLoading: true });
+    wx.showLoading({ title: '正在重新分配...' });
+
+    try {
+      // 1. 调用后端重新分配
+      const reassignRes = await wx.cloud.callFunction({
+        name: 'order',
+        data: {
+          action: 'reassignLocker',
+          orderId: currentOrderId,
+          deviceId: deviceId,
+          oldLockerId: lockerInfo._id
+        }
+      });
+
+      if (!reassignRes.result?.success) {
+        throw new Error(reassignRes.result?.errMsg || '重新分配失败');
+      }
+
+      const newLockerInfo = reassignRes.result?.data?.lockerInfo;
+      if (!newLockerInfo || !newLockerInfo._id) {
+        throw new Error('重新分配失败，未返回有效的柜门信息');
+      }
+
+      // 2. 打开新柜门
+      wx.showLoading({ title: '正在打开新柜门...' });
+      const openRes = await wx.cloud.callFunction({
+        name: 'locker',
+        data: {
+          action: 'openDoor',
+          deviceId: deviceId,
+          doorNo: newLockerInfo.doorNo,
+          cabinetNo: newLockerInfo.cabinetNo,
+          orderId: currentOrderId,
+          type: 'store'
+        }
+      });
+
+      if (!openRes.result?.success) {
+        throw new Error(openRes.result?.errMsg || '新柜门打开失败，请联系客服');
+      }
+
+      // 3. 更新页面状态，并同步 index 页面显示的柜门号
+      this.setData({
+        lockerInfo: newLockerInfo,
+        lockerNo: String(newLockerInfo.lockerNo)
+      });
+
+      const pages = getCurrentPages();
+      const indexPage = pages.find(p => p.route === 'pages/index/index');
+      if (indexPage) {
+        indexPage.showOpenedLocker(newLockerInfo.lockerNo);
+      }
+
+      wx.hideLoading();
+      this.playVoicePrompt(`已为您重新分配 ${newLockerInfo.lockerNo} 号柜门，请放入物品`);
+      wx.showToast({
+        title: `已分配 ${newLockerInfo.lockerNo} 号柜门`,
+        icon: 'none',
+        duration: 2000
+      });
+
+    } catch (err) {
+      wx.hideLoading();
+      console.error('重新分配柜门失败:', err);
+      wx.showModal({
+        title: '重新分配失败',
+        content: err.message || '请稍后重试或联系客服',
+        showCancel: false,
+        confirmText: '好的'
+      });
+    } finally {
+      this.setData({ isLoading: false });
+    }
+  },
+
+  /**
+   * 门未开 —— 再次发送开门指令
+   */
+  async handleReopenDoor() {
+    if (this.data.isLoading) return;
+
+    const { currentOrderId, deviceId, lockerInfo, lastReopenTime } = this.data;
+    if (!currentOrderId || !deviceId || !lockerInfo) {
+      wx.showToast({ title: '订单信息异常，请重试', icon: 'none' });
+      return;
+    }
+
+    // 防连点：3 秒内只能点一次
+    const now = Date.now();
+    if (now - lastReopenTime < 3000) {
+      wx.showToast({ title: '请稍后再试', icon: 'none' });
+      return;
+    }
+    this.setData({ lastReopenTime: now });
+
+    // 确认弹窗
+    const confirm = await new Promise((resolve) => {
+      wx.showModal({
+        title: '再次开门',
+        content: `确定重新打开 ${lockerInfo.lockerNo} 号柜门吗？`,
+        showCancel: true,
+        cancelText: '取消',
+        confirmText: '确定',
+        success: (res) => resolve(res.confirm)
+      });
+    });
+    if (!confirm) return;
+
+    this.setData({ isLoading: true });
+    wx.showLoading({ title: '正在重新开门...' });
+
+    try {
+      const openRes = await wx.cloud.callFunction({
+        name: 'locker',
+        data: {
+          action: 'openDoor',
+          deviceId: deviceId,
+          doorNo: lockerInfo.doorNo,
+          cabinetNo: lockerInfo.cabinetNo,
+          orderId: currentOrderId,
+          type: 'store'
+        }
+      });
+
+      if (!openRes.result?.success) {
+        throw new Error(openRes.result?.errMsg || '开门失败，请重试');
+      }
+
+      wx.hideLoading();
+      this.playVoicePrompt(`${lockerInfo.lockerNo}号柜门已打开`);
+      wx.showToast({
+        title: '已重新发送开门指令',
+        icon: 'success',
+        duration: 2000
+      });
+
+    } catch (err) {
+      wx.hideLoading();
+      console.error('再次开门失败:', err);
+      wx.showModal({
+        title: '开门失败',
+        content: err.message || '请稍后重试或联系客服',
+        showCancel: false,
+        confirmText: '好的'
+      });
+    } finally {
+      this.setData({ isLoading: false });
     }
   }
 });

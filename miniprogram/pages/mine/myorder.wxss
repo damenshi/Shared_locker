@@ -24,6 +24,11 @@
   padding: 30rpx;
 }
 
+.order-card-highlight {
+  border: 4rpx solid #facc15;
+  box-shadow: 0 6rpx 20rpx rgba(250, 204, 21, 0.25);
+}
+
 .order-header {
   display: flex;
   justify-content: space-between;

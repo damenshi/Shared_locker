@@ -1,28 +1,15 @@
-<view class="container">
+<view class="container" wx:if="{{!showSuccessView}}">
   <view class="card">
     <view class="title"></view>
   </view>
 </view>
 
-<!-- <view wx:if="{{showPayModal}}" class="modal-mask">
-  <view class="modal-container">
-    <view class="modal-title">确认支付</view>
-    <view class="modal-locker">柜门号：<text class="locker-no">{{lockerNo}}</text></view>
-    <view class="modal-content">
-      需支付预付款 <text class="highlight">{{payDeposit}}</text> 元
-    </view>
-    <view class="modal-actions">
-      <button class="btn cancel" bindtap="cancelPay">取消</button>
-      <button class="btn confirm" bindtap="confirmPay">确认支付</button>
-    </view>
-  </view>
-</view> -->
-
+<!-- 支付确认弹窗 -->
 <view wx:if="{{showPayModal}}" class="modal-mask">
   <view class="modal-container big">
     <view class="modal-title">确认支付</view>
 
-    <!-- ⚡ 超醒目柜门号区域 -->
+    <!-- 柜门号区域 -->
     <view class="locker-box strong-focus">
       <text class="locker-label strong">柜门号</text>
       <text class="locker-big strong">{{lockerNo}}</text>
@@ -45,4 +32,50 @@
   </view>
 </view>
 
+<!-- 开门成功结果页 -->
+<view wx:if="{{showSuccessView}}" class="success-page">
+  <!-- 顶部装饰条 -->
+  <view class="success-topbar"></view>
 
+  <view class="success-body">
+    <!-- 成功图标 -->
+    <view class="success-check-wrap">
+      <view class="success-check-circle">
+        <view class="success-check-line"></view>
+      </view>
+    </view>
+
+    <!-- 柜门号卡片 -->
+    <view class="success-locker-card">
+      <view class="locker-card-label">已为您开启</view>
+      <view class="locker-card-no">{{lockerNo}}号柜</view>
+      <view class="locker-card-divider"></view>
+      <view class="locker-card-hint">请放入物品并确认关好柜门</view>
+    </view>
+
+    <button class="success-btn-main" bindtap="goToOrderDetail">查看订单详情</button>
+
+    <!-- 问题处理卡片 -->
+    <view class="help-section-title">遇到问题？</view>
+    <view class="help-cards">
+      <view class="help-card help-card-warn" bindtap="handleReassignLocker">
+        <view class="help-card-icon">
+          <view class="icon-box icon-warn"></view>
+        </view>
+        <view class="help-card-text">
+          <view class="help-card-title">柜里已有物品</view>
+          <view class="help-card-desc">重新分配空闲柜门</view>
+        </view>
+      </view>
+      <view class="help-card" bindtap="handleReopenDoor">
+        <view class="help-card-icon">
+          <view class="icon-box icon-refresh"></view>
+        </view>
+        <view class="help-card-text">
+          <view class="help-card-title">门未开</view>
+          <view class="help-card-desc">再次发送开门指令</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

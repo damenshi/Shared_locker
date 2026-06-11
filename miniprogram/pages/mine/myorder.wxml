@@ -7,7 +7,7 @@
     <view class="order-list">
       <block wx:for="{{orders}}" wx:key="_id">
         
-        <view class="order-card" wx:if="{{index === 0 || isExpanded}}">
+        <view class="order-card {{item.isHighlighted ? 'order-card-highlight' : ''}}" wx:if="{{index === 0 || isExpanded}}">
           
           <view class="order-header">
             <text class="order-id">订单号：{{item._id}}</text>

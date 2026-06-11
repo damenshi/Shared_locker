@@ -2108,6 +2108,119 @@ exports.main = async (event, context) => {
     }
   }
 
+  // ========== 重新分配柜门（柜内有物品时换柜）==========
+  if (action === 'reassignLocker') {
+    const { orderId, deviceId, oldLockerId } = event;
+
+    const validation = validateParams(event, {
+      orderId: { type: 'string' },
+      deviceId: { type: 'string' },
+      oldLockerId: { type: 'string' }
+    });
+    if (!validation.valid) {
+      return { success: false, errMsg: validation.msg };
+    }
+
+    try {
+      // 1. 验证订单状态
+      const orderDoc = await db.collection('orders').doc(orderId).get();
+      if (!orderDoc.data) {
+        return { success: false, errMsg: '订单不存在' };
+      }
+      const order = orderDoc.data;
+
+      if (order.status !== CONSTANTS.ORDER_STATUSES.IN_PROGRESS) {
+        return { success: false, errMsg: `订单状态不可重新分配，当前状态：${order.status}` };
+      }
+
+      // 2. 释放旧柜门（CAS：只有 currentOrderId === orderId 时才释放）
+      const releaseRes = await db.collection('lockers').where({
+        _id: oldLockerId,
+        currentOrderId: orderId
+      }).update({
+        data: {
+          status: 'free',
+          currentOrderId: null,
+          currentUserPhone: null,
+          updatedAt: db.serverDate()
+        }
+      });
+
+      if (releaseRes.stats.updated > 0) {
+        console.log(`[reassignLocker] 旧柜门 ${oldLockerId} 已释放`);
+      } else {
+        console.warn(`[reassignLocker] 旧柜门 ${oldLockerId} 已释放或已被他人占用`);
+      }
+
+      // 3. 分配新柜门（带重试，与 createOrder 保持一致）
+      let newLocker = null;
+      const MAX_RETRIES = 3;
+
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        const freeLockers = await db.collection('lockers')
+          .where({
+            status: 'free',
+            currentOrderId: _.eq(null),
+            deviceId: deviceId
+          })
+          .limit(10)
+          .get();
+
+        if (freeLockers.data.length === 0) {
+          throw new Error('当前设备柜门已满，请联系客服');
+        }
+
+        const randomIndex = Math.floor(Math.random() * freeLockers.data.length);
+        const candidate = freeLockers.data[randomIndex];
+
+        // CAS 锁定
+        const lockRes = await db.collection('lockers').where({
+          _id: candidate._id,
+          status: 'free'
+        }).update({
+          data: {
+            status: 'occupied',
+            currentOrderId: orderId,
+            currentUserPhone: order.phone,
+            updatedAt: db.serverDate()
+          }
+        });
+
+        if (lockRes.stats.updated > 0) {
+          newLocker = candidate;
+          break;
+        } else {
+          console.warn(`[reassignLocker] 第 ${attempt} 次分配柜门(${candidate.lockerNo})失败，已被抢占`);
+        }
+      }
+
+      if (!newLocker) {
+        throw new Error('重新分配失败，当前存包人数过多，请重试');
+      }
+
+      // 4. 更新订单关联的柜门信息
+      await db.collection('orders').doc(orderId).update({
+        data: {
+          lockerId: newLocker._id,
+          cabinetNo: newLocker.cabinetNo,
+          doorNo: newLocker.doorNo,
+          lockerNo: newLocker.lockerNo,
+          updatedAt: db.serverDate()
+        }
+      });
+
+      return {
+        success: true,
+        data: {
+          lockerInfo: newLocker
+        }
+      };
+    } catch (err) {
+      console.error('重新分配柜门失败', { orderId, error: err.message });
+      return { success: false, errMsg: err.message };
+    }
+  }
+
   // 未知操作
   return { error: 'unknown action', errMsg: '未找到对应的操作' }
 }

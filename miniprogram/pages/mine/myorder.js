@@ -38,7 +38,8 @@ Page({
     orders: [],
     loading: true,
     openid: '',
-    isExpanded: false
+    isExpanded: false,
+    highlightOrderId: ''
   },
 
   toggleHistory() {
@@ -47,9 +48,10 @@ Page({
     });
   },
 
-  onLoad() {
+  onLoad(options) {
     this.setData({
-      openid: app.globalData.openid || ''
+      openid: app.globalData.openid || '',
+      highlightOrderId: options.orderId || ''
     });
     this.getOrders();
   },
@@ -92,6 +94,9 @@ Page({
             // 已关闭保持原样显示
           };
           order.displayStatus = statusMap[order.status] || order.status;
+
+          // 标记需要高亮的订单（从 store 成功页跳转过来）
+          order.isHighlighted = order._id === this.data.highlightOrderId;
 
           return order;
         });

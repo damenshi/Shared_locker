@@ -27,47 +27,39 @@
   color: #222;
 }
 
-/* ⚡ 超强聚焦柜门号 */
+/* 超强聚焦柜门号 */
 .locker-box.strong-focus {
   border-radius: 26rpx;
   padding: 60rpx 0;
   margin-bottom: 55rpx;
-  border: 2rpx solid #d3e3ff;  /* subtle iOS style border */
+  border: 2rpx solid #d3e3ff;
   background: #f9fbff;
   box-shadow: 0 8rpx 26rpx rgba(0,122,255,0.08);
 }
 
-/* 柜门号标签 —— 加大、加粗 */
 .locker-label.strong {
   display: block;
   width: 100%;
-  text-align: center;      /* 🎯 强制水平居中 */
-  font-size: 42rpx;        /* 稍微放大一点，让层级更自然 */
+  text-align: center;
+  font-size: 42rpx;
   font-weight: 600;
   color: #007aff;
-  margin-bottom: 26rpx;    /* 与大号数字间距更协调 */
-  letter-spacing: 2rpx;    /* 更偏 iOS 风格 */
+  margin-bottom: 26rpx;
+  letter-spacing: 2rpx;
 }
 
-/* 数字 —— 主角诞生 */
 .locker-big.strong {
-  font-size: 140rpx;  /* 巨大醒目 */
+  font-size: 140rpx;
   font-weight: 700;
   line-height: 1;
   color: #007aff;
   letter-spacing: 4rpx;
 }
 
-/* 内容文字 */
 .modal-content {
   font-size: 32rpx;
   color: #555;
   margin-bottom: 45rpx;
-}
-
-/* 按钮 */
-.modal-actions {
-  display: flex;
 }
 
 .btn {
@@ -89,24 +81,272 @@
   box-shadow: 0 8rpx 16rpx rgba(0,122,255,0.25);
 }
 
-/* 动画 */
 @keyframes fadeIn {
   from {opacity:0; transform:scale(0.95);}
   to {opacity:1; transform:scale(1);}
 }
 
-/* 协议提示整体样式：小字、置灰、居中、调整间距 */
 .agreement-tips {
   font-size: 24rpx;
   color: #999999;
   text-align: center;
   margin-top: 15rpx;
-  margin-bottom: 25rpx; /* 与下方按钮保持距离 */
+  margin-bottom: 25rpx;
   padding: 0 20rpx;
 }
 
-/* 可点击协议链接的样式：主题色（这里用了微信绿，可自行改成你的蓝色） */
 .link-text {
-  color: #07c160; 
+  color: #07c160;
   display: inline-block;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 24rpx;
+}
+
+/* ==================== 开门成功结果页（商务风格） ==================== */
+.success-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  font-family: "SF Pro Display", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* 顶部装饰条 */
+.success-topbar {
+  height: 8rpx;
+  background: linear-gradient(90deg, #1e3a5f 0%, #2d4a6f 50%, #c9a961 100%);
+  flex-shrink: 0;
+}
+
+.success-body {
+  flex: 1;
+  padding: 60rpx 40rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 成功勾选图标 */
+.success-check-wrap {
+  margin-bottom: 48rpx;
+}
+
+.success-check-circle {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 24rpx rgba(30,58,95,0.25);
+  position: relative;
+}
+
+.success-check-line {
+  width: 40rpx;
+  height: 20rpx;
+  border-left: 6rpx solid #c9a961;
+  border-bottom: 6rpx solid #c9a961;
+  transform: rotate(-45deg);
+  margin-top: -8rpx;
+}
+
+/* 柜门号卡片 */
+.success-locker-card {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 8rpx;
+  padding: 48rpx 32rpx 40rpx;
+  box-shadow: 0 2rpx 12rpx rgba(30,58,95,0.06);
+  border-left: 6rpx solid #1e3a5f;
+  text-align: center;
+  margin-bottom: 48rpx;
+}
+
+.locker-card-label {
+  font-size: 28rpx;
+  color: #6b7280;
+  margin-bottom: 12rpx;
+  letter-spacing: 1rpx;
+}
+
+.locker-card-no {
+  font-size: 72rpx;
+  font-weight: 700;
+  color: #1e3a5f;
+  line-height: 1.1;
+  margin-bottom: 20rpx;
+}
+
+.locker-card-divider {
+  width: 60rpx;
+  height: 2rpx;
+  background: #e5e7eb;
+  margin: 0 auto 16rpx;
+}
+
+.locker-card-hint {
+  font-size: 26rpx;
+  color: #9ca3af;
+}
+
+.success-locker-card {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 8rpx;
+  padding: 48rpx 32rpx;
+  box-shadow: 0 2rpx 12rpx rgba(30,58,95,0.06);
+  border-left: 6rpx solid #1e3a5f;
+  text-align: center;
+  margin-bottom: 48rpx;
+}
+
+/* 主按钮 */
+.success-btn-main {
+  width: 100%;
+  height: 96rpx;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 4rpx;
+  border: none;
+  margin-bottom: 48rpx;
+  box-shadow: 0 4rpx 12rpx rgba(30,58,95,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.success-btn-main::after {
+  border: none;
+}
+
+.success-btn-main:active {
+  opacity: 0.9;
+  transform: translateY(2rpx);
+}
+
+/* 问题区域标题 */
+.help-section-title {
+  width: 100%;
+  font-size: 26rpx;
+  color: #9ca3af;
+  margin-bottom: 20rpx;
+  text-align: left;
+  padding-left: 4rpx;
+}
+
+/* 问题处理卡片 */
+.help-cards {
+  width: 100%;
+  display: flex;
+  gap: 20rpx;
+}
+
+.help-card {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 8rpx;
+  padding: 32rpx 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(30,58,95,0.06);
+  border-left: 4rpx solid #1e3a5f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.help-card-warn {
+  border-left-color: #c9a961;
+}
+
+.help-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-box {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.icon-warn {
+  background: rgba(201,169,97,0.12);
+}
+
+.icon-warn::before {
+  content: '';
+  width: 6rpx;
+  height: 24rpx;
+  background: #c9a961;
+  border-radius: 3rpx;
+  position: absolute;
+  top: 12rpx;
+}
+
+.icon-warn::after {
+  content: '';
+  width: 6rpx;
+  height: 6rpx;
+  background: #c9a961;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 12rpx;
+}
+
+.icon-refresh {
+  background: rgba(30,58,95,0.08);
+}
+
+.icon-refresh::before {
+  content: '';
+  width: 24rpx;
+  height: 24rpx;
+  border: 4rpx solid #1e3a5f;
+  border-radius: 50%;
+  border-top-color: transparent;
+  position: absolute;
+}
+
+.icon-refresh::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 8rpx solid transparent;
+  border-right: 8rpx solid transparent;
+  border-bottom: 10rpx solid #1e3a5f;
+  position: absolute;
+  top: 8rpx;
+  right: 10rpx;
+  transform: rotate(45deg);
+}
+
+.help-card-text {
+  text-align: center;
+}
+
+.help-card-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 6rpx;
+}
+
+.help-card-desc {
+  font-size: 22rpx;
+  color: #9ca3af;
 }
