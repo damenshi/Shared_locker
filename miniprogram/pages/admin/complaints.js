@@ -140,27 +140,24 @@ Page({
       const res = await wx.cloud.callFunction({
         name: 'complaint',
         data: {
-          action: 'getComplaintList'
+          action: 'getComplaintList',
+          status: this.data.currentFilter || undefined
         }
       });
 
       if (res.result.success) {
-        const allComplaints = (res.result.data || []).map(item => {
+        const complaints = (res.result.data || []).map(item => {
           return {
             ...item,
             createdAtFormatted: formatDate(item.createdAt)
           };
         });
 
-        const stats = {
-          total: allComplaints.length,
-          pending: allComplaints.filter(c => c.status === 'pending').length,
-          resolved: allComplaints.filter(c => c.status === 'resolved').length
+        const stats = res.result.stats || {
+          total: complaints.length,
+          pending: complaints.filter(c => c.status === 'pending').length,
+          resolved: complaints.filter(c => c.status === 'resolved').length
         };
-
-        const complaints = this.data.currentFilter
-          ? allComplaints.filter(c => c.status === this.data.currentFilter)
-          : allComplaints;
 
         this.setData({ complaints, stats, loading: false });
 

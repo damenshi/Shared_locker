@@ -66,11 +66,6 @@
             </block>
           </view>
           <view class="action-btns">
-            <button class="btn complaint"
-                    bindtap="goComplaint"
-                    data-id="{{item._id}}">
-              投诉
-            </button>
             <button class="btn refund"
                     wx:if="{{(item.status === '已完成' || item.status === '已关闭' || item.status === '进行中' || item.status === '已强制结束') && item.deposit > 0}}"
                     bindtap="refund"
@@ -80,6 +75,9 @@
             </button>
             <button class="btn" wx:elif="{{(item.status === '已完成' || item.status === '已关闭' || item.status === '进行中' || item.status === '已强制结束') && item.deposit <= 0}}" disabled>无需退款</button>
             <button class="btn" wx:elif="{{item.status === '待提现'}}" disabled>退款中</button>
+          </view>
+          <view class="complaint-link" bindtap="goComplaint" data-id="{{item._id}}">
+            对此订单有疑问？
           </view>
         </view>
       </block>

@@ -168,7 +168,7 @@ async function replyComplaint(complaintId, merchantConfig) {
   const path = `/v3/merchant-service/complaints-v2/${complaintId}/response`
   const body = {
     complainted_mchid: merchantConfig.mchid,
-    response_content: '您的退款已处理，款项将原路返回，请注意查收。'
+    response_content: '用户您好，非常抱歉给您带来不好的体验，您可在小程序中点击我的-我的订单进行退款申请，本次退款已为您处理，款项将原路返回，请注意查收。如有其他问题，我们随时为您服务，保证让您满意！'
   }
 
   return await v3Request('POST', path, body, merchantConfig)

@@ -90,9 +90,12 @@
   margin-top: 20rpx;
 }
 
-.btn.complaint {
-  background: #f0f0f0;
-  color: #666;
+.complaint-link {
+  font-size: 24rpx;
+  color: #999;
+  text-align: center;
+  margin-top: 16rpx;
+  padding: 8rpx 0;
 }
 
 .footer-tips {

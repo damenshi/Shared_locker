@@ -249,6 +249,7 @@ const getMyComplaints = async (openid) => {
     const result = await db.collection('complaints')
       .where({ openid })
       .orderBy('createdAt', 'desc')
+      .limit(20)
       .get()
 
     return { success: true, data: result.data }
@@ -273,12 +274,23 @@ const getComplaintList = async (event, openid) => {
   }
 
   try {
-    const result = await db.collection('complaints')
-      .where(query)
-      .orderBy('createdAt', 'desc')
-      .get()
+    // 分别统计各状态总数（不受筛选条件影响）
+    const [totalRes, pendingRes, resolvedRes, result] = await Promise.all([
+      db.collection('complaints').count(),
+      db.collection('complaints').where({ status: 'pending' }).count(),
+      db.collection('complaints').where({ status: 'resolved' }).count(),
+      db.collection('complaints').where(query).orderBy('createdAt', 'desc').limit(30).get()
+    ])
 
-    return { success: true, data: result.data }
+    return {
+      success: true,
+      data: result.data,
+      stats: {
+        total: totalRes.total,
+        pending: pendingRes.total,
+        resolved: resolvedRes.total
+      }
+    }
   } catch (err) {
     console.error('[getComplaintList] 查询失败:', err)
     return { success: false, errMsg: '获取投诉列表失败' }
