@@ -1,5 +1,8 @@
 // pages/mine/myorder.js
 const app = getApp();
+const config = require('../../config.js');
+
+let rewardedVideoAd = null;
 
 function formatDate(dateStr) {
   const date = new Date(dateStr); // "2025-09-26T16:58:53.136Z"
@@ -39,7 +42,8 @@ Page({
     loading: true,
     openid: '',
     isExpanded: false,
-    highlightOrderId: ''
+    highlightOrderId: '',
+    pendingRefundEvent: null
   },
 
   toggleHistory() {
@@ -53,7 +57,51 @@ Page({
       openid: app.globalData.openid || '',
       highlightOrderId: options.orderId || ''
     });
+
+    this.initRewardedVideoAd();
     this.getOrders();
+  },
+
+  /**
+   * 初始化激励视频广告（避免重复创建和重复监听）
+   */
+  initRewardedVideoAd() {
+    if (!wx.createRewardedVideoAd) {
+      console.log('当前基础库不支持激励视频广告');
+      return;
+    }
+
+    if (!config.rewardedVideoAdUnitId) {
+      console.log('未配置激励视频广告位 ID');
+      return;
+    }
+
+    if (rewardedVideoAd) {
+      console.log('激励视频广告已初始化，复用现有实例');
+      return;
+    }
+
+    rewardedVideoAd = wx.createRewardedVideoAd({
+      adUnitId: config.rewardedVideoAdUnitId
+    });
+
+    rewardedVideoAd.onLoad(() => {
+      console.log('激励视频广告加载成功');
+    });
+
+    rewardedVideoAd.onError((err) => {
+      console.error('激励视频广告加载失败', err);
+    });
+
+    rewardedVideoAd.onClose((res) => {
+      console.log('激励视频广告关闭', res);
+      // 广告关闭（无论是否看完）都继续退款
+      const event = this.data.pendingRefundEvent;
+      this.setData({ pendingRefundEvent: null });
+      if (event) {
+        this.refund(event);
+      }
+    });
   },
 
   /**
@@ -122,9 +170,44 @@ Page({
     });
   },
 
+  /**
+   * 用户点击退款按钮：先展示激励视频广告，关闭后继续退款流程
+   */
+  async onRefundClick(event) {
+    console.log('点击退款按钮，准备展示广告');
+    this.setData({ pendingRefundEvent: event });
+
+    if (!rewardedVideoAd || !config.rewardedVideoAdUnitId) {
+      console.log('广告未初始化或未配置，直接退款');
+      this.refund(event);
+      return;
+    }
+
+    try {
+      console.log('尝试展示激励视频广告');
+      await rewardedVideoAd.show();
+      console.log('激励视频广告展示成功');
+    } catch (err) {
+      console.error('广告展示失败，尝试重新加载', err);
+      wx.showLoading({ title: '广告加载中...', mask: true });
+      try {
+        await rewardedVideoAd.load();
+        console.log('广告重新加载成功');
+        wx.hideLoading();
+        await rewardedVideoAd.show();
+        console.log('广告重新展示成功');
+      } catch (loadErr) {
+        wx.hideLoading();
+        console.error('广告重新加载并展示失败', loadErr);
+        // 广告失败不阻塞退款
+        this.refund(event);
+      }
+    }
+  },
+
   async refund(event) {
     console.log('退款事件：', event)
-  
+
     wx.showModal({
       title: '确认退款',
       content: `确认退款？`,
