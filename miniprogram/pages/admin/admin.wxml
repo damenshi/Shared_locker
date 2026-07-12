@@ -362,9 +362,20 @@
         </view>
         <view class="form-col">
           <view class="form-label">延迟退款</view>
-          <picker bindchange="onDelayedRefundChange" value="{{delayedRefundIndex}}" range="{{delayedRefundOptions}}">
-            <view class="form-input picker-value">{{delayedRefundOptions[delayedRefundIndex] || '请选择'}}</view>
-          </picker>
+          <switch checked="{{delayedRefund}}" bindchange="onDelayedRefundChange" class="form-switch" />
+        </view>
+      </view>
+      <view class="form-row" wx:if="{{delayedRefund}}">
+        <view class="form-col">
+          <view class="form-label">提现等待时间（小时）</view>
+          <input
+            type="number"
+            value="{{refundDelayHours}}"
+            data-field="refundDelayHours"
+            bindinput="onRefundDelayHoursChange"
+            placeholder="0"
+            class="form-input"
+          />
         </view>
       </view>
     </view>

@@ -43,6 +43,13 @@ Page({
     obfuscationDeviceRate: null,
     selectedRateIndex: 0,
     selectedRateValue: -1,
+
+    // 退款配置弹窗
+    showRefundConfigModal: false,
+    currentRefundDeviceId: null,
+    currentRefundInternalNo: '',
+    editDelayedRefund: false,
+    editRefundDelayHours: 0,
   },
 
   onLoad() {
@@ -592,6 +599,70 @@ Page({
   // 3. 监听柜号输入
   onStatusLockerInput(e) {
     this.setData({ statusLockerNo: e.detail.value });
+  },
+
+  // === 修改设备退款配置 ===
+  showRefundConfigModal(e) {
+    const deviceId = e.currentTarget.dataset.deviceid;
+    const internalNo = e.currentTarget.dataset.internalno;
+    const device = this.data.devices.find(d => d.deviceId === deviceId) || {};
+    this.setData({
+      showRefundConfigModal: true,
+      currentRefundDeviceId: deviceId,
+      currentRefundInternalNo: internalNo,
+      editDelayedRefund: Boolean(device.delayedRefund),
+      editRefundDelayHours: device.refundDelayHours || 0
+    });
+  },
+
+  closeRefundConfigModal() {
+    this.setData({
+      showRefundConfigModal: false,
+      currentRefundDeviceId: null,
+      currentRefundInternalNo: '',
+      editDelayedRefund: false,
+      editRefundDelayHours: 0
+    });
+  },
+
+  onEditDelayedRefundChange(e) {
+    this.setData({ editDelayedRefund: e.detail.value });
+  },
+
+  onEditRefundDelayHoursChange(e) {
+    const value = e.detail.value;
+    this.setData({ editRefundDelayHours: value === '' ? 0 : parseInt(value, 10) || 0 });
+  },
+
+  async saveRefundConfig() {
+    const { currentRefundDeviceId, editDelayedRefund, editRefundDelayHours } = this.data;
+    if (!currentRefundDeviceId) return;
+
+    wx.showLoading({ title: '保存中...' });
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'admin',
+        data: {
+          action: 'updateDeviceRefundConfig',
+          deviceId: currentRefundDeviceId,
+          delayedRefund: editDelayedRefund,
+          refundDelayHours: editRefundDelayHours
+        }
+      });
+
+      wx.hideLoading();
+      if (res.result.success) {
+        wx.showToast({ title: '保存成功', icon: 'success' });
+        this.closeRefundConfigModal();
+        this.getDevices();
+      } else {
+        wx.showToast({ title: res.result.errMsg || '保存失败', icon: 'none' });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      console.error('保存退款配置失败:', err);
+      wx.showToast({ title: '保存失败', icon: 'none' });
+    }
   },
 
   // 4. 执行状态修改核心逻辑

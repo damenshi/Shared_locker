@@ -8,7 +8,7 @@ const { getLockerServerUrl, getCurrentMiniProgram } = require('./utils/config');
 
 
 const batchCreateLockers = async (event) => {
-  const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefund, screenNo,cabinetCount, lockersPerCabinet } = event
+  const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefund, refundDelayHours, screenNo,cabinetCount, lockersPerCabinet } = event
 
   // 验证参数
   if (!internalNo || !deviceAddress || deviceDeposit === undefined || unitPrice === undefined || !screenNo || !cabinetCount || !lockersPerCabinet) {
@@ -17,6 +17,9 @@ const batchCreateLockers = async (event) => {
       errMsg: '请指定设备ID、设备地址、设备收费标准、收费策略、屏幕编号、锁板数量和每个锁板的锁数量'
     }
   }
+
+  // 校验提现等待时间
+  const parsedRefundDelayHours = Math.max(0, parseInt(refundDelayHours, 10) || 0)
 
   // 验证设备是否存在
   const deviceCheck = await db.collection('devices')
@@ -38,7 +41,8 @@ const batchCreateLockers = async (event) => {
           deviceAddress: deviceAddress,          // 设备地址
           deviceDeposit: deviceDeposit,
           unitPrice: unitPrice,
-          delayedRefund: delayedRefund || false,
+          delayedRefund: Boolean(delayedRefund),
+          refundDelayHours: parsedRefundDelayHours,
           screenNo: screenNo,
           updatedAt: db.serverDate()             // 更新时间
         }
@@ -98,6 +102,88 @@ const batchCreateLockers = async (event) => {
   } catch (err) {
     console.error('批量生成锁具失败', err)
     return { success: false, errMsg: err.message }
+  }
+}
+
+// ==========================================
+// 内部函数：更新设备退款配置（设备卡片快捷修改）
+// ==========================================
+const updateDeviceRefundConfig = async (event) => {
+  const { deviceId, delayedRefund, refundDelayHours } = event
+
+  if (!deviceId) {
+    return { success: false, errMsg: '缺少设备ID' }
+  }
+
+  const deviceCheck = await db.collection('devices').where({ deviceId }).get()
+  if (deviceCheck.data.length === 0) {
+    return { success: false, errMsg: `设备 ${deviceId} 不存在` }
+  }
+
+  const parsedRefundDelayHours = Math.max(0, parseInt(refundDelayHours, 10) || 0)
+
+  await db.collection('devices').where({ deviceId }).update({
+    data: {
+      delayedRefund: Boolean(delayedRefund),
+      refundDelayHours: parsedRefundDelayHours,
+      updatedAt: db.serverDate()
+    }
+  })
+
+  return {
+    success: true,
+    message: `设备 ${deviceId} 退款配置已更新`,
+    delayedRefund: Boolean(delayedRefund),
+    refundDelayHours: parsedRefundDelayHours
+  }
+}
+
+// ==========================================
+// 内部函数：迁移设备退款延迟配置（一次性）
+// ==========================================
+const migrateRefundConfig = async () => {
+  try {
+    // 1. delayedRefund: true → delayedRefund: true, refundDelayHours: 12
+    const trueRes = await db.collection('devices')
+      .where({ delayedRefund: true })
+      .update({
+        data: {
+          refundDelayHours: 12,
+          updatedAt: db.serverDate()
+        }
+      });
+
+    // 2. delayedRefund: false → delayedRefund: false, refundDelayHours: 0
+    const falseRes = await db.collection('devices')
+      .where({ delayedRefund: false })
+      .update({
+        data: {
+          refundDelayHours: 0,
+          updatedAt: db.serverDate()
+        }
+      });
+
+    // 3. delayedRefund 字段缺失 → delayedRefund: false, refundDelayHours: 0
+    const missingRes = await db.collection('devices')
+      .where({ delayedRefund: _.exists(false) })
+      .update({
+        data: {
+          delayedRefund: false,
+          refundDelayHours: 0,
+          updatedAt: db.serverDate()
+        }
+      });
+
+    return {
+      success: true,
+      message: '设备退款配置迁移完成',
+      trueUpdated: trueRes.stats.updated || 0,
+      falseUpdated: falseRes.stats.updated || 0,
+      missingUpdated: missingRes.stats.updated || 0
+    };
+  } catch (e) {
+    console.error('迁移设备退款配置失败:', e);
+    return { success: false, errMsg: e.message };
   }
 }
 
@@ -656,6 +742,16 @@ exports.main = async (event, context) => {
   // 批量创建储物柜
   if (action === 'batchCreateLockers') {
     return await batchCreateLockers(event)
+  }
+
+  // 更新设备退款配置
+  if (action === 'updateDeviceRefundConfig') {
+    return await updateDeviceRefundConfig(event)
+  }
+
+  // 一次性迁移设备退款配置（可调用后删除）
+  if (action === 'migrateRefundConfig') {
+    return await migrateRefundConfig()
   }
 
   // 获取所有商户配置

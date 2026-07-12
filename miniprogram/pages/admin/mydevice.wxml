@@ -111,9 +111,9 @@
               </view>
 
               <view class="row">
-              <text class="label">延时退款</text>
+                <text class="label">退款策略</text>
                 <text class="value {{item.delayedRefund ? 'green-text' : 'red-text'}}">
-                  {{item.delayedRefund ? '是' : '否'}}
+                  {{item.delayedRefund ? '余额提现（' + (item.refundDelayHours || 0) + '小时）' : '直接退款'}}
                 </text>
               </view>
             
@@ -169,6 +169,10 @@
                 data-internalno="{{item.internalNo}}"
                 data-obfuscationrate="{{item.obfuscationRate}}"
                 bindtap="showObfuscationModal">订单显示设置</button>
+              <button class="ios-btn orange"
+                data-deviceid="{{item.deviceId}}"
+                data-internalno="{{item.internalNo}}"
+                bindtap="showRefundConfigModal">退款设置</button>
             </view>
 
             <view class="action-buttons" wx:if="{{!item.isLocal}}">
@@ -207,9 +211,8 @@
       </view>
     </view>
   </view>
-</view>
 
-<view class="modal-mask" wx:if="{{showStatusModal}}" bindtap="closeStatusModal">
+  <view class="modal-mask" wx:if="{{showStatusModal}}" bindtap="closeStatusModal">
     <view class="modal">
       <view class="modal-title">设置柜门状态</view>
       
@@ -306,3 +309,28 @@
       </view>
     </view>
   </view>
+
+  <!-- 退款配置设置弹窗 -->
+  <view class="modal-mask" wx:if="{{showRefundConfigModal}}">
+    <view class="modal">
+      <view class="modal-title">设置退款配置</view>
+      <view class="modal-content-body">
+        <view class="device-tip">当前设备：{{currentRefundInternalNo}}</view>
+
+        <view class="form-row" style="margin-top: 20rpx; align-items: center;">
+          <text class="label">进入余额提现</text>
+          <switch checked="{{editDelayedRefund}}" bindchange="onEditDelayedRefundChange" />
+        </view>
+
+        <view class="form-row" style="margin-top: 20rpx;" wx:if="{{editDelayedRefund}}">
+          <text class="label">等待时间（小时）</text>
+          <input class="modal-input" type="number" value="{{editRefundDelayHours}}" bindinput="onEditRefundDelayHoursChange" placeholder="0" />
+        </view>
+      </view>
+      <view class="modal-buttons" style="margin-top: 20rpx;">
+        <button class="cancel-btn" bindtap="closeRefundConfigModal">取消</button>
+        <button class="confirm-btn" bindtap="saveRefundConfig">保存</button>
+      </view>
+    </view>
+  </view>
+</view>

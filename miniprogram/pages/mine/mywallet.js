@@ -34,14 +34,15 @@ Page({
 
       if (res.result.success) {
         const now = Date.now();
-        const delayTimes = 16 * 60 * 60 * 1000;
-        // const delayTimes = 10 * 1000;
 
         // 1. 先处理所有数据格式
         let allList = res.result.data.map(item => {
           const applyTime = new Date(item.refundApplyTime).getTime();
+          // 使用订单快照的延迟小时数，默认 0
+          const delayHours = typeof item.refundDelayHours === 'number' ? item.refundDelayHours : 0;
+          const delayTimes = delayHours * 60 * 60 * 1000;
           const canWithdraw = (now - applyTime) >= delayTimes;
-          
+
           const formatNum = (n) => n.toString().padStart(2, '0');
           const formatFullTime = (date) => `${formatNum(date.getMonth() + 1)}-${formatNum(date.getDate())} ${formatNum(date.getHours())}:${formatNum(date.getMinutes())}`;
 

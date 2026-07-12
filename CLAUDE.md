@@ -32,7 +32,7 @@ WeChat Mini Program with standard page-based architecture:
 | `paynotify` | Payment webhooks | Handles TRANSACTION.SUCCESS and REFUND.SUCCESS callbacks |
 
 ### Database Collections
-- `devices` - Locker hardware devices (deviceId, internalNo, isOnline, unitPrice, delayedRefund, masterId)
+- `devices` - Locker hardware devices (deviceId, internalNo, isOnline, unitPrice, delayedRefund, refundDelayHours, masterId)
 - `lockers` - Individual locker doors (deviceId, cabinetNo, doorNo, status: free/occupied/broken, currentOrderId)
 - `orders` - Rental orders (status: 待支付/进行中/已完成/已取消/已退款, deposit, refundAmount)
 - `users` - User accounts (openid, phone, deposit balance, isAdmin)
@@ -62,8 +62,8 @@ Socket server at `http://1.116.109.239:3000/send-command` controls physical lock
 2. `order.queryByOpenid` finds "进行中" order for this device
 3. `locker.openDoor` with type="take" opens door and frees locker
 4. `order.finishOrder` calculates fee (free 10 min, then hourly rate) and updates order
-5. If delayedRefund: order status becomes "待提现" (withdrawable after 12h)
-6. Otherwise: automatic WeChat refund for remaining deposit
+5. If `device.delayedRefund = true`: order status becomes "待提现" (withdrawable after `refundDelayHours` hours; `0` means immediately withdrawable)
+6. Otherwise (`delayedRefund = false`): automatic WeChat refund for remaining deposit
 
 ### Master/Slave Device Pattern
 Some devices have `masterId` field indicating they're secondary units:
@@ -148,11 +148,15 @@ const ORDER_STATUSES = {
 - refundAmount = deposit - fee
 
 ### Delayed Refund Flow
-When `device.delayedRefund = true`:
-1. On retrieval, order status becomes "待提现"
-2. User must wait 12 hours before withdrawing
-3. `order.withdrawRefund` initiates actual WeChat refund
-4. Prevents immediate refunds for operational reasons
+
+`device.delayedRefund` controls whether refunds go through the wallet/withdrawal flow, while `device.refundDelayHours` configures the withdrawal waiting time.
+
+- `delayedRefund = false`: Refunds are returned directly to the original payment account.
+- `delayedRefund = true`: Refunds enter the `"待提现"` status and must be withdrawn via `pages/mine/mywallet`.
+  - `refundDelayHours = 0`: Immediately withdrawable after entering `"待提现"`.
+  - `refundDelayHours = N`: Withdrawable after N hours.
+
+When a refund enters `"待提现"`, the current `refundDelayHours` is snapshotted onto the order document so that existing pending withdrawals are not affected by later device configuration changes. `order.withdrawRefund` initiates the actual WeChat refund once the waiting period has passed.
 
 ## Important Implementation Details
 

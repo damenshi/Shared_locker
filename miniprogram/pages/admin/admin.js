@@ -19,8 +19,8 @@ Page({
     screenNo: '',
     deviceAddress: '',
     deviceDeposit: '',
-    delayedRefundOptions: ['否', '是'],
-    delayedRefundIndex: 0,
+    delayedRefund: false,
+    refundDelayHours: 0,
 
     // 加载状态
     loading: false,
@@ -45,7 +45,15 @@ Page({
   // 延迟退款选项变化
   onDelayedRefundChange(e) {
     this.setData({
-      delayedRefundIndex: e.detail.value
+      delayedRefund: e.detail.value
+    });
+  },
+
+  // 提现等待时间变化
+  onRefundDelayHoursChange(e) {
+    const value = e.detail.value;
+    this.setData({
+      refundDelayHours: value === '' ? 0 : parseInt(value, 10) || 0
     });
   },
 
@@ -96,7 +104,7 @@ Page({
   
   //配置设备
   async batchCreateLockersByDevice() {
-    const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefundIndex, screenNo, cabinetCount, lockersPerCabinet } = this.data;
+    const { internalNo, deviceAddress, deviceDeposit, unitPrice, delayedRefund, refundDelayHours, screenNo, cabinetCount, lockersPerCabinet } = this.data;
 
     if (!deviceAddress || !internalNo || cabinetCount <= 0 || lockersPerCabinet <= 0) {
       return wx.showToast({
@@ -105,9 +113,8 @@ Page({
       });
     }
 
-    const delayedRefund = delayedRefundIndex === 1;
     this.showLoading('配置设备中...');
-    
+
     try {
       const result = await wx.cloud.callFunction({
         name: 'admin',
@@ -117,7 +124,8 @@ Page({
           deviceAddress: deviceAddress,
           deviceDeposit: parseInt(deviceDeposit),
           unitPrice: parseInt(unitPrice),
-          delayedRefund: delayedRefund || false,
+          delayedRefund: Boolean(delayedRefund),
+          refundDelayHours: parseInt(refundDelayHours, 10) || 0,
           screenNo: parseInt(screenNo),
           cabinetCount: parseInt(cabinetCount),
           lockersPerCabinet: parseInt(lockersPerCabinet)

@@ -262,6 +262,8 @@ async function handleDeviceLogin(deviceId, targetAppid) {
             isOnline: true,
             isConfigured: false,
             deviceDeposit: 0,
+            delayedRefund: false,
+            refundDelayHours: 0,
             urlLink: urlLink,
             screenNo: 0,
             lastLoginTime: db.serverDate(),
@@ -336,6 +338,8 @@ async function handlePreCreateDevice(deviceId, data, targetAppid) {
             isOnline: false,  // 预创建时为离线，等登录后变在线
             isConfigured: false,
             deviceDeposit: 0,
+            delayedRefund: false,
+            refundDelayHours: 0,
             createdAt: db.serverDate(),
             updatedAt: db.serverDate()
         }

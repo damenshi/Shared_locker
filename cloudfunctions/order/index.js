@@ -1175,11 +1175,13 @@ exports.main = async (event, context) => {
       // 1. 判断是否走”延迟退款”流程
       // ============================================================
       let isDelayed = false;
+      let refundDelayHours = 0;
       // 只有非强制退款时，才检查设备配置
       if (!force && order.deviceId) {
         const devRes = await db.collection('devices').where({ deviceId: order.deviceId }).get();
         if (devRes.data.length > 0 && devRes.data[0].delayedRefund === true) {
           isDelayed = true;
+          refundDelayHours = Math.max(0, parseInt(devRes.data[0].refundDelayHours, 10) || 0);
         }
       }
 
@@ -1222,7 +1224,17 @@ exports.main = async (event, context) => {
       let refundFee = order.refundAmount;
       // 兜底
       if (refundFee === undefined || refundFee === null) {
-         refundFee = order.deposit; 
+         refundFee = order.deposit;
+      }
+
+      // ============================================================
+      // [关键修复] 进行中订单先结算费用，防止绕过计费直接全额退款
+      // ============================================================
+      let feeCalculation = null;
+      if (order.status === CONSTANTS.ORDER_STATUSES.IN_PROGRESS) {
+        feeCalculation = await calculateFee(order);
+        refundFee = feeCalculation.refundAmount / 100;
+        console.log(`[refundOrder] 进行中订单提前结算: 费用=${feeCalculation.fee}分, 应退=${refundFee}元`);
       }
 
       // ============================================================
@@ -1248,13 +1260,21 @@ exports.main = async (event, context) => {
 
              // 2. 更新订单为“待提现”
              // 注意：必须把 refundAmount 写入，否则后续提现时金额为0
+             const delayedUpdateData = {
+               status: '待提现',
+               refundApplyTime: db.serverDate(),
+               refundDelayHours: refundDelayHours,
+               updatedAt: db.serverDate(),
+               refundAmount: refundFee // 记录应退金额
+             };
+             // 若进行中申请退款，同步记录结算信息，避免后续统计缺失
+             if (feeCalculation) {
+               delayedUpdateData.endAt = db.serverDate();
+               delayedUpdateData.usageDuration = feeCalculation.durationMinutes;
+               delayedUpdateData.fee = feeCalculation.fee / 100;
+             }
              await transaction.collection('orders').doc(orderId).update({
-               data: {
-                 status: '待提现', 
-                 refundApplyTime: db.serverDate(),
-                 updatedAt: db.serverDate(),
-                 refundAmount: refundFee, // 记录应退金额
-               }
+               data: delayedUpdateData
              });
          });
 
@@ -1366,8 +1386,15 @@ exports.main = async (event, context) => {
           status: CONSTANTS.ORDER_STATUSES.REFUNDED,
           refundTime: new Date(),
           refundTransactionId: refundRes?.data?.refund_id || refundRes?.id || '',
-          refundNo: refundRes?.outRefundNo || ''
+          refundNo: refundRes?.outRefundNo || '',
+          refundAmount: refundFee
         };
+        // 若进行中申请退款，同步记录结算信息
+        if (feeCalculation) {
+          orderUpdateData.endAt = db.serverDate();
+          orderUpdateData.usageDuration = feeCalculation.durationMinutes;
+          orderUpdateData.fee = feeCalculation.fee / 100;
+        }
         // 如果订单之前没有记录商户信息，现在记录
         if (!order.merchantId && merchantConfig) {
           orderUpdateData.mchid = merchantConfig.mchid;
@@ -1442,15 +1469,24 @@ exports.main = async (event, context) => {
         throw new Error('订单状态不符合提现要求，请联系客服');
       }
 
-      // 2. 延时12小时退款
+      // 2. 延时退款校验
       if (!order.refundApplyTime) {
         throw new Error('订单缺少退款申请时间记录，请联系客服');
       }
       const now = Date.now();
       const applyTime = new Date(order.refundApplyTime).getTime();
-      const delayHours = 12; //12 小时
+
+      // 优先使用订单快照的延迟小时数，其次读取设备当前配置，默认 0
+      let delayHours = 0;
+      if (typeof order.refundDelayHours === 'number') {
+        delayHours = order.refundDelayHours;
+      } else if (order.deviceId) {
+        const devRes = await db.collection('devices').where({ deviceId: order.deviceId }).get();
+        if (devRes.data.length > 0) {
+          delayHours = Math.max(0, parseInt(devRes.data[0].refundDelayHours, 10) || 0);
+        }
+      }
       const delayTimes = delayHours * 60 * 60 * 1000;
-      // const delayTimes = 10 * 1000;
 
       if (now - applyTime < delayTimes) {
         throw new Error(`系统结算排队中，请在申请 ${delayHours} 小时后再试！`);
