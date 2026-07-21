@@ -553,17 +553,29 @@ exports.main = async (event, context) => {
             .filter(id => id && id !== null);
 
           if (orderIds.length > 0) {
-            await db.collection('orders')
+            // [修复] 过滤掉已退款/已取消/已关闭等终态订单，防止状态回退
+            const finalStatuses = ['已退款', '已取消', '已关闭'];
+            const orderRes = await db.collection('orders')
               .where({ _id: _.in(orderIds) })
-              .update({
-                data: {
-                  status: '已强制结束',
-                  endAt: db.serverDate(),
-                  updatedAt: db.serverDate(),
-                  note: '管理员一键清柜强制结束'
-                }
-              });
-            totalOrders += orderIds.length;
+              .field({ status: true })
+              .get();
+            const activeOrderIds = orderRes.data
+              .filter(o => !finalStatuses.includes(o.status))
+              .map(o => o._id);
+
+            if (activeOrderIds.length > 0) {
+              await db.collection('orders')
+                .where({ _id: _.in(activeOrderIds) })
+                .update({
+                  data: {
+                    status: '已强制结束',
+                    endAt: db.serverDate(),
+                    updatedAt: db.serverDate(),
+                    note: '管理员一键清柜强制结束'
+                  }
+                });
+              totalOrders += activeOrderIds.length;
+            }
           }
 
           // 批量释放柜门

@@ -195,19 +195,20 @@ async function decryptNotify(resource, apiv3Key) {
 async function calculateFee(order) {
   const now = Date.now();
 
-  const startTime = new Date(order.createdAt).getTime(); 
-  
+  const startTime = new Date(order.createdAt).getTime();
+
   const durationMs = now - startTime;
   const durationMinutes = Math.ceil(durationMs / 1000 / 60); // 分钟
   const durationHours = Math.ceil(durationMinutes / 60);       // 小时
 
   let fee = 0; // 单位：分
   let unitPrice = 0; // 默认价格（0元/小时)
+  let isFree = false;
   try {
     const devRes = await db.collection('devices')
       .where({ deviceId: order.deviceId })
       .get();
-      
+
     if (devRes.data.length > 0) {
       const device = devRes.data[0];
       unitPrice = device.unitPrice !== undefined ? device.unitPrice : (device.unitPrice || 0);
@@ -230,7 +231,7 @@ async function calculateFee(order) {
   }
 
   // 押金转为分
-  const depositInCents = Math.round(order.deposit * 100); 
+  const depositInCents = Math.round(order.deposit * 100);
 
   // 费用不能超过押金
   if (fee > depositInCents) {
@@ -249,6 +250,112 @@ async function calculateFee(order) {
     depositInCents, // 原押金 (分)
     unitPrice
   };
+}
+
+// ==========================================
+// 工具函数：判断微信退款返回是否为"已全额退款"
+// ==========================================
+function isWechatRefundAlreadyDone(refundRes) {
+  if (!refundRes) return false;
+
+  let message = '';
+  let code = '';
+
+  // 情况1：错误信息在 data 字段（V3 API 部分场景）
+  if (refundRes.data) {
+    message = refundRes.data.message || '';
+    code = refundRes.data.code || '';
+  }
+
+  // 情况2：错误信息在 error 字符串字段（wechatpay-node-v3 SDK 常见）
+  if (!message && refundRes.error) {
+    try {
+      const parsed = typeof refundRes.error === 'string' ? JSON.parse(refundRes.error) : refundRes.error;
+      message = parsed.message || '';
+      code = parsed.code || '';
+    } catch (e) {
+      message = refundRes.error;
+    }
+  }
+
+  // 情况3：错误信息在 errRaw?.response?.text
+  if (!message && refundRes.errRaw?.response?.text) {
+    try {
+      const parsed = JSON.parse(refundRes.errRaw.response.text);
+      message = parsed.message || '';
+      code = parsed.code || '';
+    } catch (e) {
+      message = refundRes.errRaw.response.text;
+    }
+  }
+
+  // 兼容 message 直接挂在对象上的情况
+  if (!message) {
+    message = refundRes.message || '';
+  }
+
+  console.log(`[isWechatRefundAlreadyDone] status=${refundRes.status}, code=${code}, message=${message}`);
+
+  // HTTP 400 / 403 且业务错误码为 INVALID_REQUEST，message 包含"已全额退款"
+  if ((refundRes.status === 400 || refundRes.status === 403) &&
+      code === 'INVALID_REQUEST' &&
+      typeof message === 'string' &&
+      message.includes('已全额退款')) {
+    return true;
+  }
+
+  return false;
+}
+
+// ==========================================
+// 工具函数：当微信侧已退款时，修正本地订单状态为已退款
+// ==========================================
+async function markOrderAsRefunded(orderId, refundRes, refundAmount, merchantConfig) {
+  console.log(`[markOrderAsRefunded] 微信侧已退款，修正本地订单 ${orderId} 状态`);
+
+  // 尝试从 refundRes 中提取 refund_id / out_refund_no
+  let refundNo = '';
+  let refundTransactionId = '';
+
+  if (refundRes) {
+    // 先从 data 字段取
+    if (refundRes.data) {
+      refundTransactionId = refundRes.data.refund_id || refundRes.data.transaction_id || '';
+      refundNo = refundRes.data.out_refund_no || '';
+    }
+    // 再从 error 字符串里取（如果有的话）
+    if (!refundTransactionId && refundRes.error) {
+      try {
+        const parsed = typeof refundRes.error === 'string' ? JSON.parse(refundRes.error) : refundRes.error;
+        refundTransactionId = parsed.refund_id || parsed.transaction_id || '';
+        refundNo = parsed.out_refund_no || '';
+      } catch (e) {}
+    }
+    // 最后取 SDK 挂上的 outRefundNo
+    if (!refundNo) {
+      refundNo = refundRes.outRefundNo || '';
+    }
+  }
+
+  const orderUpdate = {
+    status: CONSTANTS.ORDER_STATUSES.REFUNDED,
+    refundTime: new Date(),
+    refundNo: refundNo || '',
+    refundTransactionId: refundTransactionId || '',
+    updatedAt: db.serverDate()
+  };
+  if (typeof refundAmount === 'number') {
+    orderUpdate.refundAmount = refundAmount;
+  }
+  if (!orderUpdate.refundNo && !orderUpdate.refundTransactionId) {
+    orderUpdate.note = '微信侧已全额退款，本地状态修正';
+  }
+  if (merchantConfig && !orderUpdate.merchantId) {
+    orderUpdate.mchid = merchantConfig.mchid;
+    orderUpdate.merchantId = merchantConfig._id;
+  }
+  await db.collection('orders').doc(orderId).update({ data: orderUpdate });
+  return { success: true, message: '订单已标记为已退款' };
 }
 
 exports.main = async (event, context) => {
@@ -1322,6 +1429,16 @@ exports.main = async (event, context) => {
             refundRes = await client.refunds(refundParams);
             console.log(`[退款] 商户 ${merchant.name} 退款结果:`, refundRes?.status);
 
+            // [修复] 如果微信侧已全额退款，修正本地状态后直接返回
+            if (isWechatRefundAlreadyDone(refundRes)) {
+              return await markOrderAsRefunded(
+                orderId,
+                refundRes,
+                refundFee,
+                merchant
+              );
+            }
+
             // 检查是否成功
             if (refundRes && refundRes.status === 200 &&
                 (!refundRes.data || refundRes.data.status === 'SUCCESS' || refundRes.data.status === 'PROCESSING')) {
@@ -1361,6 +1478,16 @@ exports.main = async (event, context) => {
         refundRes = await client.refunds(refundParams);
         refundRes.outRefundNo = outRefundNo;
         console.log('退款结果：', refundRes);
+
+        // [修复] 如果微信侧已全额退款，修正本地状态后直接返回
+        if (isWechatRefundAlreadyDone(refundRes)) {
+          return await markOrderAsRefunded(
+            orderId,
+            refundRes,
+            refundFee,
+            merchantConfig
+          );
+        }
 
         if (!refundRes || refundRes.status !== 200) {
           throw new Error(`退款请求失败: ${refundRes?.message || '未知错误'}`);
@@ -1546,6 +1673,16 @@ exports.main = async (event, context) => {
             refundRes = await client.refunds(refundParams);
             console.log(`[提现] 商户 ${merchant.name} 退款结果:`, refundRes?.status);
 
+            // [修复] 如果微信侧已全额退款，修正本地状态后直接返回
+            if (isWechatRefundAlreadyDone(refundRes)) {
+              return await markOrderAsRefunded(
+                orderId,
+                refundRes,
+                order.refundAmount,
+                merchant
+              );
+            }
+
             // 检查是否成功
             if (refundRes && refundRes.status === 200 &&
                 (!refundRes.data || refundRes.data.status === 'SUCCESS' || refundRes.data.status === 'PROCESSING')) {
@@ -1585,6 +1722,16 @@ exports.main = async (event, context) => {
         refundRes = await client.refunds(refundParams);
         refundRes.outRefundNo = outRefundNo;
         console.log('提现退款结果：', refundRes);
+
+        // [修复] 如果微信侧已全额退款，修正本地状态后直接返回
+        if (isWechatRefundAlreadyDone(refundRes)) {
+          return await markOrderAsRefunded(
+            orderId,
+            refundRes,
+            order.refundAmount,
+            merchantConfig
+          );
+        }
 
         if (!refundRes || refundRes.status !== 200) {
           throw new Error(`退款请求失败: ${refundRes?.message || '未知错误'}`);
