@@ -4,7 +4,7 @@ const db = cloud.database()
 const _ = db.command
 const fs = require('fs');
 const axios = require('axios');
-const { getLockerServerUrl, getCurrentMiniProgram } = require('./utils/config');
+const { getLockerServerUrl, getCurrentMiniProgram, clearCache } = require('./utils/config');
 
 
 const batchCreateLockers = async (event) => {
@@ -712,17 +712,23 @@ exports.main = async (event, context) => {
       }
       const deviceData = deviceRes.data[0];
 
-      // 2. 验证目标 appid 有效（从 mini_programs 查询）
+      // 2. 验证目标 appid 有效（从 mini_programs 查询），并读取 cloudUrl
       const miniProgram = await db.collection('mini_programs').where({ appid: targetAppid }).get();
       if (miniProgram.data.length === 0) {
         return { success: false, errMsg: '无效的小程序appid' };
       }
+      const targetCloudUrl = miniProgram.data[0].cloudUrl;
+      if (!targetCloudUrl) {
+        return { success: false, errMsg: '目标小程序未配置 cloudUrl' };
+      }
 
       // 3. 调用 locker_server 执行切换
       const lockerUrl = await getLockerServerUrl();
+      const adminToken = process.env.ADMIN_TOKEN;
       await axios.post(`${lockerUrl}/setDeviceAppid`, {
         deviceId,
         appid: targetAppid,
+        cloudUrl: targetCloudUrl,
         deviceData: {
           internalNo: deviceData.internalNo,
           cabinetCount: deviceData.cabinetCount,
@@ -730,7 +736,10 @@ exports.main = async (event, context) => {
           deviceAddress: deviceData.deviceAddress,
           screenNo: deviceData.screenNo
         }
-      }, { timeout: 10000 });
+      }, {
+        headers: { 'x-admin-token': adminToken },
+        timeout: 10000
+      });
 
       // 4. 更新本地数据库 appid
       await db.collection('devices').where({ deviceId }).update({
@@ -740,6 +749,9 @@ exports.main = async (event, context) => {
           updatedAt: db.serverDate()
         }
       });
+
+      // 5. 清除配置缓存，避免读取到旧的 miniName
+      clearCache();
 
       return {
         success: true,
@@ -855,13 +867,13 @@ exports.main = async (event, context) => {
         return { success: false, errMsg: '设备不存在' };
       }
 
-      // 验证 appid 是否有效
-      const merchant = await db.collection('merchant_configs').where({ appid }).get();
-      if (!merchant.data || merchant.data.length === 0) {
+      // 验证 appid 是否有效（统一从 mini_programs 校验）
+      const miniProgram = await db.collection('mini_programs').where({ appid }).get();
+      if (!miniProgram.data || miniProgram.data.length === 0) {
         return { success: false, errMsg: '无效的小程序appid' };
       }
 
-      const miniName = merchant.data[0].miniName || merchant.data[0].name;
+      const miniName = miniProgram.data[0].miniName;
 
       // 更新设备归属
       await db.collection('devices').where({ deviceId }).update({
