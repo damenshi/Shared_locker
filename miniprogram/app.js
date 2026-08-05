@@ -95,7 +95,7 @@ App({
         }
       });
       if(!getAddRes.result?.success)
-        throw new Error('未获取到设备地址');
+        throw new Error(getAddRes.result?.errMsg || '未获取到设备地址');
       const address = getAddRes.result.data;
       this.globalData.deviceAddress = address;
 
@@ -106,6 +106,14 @@ App({
 
     } catch (err) {
       console.error('未获取到设备地址', err);
+      if (err.message && err.message.includes('设备异常')) {
+        this.globalData.deviceId = null;
+        wx.showModal({
+          title: '提示',
+          content: err.message,
+          showCancel: false
+        });
+      }
     }
   },
 
