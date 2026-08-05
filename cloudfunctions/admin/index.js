@@ -645,7 +645,11 @@ exports.main = async (event, context) => {
       let deviceAppidMap = {};
       try {
         const lockerUrl = await getLockerServerUrl();
-        const mapRes = await axios.get(`${lockerUrl}/listDeviceAppid`, { timeout: 5000 });
+        const adminToken = process.env.ADMIN_TOKEN;
+        const mapRes = await axios.get(`${lockerUrl}/listDeviceAppid`, {
+          headers: { 'x-admin-token': adminToken },
+          timeout: 5000
+        });
         if (mapRes.data?.code === 200) {
           deviceAppidMap = mapRes.data.data || {};
         }
@@ -671,7 +675,8 @@ exports.main = async (event, context) => {
       // 组装数据（显示实际归属）
       const devices = devicesRes.data.map(d => {
         // 优先使用 locker_server 的映射，其次使用本地记录的 appid
-        const actualAppid = deviceAppidMap[d.deviceId] || d.appid || wxContext.APPID;
+        const mapEntry = deviceAppidMap[d.deviceId];
+        const actualAppid = mapEntry?.appid || d.appid || wxContext.APPID;
         return {
           ...d,
           belongsToAppid: actualAppid,
