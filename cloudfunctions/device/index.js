@@ -83,14 +83,21 @@ exports.main = async (event, context) => {
           deviceId:deviceId
         })
         .field({
-          deviceAddress : true
+          deviceAddress : true,
+          appid: true
         })
         .get()
-      
+
       if(result.data?.length === 0)
         throw new Error('获取设备地址失败');
 
-      return { success: true, data: result.data[0].deviceAddress}
+      const device = result.data[0];
+      const currentAppid = cloud.getWXContext().APPID;
+      if (device.appid && currentAppid && device.appid !== currentAppid) {
+        throw new Error('设备异常，请重启设备或断电重连');
+      }
+
+      return { success: true, data: device.deviceAddress}
     } catch (err) {
       console.error('获取设备地址失败', err)
       return { success: false, errMsg: `${err.message}` }
