@@ -10,6 +10,8 @@ const CONSTANTS = {
   OPERATION_TYPES: ['store', 'take']     // 允许的操作类型
 }
 
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN
+
 // 工具函数：参数校验
 const validateParams = (params, rules) => {
   for (const [key, rule] of Object.entries(rules)) {
@@ -176,7 +178,10 @@ exports.main = async (event, context) => {
                 doorSort: combinedCode,
               }
             },
-            { timeout: 10000 }
+            {
+              headers: { 'x-admin-token': ADMIN_TOKEN },
+              timeout: 10000
+            }
           );
 
           // 成功条件
@@ -467,7 +472,10 @@ exports.main = async (event, context) => {
             doorSort: combinedCode,
           }
         },
-        { timeout: 8000 }  // 8秒超时设置
+        {
+          headers: { 'x-admin-token': ADMIN_TOKEN },
+          timeout: 8000
+        }
       );
       
       if (response.data.code !== 200 || response.data.doorSort != combinedCode) {
@@ -568,7 +576,10 @@ exports.main = async (event, context) => {
                 doorSort: combinedCode,
               }
             },
-            { timeout: 10000 }
+            {
+              headers: { 'x-admin-token': ADMIN_TOKEN },
+              timeout: 10000
+            }
           );
 
           // 成功条件
