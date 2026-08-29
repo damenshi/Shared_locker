@@ -184,7 +184,7 @@ async function getMiniName() {
  * 获取订单描述前缀
  */
 async function getOrderDescription() {
-  return '若押金未退，点击下方【商家小程序】，选【我的-投诉建议】或联系客服，专人处理更快退回';
+  return '若押金未退，点击下方【商家小程序】，选【我的-投诉建议】或联系客服，专人处理可秒退！';
 }
 
 /**
