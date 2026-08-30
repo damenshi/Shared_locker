@@ -1,0 +1,108 @@
+<view class="page">
+  <view class="page-title">商户号管理</view>
+  <view class="page-desc">可用商户 {{availableCount}} 个 · 共 {{merchantList.length}} 个</view>
+
+  <!-- 限额设置（达到后自动切换到下一个可用商户，0 表示不限） -->
+  <view class="limits-card">
+    <view class="limit-row">
+      <text class="limit-label">每日订单限额</text>
+      <input class="limit-input" type="number" value="{{orderLimitInput}}" placeholder="0 不限" bindinput="onOrderLimitInput" />
+      <text class="limit-unit">单</text>
+    </view>
+    <view class="limit-row">
+      <text class="limit-label">投诉率阈值</text>
+      <input class="limit-input" type="digit" value="{{rateLimitInput}}" placeholder="0 不限" bindinput="onRateLimitInput" />
+      <text class="limit-unit">%</text>
+    </view>
+    <button class="limit-save-btn" bindtap="saveLimits">保存</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-tip">加载中...</view>
+
+  <view wx:elif="{{merchantList.length === 0}}" class="empty-tip">暂无商户配置</view>
+
+  <view wx:else class="merchant-list">
+    <view wx:for="{{merchantList}}" wx:key="_id" class="merchant-card {{item.isActive ? 'active' : ''}} {{item.isRestricted ? 'restricted' : ''}}">
+
+      <!-- 头部：名称 + 徽标 -->
+      <view class="merchant-header">
+        <view class="merchant-name">{{item.name}}</view>
+        <view class="badges">
+          <text wx:if="{{item.isActive}}" class="badge badge-active">使用中</text>
+          <text wx:if="{{item.isRestricted}}" class="badge badge-restricted">限制中</text>
+          <text wx:else class="badge badge-normal">正常</text>
+        </view>
+      </view>
+
+      <view class="merchant-mchid">商户号: {{item.mchid}}</view>
+      <view wx:if="{{item.isRestricted && item.statusReason}}" class="status-reason">{{item.statusReason}}</view>
+
+      <!-- 今日统计 -->
+      <view class="stats-section">
+        <view class="stats-title">今日</view>
+        <view class="stats-row">
+          <view class="stat-item">
+            <view class="stat-value">{{item.todayOrders}}<text class="stat-limit"> / {{limits.dailyOrderLimit > 0 ? limits.dailyOrderLimit : '不限'}}</text></view>
+            <view class="stat-label">订单 / 限额</view>
+          </view>
+          <view class="stat-item">
+            <view class="stat-value">{{item.todayComplaints}}</view>
+            <view class="stat-label">投诉</view>
+          </view>
+          <view class="stat-item">
+            <view class="stat-value {{item.todayRateDanger ? 'stat-danger' : ''}}">{{item.todayRate}}%<text class="stat-limit"> / {{limits.complaintRateLimit > 0 ? limits.complaintRateLimit + '%' : '不限'}}</text></view>
+            <view class="stat-label">投诉率 / 阈值</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 累计统计 -->
+      <view class="stats-section">
+        <view class="stats-title">累计</view>
+        <view class="stats-row">
+          <view class="stat-item">
+            <view class="stat-value">{{item.totalOrders}}</view>
+            <view class="stat-label">订单</view>
+          </view>
+          <view class="stat-item">
+            <view class="stat-value">{{item.totalComplaints}}</view>
+            <view class="stat-label">投诉</view>
+          </view>
+          <view class="stat-item">
+            <view class="stat-value">{{item.totalRate}}%</view>
+            <view class="stat-label">投诉率</view>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{item.consecutivePayFails > 0}}" class="fail-tip">连续下单失败 {{item.consecutivePayFails}} 次（达3次将自动标记限制）</view>
+
+      <!-- 自动轮换开关（仅非使用中且正常的商户显示） -->
+      <view wx:if="{{!item.isActive && !item.isRestricted}}" class="rotate-row">
+        <text class="rotate-label">自动轮换</text>
+        <switch checked="{{item.autoRotate}}" data-id="{{item._id}}" bindchange="onAutoRotateChange" />
+      </view>
+
+      <!-- 操作按钮 -->
+      <view class="action-row">
+        <button
+          wx:if="{{!item.isActive}}"
+          class="action-btn btn-primary {{item.isRestricted ? 'btn-disabled' : ''}}"
+          disabled="{{item.isRestricted}}"
+          data-id="{{item._id}}"
+          data-name="{{item.name}}"
+          bindtap="switchMerchant"
+        >{{item.isRestricted ? '先恢复正常' : '切换使用'}}</button>
+        <button
+          class="action-btn {{item.isRestricted ? 'btn-success' : 'btn-danger'}}"
+          data-id="{{item._id}}"
+          data-name="{{item.name}}"
+          data-status="{{item.status}}"
+          bindtap="toggleStatus"
+        >{{item.isRestricted ? '恢复正常' : '标记限制'}}</button>
+      </view>
+    </view>
+  </view>
+
+  <view class="safe-bottom"></view>
+</view>

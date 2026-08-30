@@ -267,6 +267,16 @@ async function addMerchant(event) {
         publicCert: publicCert,
         isActive: false,
         order: order,
+        // 健康度管理默认字段
+        status: 'normal',
+        dailyOrderLimit: 0,
+        complaintRateLimit: 0,
+        statsDate: '',
+        todayOrders: 0,
+        todayComplaints: 0,
+        totalOrders: 0,
+        totalComplaints: 0,
+        consecutivePayFails: 0,
         createdAt: db.serverDate(),
         updatedAt: db.serverDate()
       }
@@ -803,7 +813,22 @@ exports.main = async (event, context) => {
         })
         .get();
       console.log('[getMerchantConfigs] found:', merchants.data.length);
-      return { success: true, data: merchants.data };
+
+      // 附带全局限额配置（不存在则按不限处理）
+      let limits = { dailyOrderLimit: 0, complaintRateLimit: 0 };
+      try {
+        const limitsRes = await db.collection('system_configs').doc('merchant_limits').get();
+        if (limitsRes.data) {
+          limits = {
+            dailyOrderLimit: Number(limitsRes.data.dailyOrderLimit) || 0,
+            complaintRateLimit: Number(limitsRes.data.complaintRateLimit) || 0
+          };
+        }
+      } catch (e) {
+        console.warn('[getMerchantConfigs] 读取全局限额失败，按不限处理:', e.message);
+      }
+
+      return { success: true, data: merchants.data, limits };
     } catch (e) {
       console.error('获取商户配置失败:', e);
       return { success: false, errMsg: e.message };
@@ -825,6 +850,11 @@ exports.main = async (event, context) => {
       // doc().get() 返回单个对象，不是数组
       if (!targetMerchant.data) {
         return { success: false, errMsg: '商户不存在' };
+      }
+
+      // 限制状态的商户禁止切换（force 为应急后门，界面不暴露）
+      if (targetMerchant.data.status === 'restricted' && !event.force) {
+        return { success: false, errMsg: '该商户处于限制状态，请先恢复正常后再切换' };
       }
 
       // 验证目标商户是否属于当前小程序
@@ -853,6 +883,127 @@ exports.main = async (event, context) => {
       return { success: true, message: `已切换到商户: ${targetMerchant.data.name}` };
     } catch (e) {
       console.error('切换商户失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 修改商户状态（正常/限制）
+  if (action === 'updateMerchantStatus') {
+    const { merchantId, status } = event;
+    const userAppid = wxContext.APPID;
+
+    if (!merchantId || !['normal', 'restricted'].includes(status)) {
+      return { success: false, errMsg: '参数错误：merchantId 或 status 无效' };
+    }
+
+    try {
+      const merchantRes = await db.collection('merchant_configs').doc(merchantId).get();
+      if (!merchantRes.data) {
+        return { success: false, errMsg: '商户不存在' };
+      }
+      const merchant = merchantRes.data;
+
+      // 验证商户归属当前小程序
+      if (userAppid && merchant.appid !== userAppid) {
+        return { success: false, errMsg: '无权操作其他小程序的商户' };
+      }
+
+      const updateData = {
+        status: status,
+        statusReason: status === 'restricted' ? '管理员手动标记限制' : '',
+        statusUpdatedAt: db.serverDate(),
+        updatedAt: db.serverDate()
+      };
+      // 恢复正常时清零连续失败计数
+      if (status === 'normal') {
+        updateData.consecutivePayFails = 0;
+      }
+
+      await db.collection('merchant_configs').doc(merchantId).update({ data: updateData });
+
+      // 若被限制的是当前激活商户，自动切换到下一个可用商户
+      let switchResult = null;
+      if (status === 'restricted' && merchant.isActive) {
+        try {
+          const res = await cloud.callFunction({
+            name: 'merchant',
+            data: { action: 'autoSwitch', appid: merchant.appid, reason: 'manual_restrict', excludeId: merchantId }
+          });
+          switchResult = res.result;
+        } catch (e) {
+          console.error('[updateMerchantStatus] 自动切换失败:', e);
+        }
+      }
+
+      return {
+        success: true,
+        message: status === 'restricted' ? '已标记为限制状态' : '已恢复正常',
+        autoSwitch: switchResult
+      };
+    } catch (e) {
+      console.error('修改商户状态失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 修改全局限额配置（所有商户统一标准，0 表示不限）
+  if (action === 'updateMerchantLimits') {
+    const { dailyOrderLimit, complaintRateLimit } = event;
+
+    const orderLimit = Number(dailyOrderLimit);
+    const rateLimit = Number(complaintRateLimit);
+    if (isNaN(orderLimit) || orderLimit < 0 || !Number.isInteger(orderLimit)) {
+      return { success: false, errMsg: '订单限额须为不小于 0 的整数（0 表示不限）' };
+    }
+    if (isNaN(rateLimit) || rateLimit < 0 || rateLimit > 100) {
+      return { success: false, errMsg: '投诉率阈值须在 0~100 之间（0 表示不限）' };
+    }
+
+    try {
+      // set = 覆盖式 upsert：文档不存在则创建
+      await db.collection('system_configs').doc('merchant_limits').set({
+        data: {
+          dailyOrderLimit: orderLimit,
+          complaintRateLimit: rateLimit,
+          updatedAt: db.serverDate()
+        }
+      });
+
+      return { success: true, message: '全局限额已更新' };
+    } catch (e) {
+      console.error('修改全局限额失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 设置商户是否参与自动轮换（关闭后只能手动切换，适合备用号）
+  if (action === 'updateMerchantAutoRotate') {
+    const { merchantId, autoRotate } = event;
+    const userAppid = wxContext.APPID;
+
+    if (!merchantId || typeof autoRotate !== 'boolean') {
+      return { success: false, errMsg: '参数错误：merchantId 或 autoRotate 无效' };
+    }
+
+    try {
+      const merchantRes = await db.collection('merchant_configs').doc(merchantId).get();
+      if (!merchantRes.data) {
+        return { success: false, errMsg: '商户不存在' };
+      }
+      if (userAppid && merchantRes.data.appid !== userAppid) {
+        return { success: false, errMsg: '无权操作其他小程序的商户' };
+      }
+
+      await db.collection('merchant_configs').doc(merchantId).update({
+        data: {
+          autoRotate: autoRotate,
+          updatedAt: db.serverDate()
+        }
+      });
+
+      return { success: true, message: autoRotate ? '已加入自动轮换' : '已移出自动轮换（可手动切换）' };
+    } catch (e) {
+      console.error('设置自动轮换失败:', e);
       return { success: false, errMsg: e.message };
     }
   }

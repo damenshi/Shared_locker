@@ -254,6 +254,16 @@ async function handlePayNotify(notifyData, merchant) {
     }
     await db.collection('orders').doc(orderId).update({ data: updateData });
     console.log(`[回调] 订单 ${orderId} 已设为【进行中】`);
+
+    // 商户订单计数（不影响主流程）
+    if (merchant && merchant._id) {
+      try {
+        await cloud.callFunction({
+          name: 'merchant',
+          data: { action: 'recordPaySuccess', merchantId: merchant._id, appid: merchant.appid }
+        });
+      } catch (e) { console.error('[回调] recordPaySuccess 失败(不影响主流程):', e); }
+    }
   } else {
     //失败（明确的 500 硬伤） -> 订单改为"已关闭" + 释放柜子
     console.warn(`[回调] 订单 ${orderId} 判定为硬伤(${failReason})，执行关闭`);
@@ -272,6 +282,16 @@ async function handlePayNotify(notifyData, merchant) {
       closeUpdateData.merchantId = merchant._id;
     }
     await db.collection('orders').doc(orderId).update({ data: closeUpdateData });
+
+    // 商户订单计数（硬伤单钱已进商户，分母应包含；不影响主流程）
+    if (merchant && merchant._id) {
+      try {
+        await cloud.callFunction({
+          name: 'merchant',
+          data: { action: 'recordPaySuccess', merchantId: merchant._id, appid: merchant.appid }
+        });
+      } catch (e) { console.error('[回调] recordPaySuccess 失败(不影响主流程):', e); }
+    }
 
     try {
       await cloud.callFunction({

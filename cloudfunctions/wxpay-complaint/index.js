@@ -266,6 +266,16 @@ async function handleComplaintNotify(event) {
 
     console.log(`[投诉回调] 投诉ID:${complaintId}, 订单:${outTradeNo}, 状态:${complaintState}`)
 
+    // 投诉计数（仅新投诉事件，按 complaintId 去重；不影响主流程）
+    if (event_type === 'COMPLAINT.CREATE' && complaintId && merchantConfig && merchantConfig._id) {
+      try {
+        await cloud.callFunction({
+          name: 'merchant',
+          data: { action: 'recordComplaint', merchantId: merchantConfig._id, appid: merchantConfig.appid, complaintId }
+        })
+      } catch (e) { console.error('[投诉回调] recordComplaint 失败(不影响主流程):', e) }
+    }
+
     // 如果已经处理过，跳过
     if (complaintState === 'COMPLETE' || complaintState === 'REVOKED') {
       console.log('[投诉回调] 投诉已结束，跳过')

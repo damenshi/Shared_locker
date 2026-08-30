@@ -13,9 +13,7 @@ Page({
   },
 
   goHome() {
-    wx.navigateTo({
-      url: '/pages/home/home'
-    })
+    // 当前已在首页，无需跳转（避免重复压栈）
   },
 
   goMine() {

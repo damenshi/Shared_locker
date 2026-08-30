@@ -28,8 +28,9 @@ Page({
     // 免费模式状态
     isFreeMode: false,
 
-    // 商户列表
-    merchantList: [],
+    // 商户号概览（可用数/总数）
+    merchantAvailable: 0,
+    merchantTotal: 0,
 
     // 免费设备和离线设备列表
     freeDevices: [],
@@ -171,8 +172,8 @@ Page({
 
       // 获取当前免费模式状态
       this.fetchFreeModeStatus();
-      // 获取商户配置列表
-      this.fetchMerchantConfigs();
+      // 获取商户号概览（可用数/总数）
+      this.fetchMerchantSummary();
       // 获取免费设备和离线设备列表
       this.fetchSummaryLists();
     } catch (err) {
@@ -304,21 +305,6 @@ Page({
     });
   },
 
-  // 获取商户配置列表
-  async fetchMerchantConfigs() {
-    try {
-      const result = await wx.cloud.callFunction({
-        name: 'admin',
-        data: { action: 'getMerchantConfigs' }
-      });
-      if (result.result.success && result.result.data) {
-        this.setData({ merchantList: result.result.data });
-      }
-    } catch (err) {
-      console.error('获取商户配置失败:', err);
-    }
-  },
-
   // 获取免费设备和离线设备列表
   async fetchSummaryLists() {
     try {
@@ -341,53 +327,28 @@ Page({
     }
   },
 
-  // 切换商户
-  async switchMerchant(e) {
-    const merchantId = e.currentTarget.dataset.id;
-    const currentMerchant = this.data.merchantList.find(m => m._id === merchantId);
+  // 跳转商户号管理页面
+  goMerchantAdmin() {
+    wx.navigateTo({ url: '/pages/admin/merchantAdmin' });
+  },
 
-    // 如果点击的是当前激活的商户，不处理
-    if (currentMerchant && currentMerchant.isActive) {
-      return;
-    }
-
-    const merchantName = currentMerchant ? currentMerchant.name : '该商户';
-    wx.showModal({
-      title: '确认切换商户',
-      content: `确定要切换到「${merchantName}」吗？新订单将使用该商户支付。`,
-      success: async (res) => {
-        if (res.confirm) {
-          this.showLoading('切换中...');
-          try {
-            const result = await wx.cloud.callFunction({
-              name: 'admin',
-              data: {
-                action: 'switchMerchant',
-                merchantId: merchantId
-              }
-            });
-            this.hideLoading();
-            if (result.result.success) {
-              wx.showToast({
-                title: result.result.message || '切换成功',
-                icon: 'success'
-              });
-              // 刷新商户列表
-              this.fetchMerchantConfigs();
-            } else {
-              wx.showToast({
-                title: result.result.errMsg || '切换失败',
-                icon: 'none'
-              });
-            }
-          } catch (err) {
-            this.hideLoading();
-            console.error('切换商户失败:', err);
-            wx.showToast({ title: '切换失败', icon: 'none' });
-          }
-        }
+  // 获取商户号概览（可用数/总数，用于入口卡片显示）
+  async fetchMerchantSummary() {
+    try {
+      const result = await wx.cloud.callFunction({
+        name: 'admin',
+        data: { action: 'getMerchantConfigs' }
+      });
+      if (result.result && result.result.success && result.result.data) {
+        const list = result.result.data;
+        this.setData({
+          merchantTotal: list.length,
+          merchantAvailable: list.filter(m => (m.status || 'normal') !== 'restricted').length
+        });
       }
-    });
+    } catch (err) {
+      console.error('获取商户概览失败:', err);
+    }
   }
 
 })

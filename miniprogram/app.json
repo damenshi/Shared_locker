@@ -19,7 +19,8 @@
     "pages/mine/complaintDetail",
     "pages/admin/complaints",
     "pages/admin/complaintDetail",
-    "pages/admin/refundStats"
+    "pages/admin/refundStats",
+    "pages/admin/merchantAdmin"
   ],
   "window": {
     "navigationBarTitleText": "储物柜",

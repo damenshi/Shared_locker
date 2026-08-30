@@ -76,7 +76,15 @@ Page({
   },
 
   // 页面跳转方法
-  goHome() { wx.switchTab({ url: '/pages/home/home' }); },
+  goHome() {
+    // 本项目无原生 tabBar，mine 由首页 navigateTo 进入，用 navigateBack 返回
+    const pages = getCurrentPages();
+    if (pages.length > 1) {
+      wx.navigateBack();
+    } else {
+      wx.reLaunch({ url: '/pages/home/home' });
+    }
+  },
 
   goMyOrders() { wx.navigateTo({ url: '/pages/mine/myorder' }); },
 

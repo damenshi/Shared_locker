@@ -375,6 +375,7 @@ exports.main = async (event, context) => {
       return { success: false, errMsg: validation.msg }
     }
 
+    let activeMerchant;
     try {
       // 先查询订单，获取设备的 appid
       let deviceAppid = '';
@@ -384,7 +385,6 @@ exports.main = async (event, context) => {
       }
 
       // 根据设备 appid 获取对应的商户配置
-      let activeMerchant;
       try {
         activeMerchant = await getMerchantConfigByAppid(deviceAppid);
       } catch (e) {
@@ -415,9 +415,15 @@ exports.main = async (event, context) => {
 
       const resp = await client.transactions_jsapi(orderParams);
       console.log('JSAPI下单返回:', resp);
+      // 先校验返回再解析：下单失败时库可能返回错误对象而非抛异常，避免丢失真实错误码
+      if (!resp || !resp.data || !resp.data.package) {
+        const wxCode = (resp && resp.data && resp.data.code) || 'UNKNOWN';
+        const wxMsg = (resp && resp.data && resp.data.message) || 'prepay_id 缺失';
+        throw new Error(`下单失败[${wxCode}]: ${wxMsg}`);
+      }
       const prepayId = resp.data.package.split('=')[1]; // 从 package 字符串里解析
       if (!prepayId) {
-        throw new Error('下单失败: prepay_id 缺失');
+        throw new Error('下单失败[UNKNOWN]: prepay_id 缺失');
       }
 
       // 直接生成支付签名参数，使用对应商户的私钥
@@ -443,6 +449,21 @@ exports.main = async (event, context) => {
       return { success: true, data: payParams };
     } catch (err) {
       console.error('createPrepay 下单失败', err)
+      // 商户侧失败计数（连续3次自动标记限制并切换）；用户/参数问题白名单不计
+      try {
+        let wxCode = (err.response && err.response.data && err.response.data.code) || '';
+        if (!wxCode) {
+          const m = /\[([A-Z_]+)\]/.exec(err.message || '');
+          wxCode = m ? m[1] : '';
+        }
+        const USER_FAULT_CODES = ['NOT_ENOUGH', 'PARAM_ERROR', 'INVALID_REQUEST', 'ORDERPAID', 'ORDERCLOSED'];
+        if (activeMerchant && activeMerchant._id && !USER_FAULT_CODES.includes(wxCode)) {
+          await cloud.callFunction({
+            name: 'merchant',
+            data: { action: 'recordPayFail', merchantId: activeMerchant._id, appid: activeMerchant.appid, errCode: wxCode }
+          });
+        }
+      } catch (e) { console.error('recordPayFail 调用失败(不影响主流程):', e); }
       return { success: false, errMsg: err.message }
     }
   }

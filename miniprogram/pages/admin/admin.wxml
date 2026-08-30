@@ -56,6 +56,27 @@
     </view>
   </view>
 
+  <!-- 分组标题：商户管理 -->
+  <view class="section-header">
+    <view class="section-line"></view>
+    <text class="section-title">商户管理</text>
+    <view class="section-line"></view>
+  </view>
+
+  <!-- 商户管理（入口卡片，点击进入管理页面） -->
+  <view class="card card-merchant" bindtap="goMerchantAdmin">
+    <view class="card-header-row">
+      <view class="card-icon icon-merchant">
+        <text class="icon-text">🏦</text>
+      </view>
+      <view class="card-info">
+        <view class="card-title">商户管理</view>
+        <view class="card-desc">可用商户 {{merchantAvailable}}/{{merchantTotal}} 个</view>
+      </view>
+      <view class="card-arrow">›</view>
+    </view>
+  </view>
+
   <!-- 分组标题：订单管理 -->
   <view class="section-header">
     <view class="section-line"></view>
@@ -213,38 +234,6 @@
     <view class="section-line"></view>
     <text class="section-title">系统设置</text>
     <view class="section-line"></view>
-  </view>
-
-  <!-- 商户管理 -->
-  <view class="card card-merchant">
-    <view class="card-header-row">
-      <view class="card-icon icon-merchant">
-        <text class="icon-text">🏦</text>
-      </view>
-      <view class="card-info">
-        <view class="card-title">商户管理</view>
-        <view class="card-desc">切换支付商户号</view>
-      </view>
-    </view>
-
-    <view class="merchant-list">
-      <view
-        wx:for="{{merchantList}}"
-        wx:key="_id"
-        class="merchant-item {{item.isActive ? 'active' : ''}}"
-        bindtap="switchMerchant"
-        data-id="{{item._id}}"
-      >
-        <view class="merchant-info">
-          <view class="merchant-name">{{item.name}}</view>
-          <view class="merchant-mchid">商户号: {{item.mchid}}</view>
-        </view>
-        <view class="merchant-status">
-          <text wx:if="{{item.isActive}}" class="status-active">使用中</text>
-          <text wx:else class="status-inactive">点击切换</text>
-        </view>
-      </view>
-    </view>
   </view>
 
   <!-- 全局免费设置 -->
