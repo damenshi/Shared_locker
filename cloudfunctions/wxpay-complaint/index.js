@@ -363,11 +363,15 @@ async function initNotifyUrl(event) {
 
   console.log('[initNotifyUrl] 当前 APPID:', currentAppid)
 
-  // 只查询当前 appid 的商户
+  // 只查询当前 appid 的商户（传入 mchid 时只处理该商户，避免影响同 appid 其他商户）
   let merchants = []
   try {
+    const query = { appid: currentAppid }
+    if (event.mchid) {
+      query.mchid = String(event.mchid)
+    }
     const res = await db.collection('merchant_configs')
-      .where({ appid: currentAppid })
+      .where(query)
       .get()
     merchants = res.data || []
   } catch (e) {
@@ -425,10 +429,114 @@ async function initNotifyUrl(event) {
 }
 
 // ==========================================
+// 商户凭证验证（添加商户时录入校验，不入库）
+// ==========================================
+async function verifyCredentials(event) {
+  const { mchid, merchantSerialNo, privateKey, apiv3Key } = event
+
+  if (!mchid || !merchantSerialNo || !privateKey || !apiv3Key) {
+    return { success: false, errMsg: '缺少必填参数（mchid/证书序列号/私钥/APIv3密钥）' }
+  }
+
+  // 1. 本地格式校验：私钥必须可解析为合法密钥
+  try {
+    crypto.createPrivateKey(privateKey)
+  } catch (e) {
+    return { success: false, errMsg: '商户私钥格式无效，请确认粘贴的是 apiclient_key.pem 的完整内容' }
+  }
+
+  const merchant = { mchid: String(mchid), merchantSerialNo, privateKey }
+
+  const formatHttpError = (err) => {
+    if (err.response) {
+      const status = err.response.status
+      const detail = err.response.data && err.response.data.message
+      if (status === 401) {
+        return `签名验证未通过(401)：请核对证书序列号与商户私钥是否匹配、商户号是否正确${detail ? '；' + detail : ''}`
+      }
+      return `微信返回错误(${status})${detail ? '：' + detail : ''}`
+    }
+    return `网络异常：${err.message}`
+  }
+
+  // 2. 探针1：GET /v3/certificates 验证签名，并取平台证书用于验证 apiv3Key
+  //    （部分公钥模式商户该接口不可用，失败时用探针2复核，避免误拦）
+  let certData = null
+  let certErr = null
+  try {
+    certData = await v3Request('GET', '/v3/certificates', null, merchant)
+  } catch (err) {
+    certErr = err
+  }
+
+  if (!certData) {
+    // 3. 探针2：投诉回调查询接口（401=签名错误；404等=签名正确但未配置；200=签名正确）
+    try {
+      await v3Request('GET', '/v3/merchant-service/complaint-notifications', null, merchant)
+    } catch (err) {
+      if (err.response && err.response.status === 401) {
+        return { success: false, errMsg: formatHttpError(err), verified: { sign: false } }
+      }
+      if (!err.response) {
+        // 网络异常无法验证，拒绝入库以免误判
+        return { success: false, errMsg: '网络异常，暂时无法验证凭证：' + err.message, verified: { sign: false } }
+      }
+      // 404等资源类错误：签名已通过
+      return {
+        success: true,
+        message: '签名验证通过（APIv3密钥未能在线核验）',
+        verified: { sign: true, apiv3Key: false },
+        warning: 'APIv3密钥未能在线核验，请务必确认复制了完整的32位密钥'
+      }
+    }
+    return {
+      success: true,
+      message: '签名验证通过（APIv3密钥未能在线核验）',
+      verified: { sign: true, apiv3Key: false },
+      warning: 'APIv3密钥未能在线核验，请务必确认复制了完整的32位密钥'
+    }
+  }
+
+  // 4. 验证 APIv3 密钥：用它解密平台证书（解密失败即密钥错误）
+  try {
+    const certs = (certData && certData.data) || []
+    if (!certs.length || !certs[0].encrypt_certificate) {
+      return {
+        success: true,
+        message: '签名验证通过（微信未返回平台证书）',
+        verified: { sign: true, apiv3Key: false },
+        warning: 'APIv3密钥未能在线核验，请务必确认复制了完整的32位密钥'
+      }
+    }
+    const { associated_data, nonce, ciphertext } = certs[0].encrypt_certificate
+    const cipherBuffer = Buffer.from(ciphertext, 'base64')
+    const authTag = cipherBuffer.slice(cipherBuffer.length - 16)
+    const dataBuffer = cipherBuffer.slice(0, cipherBuffer.length - 16)
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      Buffer.from(apiv3Key, 'utf8'),
+      Buffer.from(nonce, 'utf8')
+    )
+    decipher.setAuthTag(authTag)
+    decipher.setAAD(Buffer.from(associated_data || '', 'utf8'))
+    Buffer.concat([decipher.update(dataBuffer), decipher.final()])
+  } catch (e) {
+    return { success: false, errMsg: 'APIv3 密钥验证失败：与商户号不匹配或格式错误（应为32位）', verified: { sign: true, apiv3Key: false } }
+  }
+
+  return { success: true, message: '凭证验证通过', verified: { sign: true, apiv3Key: true } }
+}
+
+// ==========================================
 // 云函数入口
 // ==========================================
 exports.main = async (event, context) => {
-  console.log('[wxpay-complaint] 收到请求:', JSON.stringify(event).substring(0, 300))
+  // 含敏感信息（私钥/APIv3密钥）的请求不打印 event，防止泄漏到日志
+  if (event && event.action === 'verifyCredentials') {
+    console.log('[wxpay-complaint] 收到请求: verifyCredentials（内容不记录）')
+  } else {
+    console.log('[wxpay-complaint] 收到请求:', JSON.stringify(event).substring(0, 300))
+  }
 
   // HTTP 触发器（投诉回调）
   if (event.httpMethod || (event.headers && event.body !== undefined)) {
@@ -440,6 +548,10 @@ exports.main = async (event, context) => {
 
   if (action === 'initNotifyUrl') {
     return initNotifyUrl(event)
+  }
+
+  if (action === 'verifyCredentials') {
+    return verifyCredentials(event)
   }
 
   return { success: false, errMsg: '未知操作' }

@@ -17,6 +17,9 @@
     <button class="limit-save-btn" bindtap="saveLimits">保存</button>
   </view>
 
+  <!-- 添加商户 -->
+  <view class="add-merchant-btn" bindtap="openAddModal">+ 添加商户</view>
+
   <view wx:if="{{loading}}" class="loading-tip">加载中...</view>
 
   <view wx:elif="{{merchantList.length === 0}}" class="empty-tip">暂无商户配置</view>
@@ -101,8 +104,98 @@
           bindtap="toggleStatus"
         >{{item.isRestricted ? '恢复正常' : '标记限制'}}</button>
       </view>
+
+      <!-- 删除（使用中的商户不显示入口，后端亦有校验） -->
+      <view wx:if="{{!item.isActive}}" class="delete-row">
+        <text class="delete-btn" data-id="{{item._id}}" data-name="{{item.name}}" data-mchid="{{item.mchid}}" bindtap="deleteMerchant">删除商户</text>
+      </view>
     </view>
   </view>
 
   <view class="safe-bottom"></view>
+</view>
+
+<!-- 添加商户弹窗 -->
+<view class="modal-mask" wx:if="{{showAddModal}}" bindtap="closeAddModal">
+  <view class="modal add-modal" catchtap="true">
+    <view class="modal-title">添加商户</view>
+    <scroll-view scroll-y class="add-form-scroll">
+      <!-- JSON 快速填入 -->
+      <view class="json-paste-toggle" bindtap="toggleJsonPaste">{{showJsonPaste ? '收起 JSON 快速填入' : '有配置 JSON？点此粘贴快速填入'}}</view>
+      <view wx:if="{{showJsonPaste}}" class="json-paste-block">
+        <textarea class="cert-textarea" maxlength="-1" value="{{jsonInput}}" bindinput="onJsonInput" placeholder='粘贴配置内容，如：{"name":"渡汕3","mchid":"1117082762","merchantSerialNo":"...","apiv3Key":"..."}（支持多余尾逗号）' />
+        <button class="cert-btn json-parse-btn" catchtap="parseJsonInput">解析填入</button>
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">商户名称 <text class="req">*</text></view>
+        <input class="form-input" placeholder="如：度杜山1" value="{{addForm.name}}" data-field="name" bindinput="onAddFormInput" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">商户号 mchid <text class="req">*</text></view>
+        <input class="form-input" type="number" placeholder="微信支付商户号，如 1750011210" value="{{addForm.mchid}}" data-field="mchid" bindinput="onAddFormInput" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">证书序列号 <text class="req">*</text></view>
+        <input class="form-input" placeholder="商户平台 API安全 里的证书序列号" value="{{addForm.merchantSerialNo}}" data-field="merchantSerialNo" bindinput="onAddFormInput" />
+        <view class="form-tip">提供商户证书（非公钥）时可留空，提交时自动从证书解析</view>
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">APIv3 密钥 <text class="req">*</text></view>
+        <input class="form-input" password placeholder="32位 APIv3 密钥" value="{{addForm.apiv3Key}}" data-field="apiv3Key" bindinput="onAddFormInput" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">关联小程序 appid <text class="req">*</text></view>
+        <input class="form-input" placeholder="该商户收款对应的小程序 appid" value="{{addForm.appid}}" data-field="appid" bindinput="onAddFormInput" />
+        <view class="form-tip">为哪个小程序绑定，就到哪个小程序里添加并切换使用</view>
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">小程序名称</view>
+        <input class="form-input" placeholder="选填：该 appid 未注册过时才需要填" value="{{addForm.miniName}}" data-field="miniName" bindinput="onAddFormInput" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">退款回调地址 <text class="req">*</text></view>
+        <input class="form-input" placeholder="https://xxx.tcloudbase.com/paynotify" value="{{addForm.notifyUrl}}" data-field="notifyUrl" bindinput="onAddFormInput" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">投诉回调地址 <text class="req">*</text></view>
+        <input class="form-input" placeholder="https://xxx.tcloudbase.com/wxpay-complaint" value="{{addForm.complaintNotifyUrl}}" data-field="complaintNotifyUrl" bindinput="onAddFormInput" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">商户私钥 apiclient_key.pem <text class="req">*</text></view>
+        <view class="cert-row">
+          <button class="cert-btn" catchtap="chooseCertFile" data-field="privateKey">选择文件</button>
+          <button class="cert-btn {{pasteMode.privateKey ? 'cert-btn-active' : ''}}" catchtap="togglePaste" data-field="privateKey">粘贴内容</button>
+          <text wx:if="{{certInfo.privateKey}}" class="cert-badge {{certInfo.privateKey.ok ? 'cert-ok' : 'cert-err'}}">{{certInfo.privateKey.label}}</text>
+        </view>
+        <textarea wx:if="{{pasteMode.privateKey}}" class="cert-textarea" maxlength="-1" value="{{addForm.privateKey}}" data-field="privateKey" bindinput="onAddFormInput" placeholder="粘贴 apiclient_key.pem 完整内容（-----BEGIN PRIVATE KEY----- 开头）" />
+        <view wx:if="{{certInfo.privateKey && certInfo.privateKey.fileName}}" class="form-tip">已读取：{{certInfo.privateKey.fileName}}</view>
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">微信支付公钥 / 商户证书 <text class="req">*</text></view>
+        <view class="cert-row">
+          <button class="cert-btn" catchtap="chooseCertFile" data-field="publicCert">选择文件</button>
+          <button class="cert-btn {{pasteMode.publicCert ? 'cert-btn-active' : ''}}" catchtap="togglePaste" data-field="publicCert">粘贴内容</button>
+          <text wx:if="{{certInfo.publicCert}}" class="cert-badge {{certInfo.publicCert.ok ? 'cert-ok' : 'cert-err'}}">{{certInfo.publicCert.label}}</text>
+        </view>
+        <textarea wx:if="{{pasteMode.publicCert}}" class="cert-textarea" maxlength="-1" value="{{addForm.publicCert}}" data-field="publicCert" bindinput="onAddFormInput" placeholder="粘贴 pub_key.pem（微信支付公钥）或 apiclient_cert.pem（商户证书）完整内容，二选一" />
+        <view wx:if="{{certInfo.publicCert && certInfo.publicCert.fileName}}" class="form-tip">已读取：{{certInfo.publicCert.fileName}}</view>
+      </view>
+
+      <view class="form-tip cert-select-tip">手机选文件：先把 pem 文件发送到微信聊天（推荐发给"文件传输助手"），再点"选择文件"从该聊天中选取；电脑端可直接粘贴内容。</view>
+    </scroll-view>
+    <view class="modal-buttons">
+      <button class="cancel-btn" catchtap="closeAddModal">取消</button>
+      <button class="confirm-btn" catchtap="submitAddMerchant" disabled="{{addSubmitting}}">{{addSubmitting ? '提交中...' : '提交验证'}}</button>
+    </view>
+  </view>
 </view>

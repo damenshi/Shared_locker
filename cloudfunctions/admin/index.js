@@ -4,6 +4,7 @@ const db = cloud.database()
 const _ = db.command
 const fs = require('fs');
 const axios = require('axios');
+const crypto = require('crypto');
 const { getLockerServerUrl, getCurrentMiniProgram, clearCache } = require('./utils/config');
 
 
@@ -188,10 +189,15 @@ const migrateRefundConfig = async () => {
 }
 
 // ==========================================
-// 内部函数：添加商户配置
+// 内部函数：添加商户配置（商户管理页面一键绑定）
+// 流程：参数校验 → 查重 → 凭证实测(不入库) → mini_programs 处理 → 入库 → 自动配置投诉回调
 // ==========================================
 async function addMerchant(event) {
-  const { name, mchid, merchantSerialNo, apiv3Key, appid, certSuffix, order = 99 } = event;
+  const {
+    name, mchid, merchantSerialNo, apiv3Key, appid, certSuffix, order = 99,
+    notify_url, miniName, complaintNotifyUrl,
+    privateKey: privateKeyText, publicCert: publicCertText
+  } = event;
 
   if (!name || !mchid) {
     return { success: false, errMsg: '请提供商户名称和mchid' };
@@ -201,70 +207,159 @@ async function addMerchant(event) {
   const merchantId = certSuffix || `merchant_${mchid}`;
 
   try {
-    // 检查是否已存在（用where查询，不用doc）
+    // ---------- 1. 参数校验 ----------
+    const mchidStr = String(mchid).trim();
+    if (!/^\d{6,32}$/.test(mchidStr)) {
+      return { success: false, errMsg: '商户号格式无效（应为6~32位数字）' };
+    }
+    if (!apiv3Key || String(apiv3Key).length !== 32) {
+      return { success: false, errMsg: 'APIv3密钥格式无效（应为32位）' };
+    }
+    if (!appid) {
+      return { success: false, errMsg: '请填写商户关联的小程序appid' };
+    }
+    const notifyUrl = (notify_url || '').trim();
+    if (!notifyUrl || !notifyUrl.startsWith('https://')) {
+      return { success: false, errMsg: '退款回调地址必填且必须以 https:// 开头' };
+    }
+
+    let privateKey = (privateKeyText || '').trim();
+    let publicCert = (publicCertText || '').trim();
+
+    // 证书文本完全未提供时，回退到本地文件读取（兼容旧的文件+部署流程）
+    // 注意：只在两者都缺失时兜底，避免部分缺失时把其他商户的证书混装进来
+    if (!privateKey && !publicCert) {
+      try {
+        const certFiles = [];
+        if (certSuffix) {
+          certFiles.push(
+            { key: `./private/apiclient_key_${certSuffix}.pem`, cert: `./private/apiclient_cert_${certSuffix}.pem` },
+            { key: `./private/pub_key_${certSuffix}.pem`, cert: `./private/apiclient_cert_${certSuffix}.pem` }
+          );
+        }
+        certFiles.push(
+          { key: `./private/apiclient_key_${merchantId.replace('merchant_', '')}.pem`, cert: `./private/apiclient_cert_${merchantId.replace('merchant_', '')}.pem` },
+          { key: `./private/apiclient_key.pem`, cert: `./private/apiclient_cert.pem` },
+          { key: `./private/apiclient_key_yh.pem`, cert: `./private/apiclient_cert_yh.pem` },
+          { key: `./private/apiclient_key_xyh.pem`, cert: `./private/apiclient_cert_xyh.pem` },
+          { key: `./private/apiclient_key_sxkj.pem`, cert: `./private/apiclient_cert_sxkj.pem` }
+        );
+        for (const files of certFiles) {
+          try {
+            if (!privateKey && fs.existsSync(files.key)) {
+              privateKey = fs.readFileSync(files.key, 'utf8');
+              console.log(`[添加商户] 从文件读取私钥: ${files.key}`);
+            }
+            if (!publicCert && fs.existsSync(files.cert)) {
+              publicCert = fs.readFileSync(files.cert, 'utf8');
+              console.log(`[添加商户] 从文件读取证书: ${files.cert}`);
+            }
+            if (privateKey && publicCert) break;
+          } catch (e) {
+            continue;
+          }
+        }
+      } catch (e) {
+        console.log('[添加商户] 读取证书文件失败:', e.message);
+      }
+    }
+
+    if (!privateKey || !privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+      return { success: false, errMsg: '缺少商户私钥：请提供 apiclient_key.pem 内容（选择文件或粘贴）' };
+    }
+    try {
+      crypto.createPrivateKey(privateKey);
+    } catch (e) {
+      return { success: false, errMsg: '商户私钥格式无效，无法解析，请检查是否完整复制' };
+    }
+
+    const isCert = publicCert.includes('-----BEGIN CERTIFICATE-----');
+    const isPubKey = publicCert.includes('-----BEGIN PUBLIC KEY-----');
+    if (!publicCert || (!isCert && !isPubKey)) {
+      return { success: false, errMsg: '缺少证书/公钥：请提供 apiclient_cert.pem（商户证书）或 pub_key.pem（微信支付公钥）内容' };
+    }
+
+    let serialNo = (merchantSerialNo || '').trim();
+    // 序列号未填且提供的是商户证书时，尝试自动解析（Node>=15.6，低版本环境跳过）
+    if (!serialNo && isCert && typeof crypto.X509Certificate === 'function') {
+      try {
+        serialNo = new crypto.X509Certificate(publicCert).serialNumber;
+        console.log('[添加商户] 从证书自动解析序列号:', serialNo);
+      } catch (e) {
+        // 解析失败则要求手填
+      }
+    }
+    if (!serialNo || !/^[0-9A-Fa-f]{10,40}$/.test(serialNo)) {
+      return { success: false, errMsg: isPubKey && !serialNo
+        ? '公钥模式无法自动解析序列号，请手动填写证书序列号'
+        : '证书序列号格式无效（10~40位十六进制）' };
+    }
+
+    // ---------- 2. 查重 ----------
     const existing = await db.collection('merchant_configs').where({ _id: merchantId }).get();
     if (existing.data && existing.data.length > 0) {
       return { success: false, errMsg: `商户ID ${merchantId} 已存在` };
     }
-
-    // 读取证书文件（优先用 certSuffix 指定，否则尝试多种命名格式）
-    let privateKey = '';
-    let publicCert = '';
-
-    try {
-      const certFiles = [];
-
-      // 优先使用指定的 certSuffix
-      if (certSuffix) {
-        certFiles.push(
-          { key: `./private/apiclient_key_${certSuffix}.pem`, cert: `./private/apiclient_cert_${certSuffix}.pem` },
-          { key: `./private/pub_key_${certSuffix}.pem`, cert: `./private/apiclient_cert_${certSuffix}.pem` }
-        );
-      }
-
-      // 添加默认的证书文件名格式
-      certFiles.push(
-        { key: `./private/apiclient_key_${merchantId.replace('merchant_', '')}.pem`, cert: `./private/apiclient_cert_${merchantId.replace('merchant_', '')}.pem` },
-        { key: `./private/apiclient_key.pem`, cert: `./private/apiclient_cert.pem` },
-        { key: `./private/apiclient_key_yh.pem`, cert: `./private/apiclient_cert_yh.pem` },
-        { key: `./private/apiclient_key_xyh.pem`, cert: `./private/apiclient_cert_xyh.pem` },
-        { key: `./private/apiclient_key_sxkj.pem`, cert: `./private/apiclient_cert_sxkj.pem` }
-      );
-
-      for (const files of certFiles) {
-        try {
-          if (fs.existsSync(files.key)) {
-            privateKey = fs.readFileSync(files.key, 'utf8');
-            console.log(`[添加商户] 找到私钥: ${files.key}`);
-          }
-          if (fs.existsSync(files.cert)) {
-            publicCert = fs.readFileSync(files.cert, 'utf8');
-            console.log(`[添加商户] 找到证书: ${files.cert}`);
-          }
-          if (privateKey && publicCert) break;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!privateKey || !publicCert) {
-        console.log('[添加商户] 未找到证书文件，请在部署后手动上传');
-      }
-    } catch (e) {
-      console.log('[添加商户] 读取证书失败:', e.message);
+    const dupMchid = await db.collection('merchant_configs').where({ mchid: mchidStr }).get();
+    if (dupMchid.data && dupMchid.data.length > 0) {
+      return { success: false, errMsg: `商户号 ${mchidStr} 已绑定过（若刚提交成功，请在列表中查看并点击"切换使用"）` };
     }
 
-    // 插入新商户配置
+    // ---------- 3. 入库前凭证实测（不通过则不写库） ----------
+    let verifyRes;
+    try {
+      const r = await cloud.callFunction({
+        name: 'wxpay-complaint',
+        data: {
+          action: 'verifyCredentials',
+          mchid: mchidStr,
+          merchantSerialNo: serialNo,
+          privateKey,
+          apiv3Key: String(apiv3Key)
+        }
+      });
+      verifyRes = r.result;
+    } catch (e) {
+      verifyRes = { success: false, errMsg: '凭证验证服务调用失败：' + e.message };
+    }
+    if (!verifyRes || !verifyRes.success) {
+      return { success: false, errMsg: (verifyRes && verifyRes.errMsg) || '凭证验证失败', step: 'verify' };
+    }
+    const verifyWarning = verifyRes.warning || '';
+
+    // ---------- 4. mini_programs 处理 ----------
+    let miniProgramCreated = false;
+    try {
+      const miniRes = await db.collection('mini_programs').where({ appid }).get();
+      if (miniRes.data && miniRes.data.length > 0) {
+        if (miniName && miniRes.data[0].miniName !== miniName) {
+          await db.collection('mini_programs').where({ appid }).update({
+            data: { miniName, updatedAt: db.serverDate() }
+          });
+        }
+      } else if (miniName) {
+        await db.collection('mini_programs').add({
+          data: { appid, miniName, isActive: true, createdAt: db.serverDate() }
+        });
+        miniProgramCreated = true;
+      }
+      clearCache();
+    } catch (e) {
+      console.error('[添加商户] mini_programs 处理失败:', e);
+    }
+
+    // ---------- 5. 插入商户配置 ----------
     const result = await db.collection('merchant_configs').add({
       data: {
         _id: merchantId,
         name: name,
-        mchid: mchid,
-        merchantSerialNo: merchantSerialNo || '',
+        mchid: mchidStr,
+        merchantSerialNo: serialNo,
         apiv3Key: apiv3Key || '',
-        appid: appid || '',  // 新增：商户关联的appid
+        appid: appid || '',
         privateKey: privateKey,
         publicCert: publicCert,
+        notify_url: notifyUrl,
         isActive: false,
         order: order,
         // 健康度管理默认字段
@@ -282,11 +377,33 @@ async function addMerchant(event) {
       }
     });
 
+    // ---------- 6. 自动配置投诉回调（失败不影响入库，可重试） ----------
+    let notifyInit = null;
+    if (complaintNotifyUrl) {
+      try {
+        const r = await cloud.callFunction({
+          name: 'wxpay-complaint',
+          data: {
+            action: 'initNotifyUrl',
+            appid: appid,
+            mchid: mchidStr,
+            notifyUrl: complaintNotifyUrl
+          }
+        });
+        notifyInit = r.result;
+      } catch (e) {
+        notifyInit = { success: false, errMsg: e.message };
+      }
+    }
+
     return {
       success: true,
       message: `商户 ${name} 添加成功`,
       merchantId: result._id,
-      hasCert: !!(privateKey && publicCert)
+      hasCert: true,
+      miniProgramCreated,
+      verifyWarning,
+      notifyInit
     };
   } catch (e) {
     console.error('添加商户失败:', e);
@@ -516,11 +633,6 @@ exports.main = async (event, context) => {
     return await initSecondMerchant();
   }
 
-  // 添加商户配置
-  if (action === 'addMerchant') {
-    return await addMerchant(event);
-  }
-
   // 更新商户证书
   if (action === 'updateMerchantCert') {
     return await updateMerchantCert(event);
@@ -711,6 +823,80 @@ exports.main = async (event, context) => {
     return { success: false, errMsg: '没有管理员权限' }
   }
 
+  // 添加商户配置（商户管理页面一键绑定，需超级管理员）
+  if (action === 'addMerchant') {
+    return await addMerchant(event);
+  }
+
+  // 重新配置投诉回调（添加商户后 notifyInit 失败时重试，也可独立排障）
+  if (action === 'initComplaintNotify') {
+    const { appid, mchid, notifyUrl } = event;
+    if (!appid || !notifyUrl) {
+      return { success: false, errMsg: '缺少 appid 或 notifyUrl' };
+    }
+    try {
+      const r = await cloud.callFunction({
+        name: 'wxpay-complaint',
+        data: { action: 'initNotifyUrl', appid, mchid, notifyUrl }
+      });
+      return r.result || { success: false, errMsg: '调用投诉回调配置失败' };
+    } catch (e) {
+      console.error('配置投诉回调失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
+  // 删除商户配置（需超级管理员；使用中或存在未完成关联订单的商户不可删除）
+  if (action === 'deleteMerchant') {
+    const { merchantId } = event;
+    if (!merchantId) {
+      return { success: false, errMsg: '缺少商户ID' };
+    }
+    try {
+      let merchant;
+      try {
+        const merchantRes = await db.collection('merchant_configs').doc(merchantId).get();
+        merchant = merchantRes.data;
+      } catch (e) {
+        return { success: false, errMsg: '商户不存在或已被删除' };
+      }
+      if (!merchant || !merchant.mchid) {
+        return { success: false, errMsg: '商户不存在或已被删除' };
+      }
+
+      // 规则一：使用中的商户不能删除（收退款依赖当前激活商户，先切换走）
+      if (merchant.isActive) {
+        return { success: false, errMsg: '该商户正在使用中，请先切换到其他商户后再删除' };
+      }
+
+      // 规则二：存在未完成关联订单的商户不能删除
+      // （退款/提现按 order.merchantId 定位商户配置，删除后这些订单将无法退款；老订单可能只存 mchid）
+      const related = _.or([{ merchantId: merchantId }, { mchid: merchant.mchid }]);
+      const BLOCK_STATUSES = ['待支付', '进行中', '待提现', '已强制结束'];
+      const pendingRes = await db.collection('orders')
+        .where(_.and([related, { status: _.in(BLOCK_STATUSES) }]))
+        .count();
+      if (pendingRes.total > 0) {
+        return { success: false, errMsg: `有 ${pendingRes.total} 笔未完成订单关联该商户（删除后无法退款），不能删除` };
+      }
+
+      const totalRes = await db.collection('orders').where(related).count();
+      const historicalCount = totalRes.total || 0;
+
+      await db.collection('merchant_configs').doc(merchantId).remove();
+      clearCache();
+
+      return {
+        success: true,
+        message: `商户 ${merchant.name} 已删除`,
+        historicalCount
+      };
+    } catch (e) {
+      console.error('删除商户失败:', e);
+      return { success: false, errMsg: e.message };
+    }
+  }
+
   // 切换设备归属（调用 locker_server）
   if (action === 'switchDeviceAppid') {
     const { deviceId, targetAppid } = event;
@@ -828,7 +1014,23 @@ exports.main = async (event, context) => {
         console.warn('[getMerchantConfigs] 读取全局限额失败，按不限处理:', e.message);
       }
 
-      return { success: true, data: merchants.data, limits };
+      // 默认回调地址（用于添加商户表单预填）：优先取当前 appid 商户，其次取任意商户（同环境域名共用）
+      let defaultNotifyUrl = '';
+      const fromList = merchants.data.find(m => m.notify_url);
+      if (fromList) {
+        defaultNotifyUrl = fromList.notify_url;
+      } else {
+        try {
+          const anyRes = await db.collection('merchant_configs').limit(1).get();
+          if (anyRes.data && anyRes.data[0] && anyRes.data[0].notify_url) {
+            defaultNotifyUrl = anyRes.data[0].notify_url;
+          }
+        } catch (e) {
+          console.warn('[getMerchantConfigs] 读取默认回调地址失败:', e.message);
+        }
+      }
+
+      return { success: true, data: merchants.data, limits, defaultNotifyUrl };
     } catch (e) {
       console.error('获取商户配置失败:', e);
       return { success: false, errMsg: e.message };
